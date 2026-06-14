@@ -17,6 +17,7 @@ import '../../features/bookings/presentation/pages/digital_passport_page.dart';
 import '../../features/more/presentation/pages/story_creator_page.dart';
 import '../../features/more/presentation/pages/settings_page.dart';
 import '../../features/more/presentation/pages/help_support_page.dart';
+import '../../features/destinations/presentation/pages/destination_details_page.dart';
 
 import '../../features/navigation/presentation/nav_hub_page.dart';
 
@@ -34,6 +35,13 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/login',
       builder: (context, state) => const LoginPage(),
+    ),
+    GoRoute(
+      path: '/destination/:id',
+      builder: (context, state) {
+        final id = state.pathParameters['id'] ?? 'george_everest';
+        return DestinationDetailsPage(id: id);
+      },
     ),
     ShellRoute(
       navigatorKey: _shellNavigatorKey,
