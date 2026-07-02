@@ -185,6 +185,20 @@ class _DestinationDetailsPageState extends State<DestinationDetailsPage> with Si
                           'Perched on a cliff edge with breathtaking views of the Doon Valley on one side and the Aglar River valley and snow bound Himalayan peaks on the other, Sir George Everest\'s House is a historic landmark. Built in 1832, it served as the home and laboratory of the Surveyor General of India. The trek to the peak is an exhilarating (but uphill) journey through pine forests and rocky terrain, offering a 360-degree panoramic spectacle.',
                           style: TextStyle(fontSize: 14, color: Colors.grey, height: 1.5),
                         ),
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 50,
+                          child: ElevatedButton.icon(
+                            onPressed: () => context.push('/restaurants'),
+                            icon: const Icon(Icons.restaurant_rounded, color: Colors.white),
+                            label: const Text('Explore Nearby Restaurants', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.orange,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                            ),
+                          ),
+                        ),
                         const SizedBox(height: 24),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,

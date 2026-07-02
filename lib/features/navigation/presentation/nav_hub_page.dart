@@ -10,17 +10,119 @@ class NavHubPage extends StatelessWidget {
     required this.child,
   });
 
+  int _calculateSelectedIndex(BuildContext context) {
+    final String location = GoRouterState.of(context).uri.path;
+    if (location.startsWith('/map')) return 1;
+    if (location.startsWith('/explore') || location.startsWith('/restaurants')) return 2;
+    if (location.startsWith('/trips')) return 3;
+    if (location.startsWith('/profile') || location.startsWith('/digital-passport')) return 4;
+    return 0; // Default to Home
+  }
+
+  void _onItemTapped(int index, BuildContext context) {
+    switch (index) {
+      case 0:
+        context.go('/home');
+        break;
+      case 1:
+        context.go('/map');
+        break;
+      case 2:
+        context.go('/explore');
+        break;
+      case 3:
+        context.go('/trips');
+        break;
+      case 4:
+        context.go('/profile');
+        break;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final int currentIndex = _calculateSelectedIndex(context);
+    final String location = GoRouterState.of(context).uri.path;
+    final bool isLightMode = currentIndex == 2 || currentIndex == 3 || currentIndex == 4 || location.startsWith('/ongoing-trips'); // Explore, Trips, Profile, Ongoing Trips
+
     return Scaffold(
       extendBody: true,
       body: child,
-      drawer: const NavDrawer(),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
-        title: const Text('NaviiGo', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _onItemTapped(2, context),
+        backgroundColor: const Color(0xFFFF6B00), // Orange
+        shape: const CircleBorder(),
+        elevation: 8,
+        child: const Icon(Icons.explore, color: Colors.white, size: 28),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.1),
+              blurRadius: 20,
+              offset: const Offset(0, -5),
+            ),
+          ],
+        ),
+        child: BottomAppBar(
+          color: isLightMode ? Colors.white : const Color(0xFF1E1E1E),
+          elevation: 0,
+          shape: const CircularNotchedRectangle(),
+          notchMargin: 8.0,
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+          child: SizedBox(
+            height: 60,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    _buildNavItem(context, 0, Icons.home_filled, 'HOME', currentIndex, isLightMode),
+                    const SizedBox(width: 24),
+                    _buildNavItem(context, 1, Icons.map_rounded, 'MAP', currentIndex, isLightMode),
+                  ],
+                ),
+                Row(
+                  children: [
+                    _buildNavItem(context, 3, Icons.flight_takeoff_rounded, 'TRIPS', currentIndex, isLightMode),
+                    const SizedBox(width: 24),
+                    _buildNavItem(context, 4, Icons.person, 'PROFILE', currentIndex, isLightMode),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavItem(BuildContext context, int index, IconData icon, String label, int currentIndex, bool isLightMode) {
+    final bool isSelected = currentIndex == index;
+    final Color selectedColor = const Color(0xFFFF6B00);
+    final Color unselectedColor = isLightMode ? Colors.grey[400]! : Colors.grey;
+    final Color color = isSelected ? selectedColor : unselectedColor;
+
+    return GestureDetector(
+      onTap: () => _onItemTapped(index, context),
+      behavior: HitTestBehavior.opaque,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, color: color, size: 24),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 10,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+        ],
       ),
     );
   }

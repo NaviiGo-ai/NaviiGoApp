@@ -23,7 +23,7 @@ class HeroDestinationCard extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           const Text(
-            'We Navigate,\\nYou Go',
+            'We Navigate,\nYou Go',
             style: TextStyle(
               fontSize: 32,
               height: 1.1,
@@ -59,7 +59,7 @@ class HeroDestinationCard extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   const Text(
-                    'Explore\\nDestinations',
+                    'Explore\nDestinations',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 24,

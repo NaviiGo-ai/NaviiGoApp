@@ -9,11 +9,15 @@ import '../../features/dashboard/presentation/pages/ongoing_trips_page.dart';
 import '../../features/dashboard/presentation/pages/live_tracking_page.dart';
 import '../../features/dashboard/presentation/pages/analytics_page.dart';
 import '../../features/explore/presentation/pages/hidden_gems_page.dart';
+import '../../features/explore/presentation/pages/trip_planner_page.dart';
+import '../../features/explore/presentation/pages/map_page.dart';
+import '../../features/trips/presentation/pages/generated_itinerary_page.dart';
 import '../../features/explore/presentation/pages/restaurants_page.dart';
+import '../../features/explore/presentation/pages/restaurant_details_page.dart';
 import '../../features/explore/presentation/pages/transportation_page.dart';
+import '../../features/profile/presentation/pages/profile_page.dart';
 import '../../features/bookings/presentation/pages/saved_places_page.dart';
 import '../../features/bookings/presentation/pages/payment_history_page.dart';
-import '../../features/bookings/presentation/pages/digital_passport_page.dart';
 import '../../features/more/presentation/pages/story_creator_page.dart';
 import '../../features/more/presentation/pages/settings_page.dart';
 import '../../features/more/presentation/pages/help_support_page.dart';
@@ -43,6 +47,13 @@ final GoRouter appRouter = GoRouter(
         return DestinationDetailsPage(id: id);
       },
     ),
+    GoRoute(
+      path: '/restaurant/:id',
+      builder: (context, state) {
+        final id = state.pathParameters['id'] ?? '1';
+        return RestaurantDetailsPage(id: id);
+      },
+    ),
     ShellRoute(
       navigatorKey: _shellNavigatorKey,
       builder: (context, state, child) {
@@ -53,6 +64,10 @@ final GoRouter appRouter = GoRouter(
         GoRoute(
           path: '/home',
           builder: (context, state) => const HomePage(),
+        ),
+        GoRoute(
+          path: '/map',
+          builder: (context, state) => const MapPage(),
         ),
         GoRoute(
           path: '/upcoming-trips',
@@ -69,6 +84,16 @@ final GoRouter appRouter = GoRouter(
         GoRoute(
           path: '/analytics',
           builder: (context, state) => const AnalyticsPage(),
+        ),
+
+        // MAIN BOTTOM NAV ROUTES
+        GoRoute(
+          path: '/explore',
+          builder: (context, state) => const TripPlannerPage(),
+        ),
+        GoRoute(
+          path: '/trips',
+          builder: (context, state) => const GeneratedItineraryPage(),
         ),
 
         // EXPLORE
@@ -95,8 +120,8 @@ final GoRouter appRouter = GoRouter(
           builder: (context, state) => const PaymentHistoryPage(),
         ),
         GoRoute(
-          path: '/digital-passport',
-          builder: (context, state) => const DigitalPassportPage(),
+          path: '/profile',
+          builder: (context, state) => const ProfilePage(),
         ),
 
         // MORE
