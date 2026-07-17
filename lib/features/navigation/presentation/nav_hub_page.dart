@@ -43,7 +43,18 @@ class NavHubPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final int currentIndex = _calculateSelectedIndex(context);
     final String location = GoRouterState.of(context).uri.path;
-    final bool isLightMode = currentIndex == 2 || currentIndex == 3 || currentIndex == 4 || location.startsWith('/ongoing-trips'); // Explore, Trips, Profile, Ongoing Trips
+    final bool isLightMode = currentIndex == 2 || currentIndex == 3 || currentIndex == 4
+        || location.startsWith('/ongoing-trips')
+        || location.startsWith('/upcoming-trips')
+        || location.startsWith('/past-trips')
+        || location.startsWith('/explore-discover')
+        || location.startsWith('/digital-passport')
+        || location.startsWith('/bookings')
+        || location.startsWith('/saved-places')
+        || location.startsWith('/payment-history')
+        || location.startsWith('/restaurants')
+        || location.startsWith('/hidden-gems')
+        || location.startsWith('/transportation');
 
     return Scaffold(
       extendBody: true,

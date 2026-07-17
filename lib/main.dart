@@ -4,7 +4,6 @@ import 'app.dart';
 import 'core/cache/hive_service.dart';
 import 'core/network/firebase_client.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'seeder.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
 class GeneratedItineraryPage extends StatelessWidget {
   const GeneratedItineraryPage({super.key});
@@ -19,7 +20,44 @@ class GeneratedItineraryPage extends StatelessWidget {
         ),
         title: const Text('NaviiGo', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 20)),
         actions: [
-          IconButton(icon: const Icon(Icons.notifications_none_rounded, color: Colors.black), onPressed: () {}),
+          // Multiplayer Live Avatars
+          SizedBox(
+            width: 80,
+            child: Stack(
+              children: [
+                Positioned(
+                  right: 40,
+                  top: 12,
+                  child: CircleAvatar(
+                    radius: 14,
+                    backgroundImage: const NetworkImage('https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80'),
+                    child: Container(decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 2))),
+                  ).animate(onPlay: (c) => c.repeat(reverse: true)).slideY(begin: -0.2, end: 0.2, duration: 2.seconds),
+                ),
+                Positioned(
+                  right: 20,
+                  top: 12,
+                  child: CircleAvatar(
+                    radius: 14,
+                    backgroundImage: const NetworkImage('https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=100&q=80'),
+                    child: Container(decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 2))),
+                  ).animate(onPlay: (c) => c.repeat(reverse: true)).slideY(begin: 0.2, end: -0.2, duration: 2.seconds),
+                ),
+                Positioned(
+                  right: 4,
+                  top: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(color: Colors.green, shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 2)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.chat_bubble_outline_rounded, color: Colors.black), 
+            onPressed: () {},
+          ).animate().shake(hz: 2, duration: 1.seconds, delay: 2.seconds),
         ],
       ),
       body: SingleChildScrollView(
@@ -29,9 +67,9 @@ class GeneratedItineraryPage extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Header Text ABOVE image
-            const Text('Lorem Ipsum', style: TextStyle(color: Color(0xFF8B4513), fontSize: 32, fontWeight: FontWeight.w900, fontFamily: 'serif')),
+            const Text('Santorini Escape', style: TextStyle(color: Color(0xFF8B4513), fontSize: 32, fontWeight: FontWeight.w900)).animate().fadeIn().slideX(),
             const SizedBox(height: 8),
-            const Text('LOREM IPSUM • 7 DAYS', style: TextStyle(color: Color(0xFFFFB74D), fontSize: 10, letterSpacing: 2, fontWeight: FontWeight.bold)),
+            const Text('GREECE • 7 DAYS', style: TextStyle(color: Color(0xFFFFB74D), fontSize: 10, letterSpacing: 2, fontWeight: FontWeight.bold)).animate().fadeIn(delay: 200.ms),
             const SizedBox(height: 24),
             
             // Hero Image Card
@@ -41,9 +79,10 @@ class GeneratedItineraryPage extends StatelessWidget {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(24),
                 image: const DecorationImage(
-                  image: NetworkImage('https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&q=80'),
+                  image: NetworkImage('https://images.unsplash.com/photo-1533105079780-92b9be482077?auto=format&fit=crop&q=80'), // Santorini
                   fit: BoxFit.cover,
                 ),
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 20, offset: const Offset(0, 10))],
               ),
               child: Stack(
                 children: [
@@ -66,13 +105,13 @@ class GeneratedItineraryPage extends StatelessWidget {
                       children: [
                         Text('CURRENT EXPEDITION', style: TextStyle(color: Colors.white70, fontSize: 8, letterSpacing: 1.5, fontWeight: FontWeight.bold)),
                         SizedBox(height: 4),
-                        Text('Lorem Ipsum Dolor', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold, fontFamily: 'serif')),
+                        Text('Oia Sunsets', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
                       ],
                     ),
                   ),
                 ],
               ),
-            ),
+            ).animate().scale(duration: 500.ms, curve: Curves.easeOutCubic),
             const SizedBox(height: 32),
 
             // Estimated Costs
@@ -93,13 +132,13 @@ class GeneratedItineraryPage extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  _buildCostRow(Icons.home_work_rounded, 'ACCOMMODATION', '₹ 6000'),
+                  _buildCostRow(Icons.home_work_rounded, 'ACCOMMODATION', '€ 1,200'),
                   const SizedBox(height: 16),
-                  _buildCostRow(Icons.directions_bus_rounded, 'TRANSPORTATION', '₹ 3000'),
+                  _buildCostRow(Icons.directions_bus_rounded, 'TRANSPORTATION', '€ 300'),
                   const SizedBox(height: 16),
-                  _buildCostRow(Icons.restaurant_rounded, 'FOOD AND DINING', '₹ 4000'),
+                  _buildCostRow(Icons.restaurant_rounded, 'FOOD AND DINING', '€ 800'),
                   const SizedBox(height: 16),
-                  _buildCostRow(Icons.local_activity_rounded, 'ACTIVITIES', '₹ 2000'),
+                  _buildCostRow(Icons.local_activity_rounded, 'ACTIVITIES', '€ 450'),
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: 16.0),
                     child: Divider(color: Colors.black12),
@@ -108,31 +147,35 @@ class GeneratedItineraryPage extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text('TOTAL ESTIMATED', style: TextStyle(color: Color(0xFF6B4E3B), fontSize: 12, fontWeight: FontWeight.bold)),
-                      Text('₹ 15000', style: TextStyle(color: Color(0xFFFF6B00), fontSize: 18, fontWeight: FontWeight.bold)),
+                      Text('€ 2,750', style: TextStyle(color: Color(0xFFFF6B00), fontSize: 18, fontWeight: FontWeight.bold)),
                     ],
                   ),
                 ],
               ),
-            ),
+            ).animate().fadeIn(delay: 400.ms).slideY(begin: 0.1),
             const SizedBox(height: 48),
 
-            // Timeline
-            _buildTimelineDay('JUNE 10, 2024', 'Day 1: Lorem\nIpsum & Dolor Sit', 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.'),
-            const SizedBox(height: 24),
-            _buildTimelineItem('10:00 AM', 'Check-in at Lorem Ipsum', 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.', 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&q=80'),
-            _buildTimelineItem('02:30 PM', 'Lorem Ipsum Walk to Place', 'Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.', 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&q=80'),
-            
-            const SizedBox(height: 48),
-            _buildTimelineDay('JUNE 11, 2024', 'Day 2: Lorem\nIpsum Tour', 'Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.'),
-            const SizedBox(height: 24),
-            _buildTimelineItem('09:00 AM', 'Private Lorem Ipsum', 'Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.', 'https://images.unsplash.com/photo-1518998053401-a28c4bb1c850?auto=format&fit=crop&q=80'),
-            
-            const SizedBox(height: 48),
-            _buildTimelineDay('JUNE 12, 2024', 'Day 3: Lorem\nIpsum Exploration', 'Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium.'),
-            const SizedBox(height: 24),
-            GestureDetector(
-              onTap: () => context.push('/restaurants'),
-              child: _buildTimelineItem('01:00 PM', 'Lunch at Lorem Ipsum (Tap for Nearby)', 'Totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo.', 'https://images.unsplash.com/photo-1550547660-d9450f859349?auto=format&fit=crop&q=80'),
+            // Interactive Expanding Timeline
+            _buildExpandableDay(
+              date: 'JUNE 10, 2024',
+              title: 'Day 1: Arrival & Oia',
+              description: 'Check in and watch the famous sunset.',
+              initiallyExpanded: true,
+              items: [
+                _buildTimelineItem('10:00 AM', 'Check-in at Grand Resort', 'Drop off bags and freshen up.', 'https://images.unsplash.com/photo-1512453979798-5ea266f8880c?auto=format&fit=crop&q=80'),
+                _buildTimelineItem('02:30 PM', 'Oia Castle Walk', 'Head up to the castle ruins for the best sunset viewing spot.', 'https://images.unsplash.com/photo-1533105079780-92b9be482077?auto=format&fit=crop&q=80', isLast: true),
+              ],
+            ),
+            const SizedBox(height: 16),
+            _buildExpandableDay(
+              date: 'JUNE 11, 2024',
+              title: 'Day 2: Caldera Cruise',
+              description: 'Sail the volcanic islands.',
+              initiallyExpanded: false,
+              items: [
+                _buildTimelineItem('09:00 AM', 'Catamaran Departure', 'Set sail from Ammoudi Bay.', 'https://images.unsplash.com/photo-1555400038-63f5ba517a47?auto=format&fit=crop&q=80'),
+                _buildTimelineItem('01:00 PM', 'Volcano Hot Springs', 'Swim in the therapeutic sulfur waters.', 'https://images.unsplash.com/photo-1499793983690-e29da59ef1c2?auto=format&fit=crop&q=80', isLast: true),
+              ],
             ),
             
             const SizedBox(height: 100), // Bottom nav padding
@@ -143,7 +186,7 @@ class GeneratedItineraryPage extends StatelessWidget {
         backgroundColor: const Color(0xFFFF6B00),
         onPressed: () {},
         child: const Icon(Icons.add_rounded, color: Colors.white),
-      ),
+      ).animate().scale(delay: 800.ms, curve: Curves.elasticOut),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
@@ -168,22 +211,43 @@ class GeneratedItineraryPage extends StatelessWidget {
     );
   }
 
-  Widget _buildTimelineDay(String date, String title, String description) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(date, style: const TextStyle(color: Color(0xFFFFB74D), fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
-        const SizedBox(height: 8),
-        Text(title, style: const TextStyle(color: Color(0xFF8B4513), fontSize: 28, fontWeight: FontWeight.w900, fontFamily: 'serif', height: 1.1)),
-        const SizedBox(height: 12),
-        Text(description, style: const TextStyle(color: Colors.black87, fontSize: 12, height: 1.5)),
-      ],
-    );
+  Widget _buildExpandableDay({
+    required String date, 
+    required String title, 
+    required String description, 
+    required List<Widget> items,
+    bool initiallyExpanded = false,
+  }) {
+    return Theme(
+      data: ThemeData().copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        initiallyExpanded: initiallyExpanded,
+        tilePadding: EdgeInsets.zero,
+        iconColor: const Color(0xFF8B4513),
+        collapsedIconColor: const Color(0xFF8B4513),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(date, style: const TextStyle(color: Color(0xFFFFB74D), fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+            const SizedBox(height: 8),
+            Text(title, style: const TextStyle(color: Color(0xFF8B4513), fontSize: 24, fontWeight: FontWeight.w900, height: 1.1)),
+          ],
+        ),
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 8.0),
+          child: Text(description, style: const TextStyle(color: Colors.black87, fontSize: 12, height: 1.5)),
+        ),
+        children: [
+          const SizedBox(height: 24),
+          ...items.animate(interval: 100.ms).fadeIn().slideY(begin: 0.2),
+        ],
+      ),
+    ).animate().fadeIn(delay: 600.ms).slideX(begin: 0.1);
   }
 
-  Widget _buildTimelineItem(String time, String title, String description, String imageUrl) {
+  Widget _buildTimelineItem(String time, String title, String description, String imageUrl, {bool isLast = false}) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 24.0),
+      padding: const EdgeInsets.only(bottom: 0.0),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -193,16 +257,20 @@ class GeneratedItineraryPage extends StatelessWidget {
               Container(
                 width: 12,
                 height: 12,
+                margin: const EdgeInsets.only(top: 4),
                 decoration: const BoxDecoration(
                   color: Color(0xFFFFB74D),
                   shape: BoxShape.circle,
                 ),
               ),
-              Container(
-                width: 2,
-                height: 100,
-                color: const Color(0xFFFFB74D).withValues(alpha: 0.3),
-              ),
+              if (!isLast)
+                Container(
+                  width: 2,
+                  height: 120, // Enough to connect to next
+                  color: const Color(0xFFFFB74D).withValues(alpha: 0.3),
+                ),
+              if (isLast)
+                const SizedBox(height: 24),
             ],
           ),
           const SizedBox(width: 16),
@@ -213,9 +281,10 @@ class GeneratedItineraryPage extends StatelessWidget {
               children: [
                 Text(time, style: const TextStyle(color: Color(0xFFFFB74D), fontSize: 10, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 4),
-                Text(title, style: const TextStyle(color: Color(0xFF8B4513), fontSize: 16, fontWeight: FontWeight.bold, fontFamily: 'serif')),
+                Text(title, style: const TextStyle(color: Color(0xFF8B4513), fontSize: 16, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 4),
-                Text(description, style: const TextStyle(color: Colors.black87, fontSize: 10, height: 1.5)),
+                Text(description, style: const TextStyle(color: Colors.black87, fontSize: 11, height: 1.5)),
+                if (!isLast) const SizedBox(height: 32),
               ],
             ),
           ),
@@ -226,6 +295,7 @@ class GeneratedItineraryPage extends StatelessWidget {
             height: 70,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
+              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 10)],
               image: DecorationImage(image: NetworkImage(imageUrl), fit: BoxFit.cover),
             ),
           ),

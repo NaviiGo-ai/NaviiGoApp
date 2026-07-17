@@ -27,6 +27,16 @@ class _DestinationDetailsPageState extends State<DestinationDetailsPage> with Si
 
   @override
   Widget build(BuildContext context) {
+    // Dynamic Theming: Simulate picking a vibrant color based on destination ID
+    final List<Color> themeColors = [
+      const Color(0xFFFF6B00), // Orange
+      const Color(0xFF2563EB), // Blue
+      const Color(0xFF059669), // Green
+      const Color(0xFFDB2777), // Pink
+      const Color(0xFF7C3AED), // Purple
+    ];
+    final themeColor = themeColors[widget.id.hashCode % themeColors.length];
+
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Stack(
@@ -99,13 +109,13 @@ class _DestinationDetailsPageState extends State<DestinationDetailsPage> with Si
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Row(
+                        Row(
                           children: [
-                            Icon(Icons.location_on_rounded, color: Colors.orange, size: 16),
-                            SizedBox(width: 4),
+                            Icon(Icons.location_on_rounded, color: themeColor, size: 16),
+                            const SizedBox(width: 4),
                             Text(
                               'Mussoorie, Uttarakhand',
-                              style: TextStyle(color: Colors.orange, fontSize: 12, fontWeight: FontWeight.bold),
+                              style: TextStyle(color: themeColor, fontSize: 12, fontWeight: FontWeight.bold),
                             ),
                           ],
                         ),
@@ -126,11 +136,11 @@ class _DestinationDetailsPageState extends State<DestinationDetailsPage> with Si
                                 color: Colors.grey.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(20),
                               ),
-                              child: const Row(
+                              child: Row(
                                 children: [
-                                  Icon(Icons.directions_walk_rounded, size: 16, color: Colors.orange),
-                                  SizedBox(width: 4),
-                                  Text('20km Distance', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                  Icon(Icons.directions_walk_rounded, size: 16, color: themeColor),
+                                  const SizedBox(width: 4),
+                                  const Text('20km Distance', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                                 ],
                               ),
                             ),
@@ -141,11 +151,11 @@ class _DestinationDetailsPageState extends State<DestinationDetailsPage> with Si
                                 color: Colors.grey.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(20),
                               ),
-                              child: const Row(
+                              child: Row(
                                 children: [
-                                  Icon(Icons.star_rounded, size: 16, color: Colors.orange),
-                                  SizedBox(width: 4),
-                                  Text('100+ Reviews', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                  Icon(Icons.star_rounded, size: 16, color: themeColor),
+                                  const SizedBox(width: 4),
+                                  const Text('100+ Reviews', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                                 ],
                               ),
                             ),
@@ -161,7 +171,7 @@ class _DestinationDetailsPageState extends State<DestinationDetailsPage> with Si
                           child: TabBar(
                             controller: _tabController,
                             indicator: BoxDecoration(
-                              color: Colors.orange,
+                              color: themeColor,
                               borderRadius: BorderRadius.circular(20),
                             ),
                             indicatorSize: TabBarIndicatorSize.tab,
@@ -194,7 +204,7 @@ class _DestinationDetailsPageState extends State<DestinationDetailsPage> with Si
                             icon: const Icon(Icons.restaurant_rounded, color: Colors.white),
                             label: const Text('Explore Nearby Restaurants', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.orange,
+                              backgroundColor: themeColor,
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                             ),
                           ),

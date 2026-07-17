@@ -20,7 +20,7 @@ class _SplashPageState extends State<SplashPage> {
   void _navigateToNext() async {
     await Future.delayed(const Duration(milliseconds: 2500));
     if (mounted) {
-      context.go('/home');
+      context.go('/login');
     }
   }
 

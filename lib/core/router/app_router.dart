@@ -3,13 +3,18 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/splash/presentation/splash_page.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
+import '../../features/auth/presentation/pages/onboarding_wizard_page.dart';
+import '../../features/auth/presentation/pages/vibe_match_page.dart';
+import '../../features/explore/presentation/pages/ar_explore_page.dart';
 import '../../features/dashboard/presentation/pages/home_page.dart';
 import '../../features/dashboard/presentation/pages/upcoming_trips_page.dart';
 import '../../features/dashboard/presentation/pages/ongoing_trips_page.dart';
+import '../../features/dashboard/presentation/pages/past_trips_page.dart';
 import '../../features/dashboard/presentation/pages/live_tracking_page.dart';
 import '../../features/dashboard/presentation/pages/analytics_page.dart';
 import '../../features/explore/presentation/pages/hidden_gems_page.dart';
 import '../../features/explore/presentation/pages/trip_planner_page.dart';
+import '../../features/explore/presentation/pages/explore_discover_page.dart';
 import '../../features/explore/presentation/pages/map_page.dart';
 import '../../features/trips/presentation/pages/generated_itinerary_page.dart';
 import '../../features/explore/presentation/pages/restaurants_page.dart';
@@ -18,6 +23,8 @@ import '../../features/explore/presentation/pages/transportation_page.dart';
 import '../../features/profile/presentation/pages/profile_page.dart';
 import '../../features/bookings/presentation/pages/saved_places_page.dart';
 import '../../features/bookings/presentation/pages/payment_history_page.dart';
+import '../../features/bookings/presentation/pages/digital_passport_page.dart';
+import '../../features/bookings/presentation/pages/bookings_page.dart';
 import '../../features/more/presentation/pages/story_creator_page.dart';
 import '../../features/more/presentation/pages/settings_page.dart';
 import '../../features/more/presentation/pages/help_support_page.dart';
@@ -39,6 +46,14 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/login',
       builder: (context, state) => const LoginPage(),
+    ),
+    GoRoute(
+      path: '/onboarding',
+      builder: (context, state) => const OnboardingWizardPage(),
+    ),
+    GoRoute(
+      path: '/vibe-match',
+      builder: (context, state) => const VibeMatchPage(),
     ),
     GoRoute(
       path: '/destination/:id',
@@ -70,6 +85,10 @@ final GoRouter appRouter = GoRouter(
           builder: (context, state) => const MapPage(),
         ),
         GoRoute(
+          path: '/ar-explore',
+          builder: (context, state) => const ARExplorePage(),
+        ),
+        GoRoute(
           path: '/upcoming-trips',
           builder: (context, state) => const UpcomingTripsPage(),
         ),
@@ -85,11 +104,19 @@ final GoRouter appRouter = GoRouter(
           path: '/analytics',
           builder: (context, state) => const AnalyticsPage(),
         ),
+        GoRoute(
+          path: '/past-trips',
+          builder: (context, state) => const PastTripsPage(),
+        ),
 
         // MAIN BOTTOM NAV ROUTES
         GoRoute(
           path: '/explore',
           builder: (context, state) => const TripPlannerPage(),
+        ),
+        GoRoute(
+          path: '/explore-discover',
+          builder: (context, state) => const ExploreDiscoverPage(),
         ),
         GoRoute(
           path: '/trips',
@@ -118,6 +145,14 @@ final GoRouter appRouter = GoRouter(
         GoRoute(
           path: '/payment-history',
           builder: (context, state) => const PaymentHistoryPage(),
+        ),
+        GoRoute(
+          path: '/digital-passport',
+          builder: (context, state) => const DigitalPassportPage(),
+        ),
+        GoRoute(
+          path: '/bookings',
+          builder: (context, state) => const BookingsPage(),
         ),
         GoRoute(
           path: '/profile',

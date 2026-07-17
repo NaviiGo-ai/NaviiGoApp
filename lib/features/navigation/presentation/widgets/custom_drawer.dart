@@ -67,6 +67,7 @@ class CustomDrawer extends StatelessWidget {
               _buildDrawerItem(context, icon: Icons.home_rounded, title: 'Home', route: '/home'),
               _buildDrawerItem(context, icon: Icons.calendar_today_rounded, title: 'Upcoming Trips', route: '/upcoming-trips'),
               _buildDrawerItem(context, icon: Icons.flight_takeoff_rounded, title: 'Ongoing Trips', route: '/ongoing-trips'),
+              _buildDrawerItem(context, icon: Icons.history_rounded, title: 'Past Trips', route: '/past-trips'),
               _buildDrawerItem(context, icon: Icons.location_on_rounded, title: 'Live Tracking', route: '/live-tracking'),
               _buildDrawerItem(context, icon: Icons.bar_chart_rounded, title: 'Analytics', route: '/analytics'),
               
@@ -74,15 +75,17 @@ class CustomDrawer extends StatelessWidget {
               
               _buildSectionHeader('EXPLORE'),
               _buildDrawerItem(context, icon: Icons.diamond_rounded, title: 'Hidden Gems', route: '/hidden-gems'),
+              _buildDrawerItem(context, icon: Icons.explore_rounded, title: 'Explore', route: '/explore-discover'),
               _buildDrawerItem(context, icon: Icons.restaurant_rounded, title: 'Restaurants', route: '/restaurants'),
               _buildDrawerItem(context, icon: Icons.directions_bus_rounded, title: 'Transportation', route: '/transportation'),
               
               const Divider(color: Colors.white10),
               
               _buildSectionHeader('MY BOOKINGS'),
+              _buildDrawerItem(context, icon: Icons.luggage_rounded, title: 'Bookings', route: '/bookings'),
               _buildDrawerItem(context, icon: Icons.bookmark_border_rounded, title: 'Saved Places', route: '/saved-places'),
               _buildDrawerItem(context, icon: Icons.receipt_long_rounded, title: 'Payment History', route: '/payment-history'),
-              _buildDrawerItem(context, icon: Icons.book_rounded, title: 'Digital passport', route: '/digital-passport'),
+              _buildDrawerItem(context, icon: Icons.book_rounded, title: 'Digital Passport', route: '/digital-passport'),
               
               const Divider(color: Colors.white10),
               
