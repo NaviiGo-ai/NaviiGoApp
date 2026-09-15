@@ -544,20 +544,6 @@ class _MapPageState extends State<MapPage> {
       ),
     );
   }
-
-  Widget _buildImagePlaceholder() {
-    return Container(
-      width: 120,
-      color: AppColors.surfaceWarm,
-      child: const Center(
-        child: Icon(
-          Icons.photo_library_outlined,
-          color: AppColors.border,
-          size: 32,
-        ),
-      ),
-    );
-  }
 }
 
 class _WarmIndiaMapPainter extends CustomPainter {
