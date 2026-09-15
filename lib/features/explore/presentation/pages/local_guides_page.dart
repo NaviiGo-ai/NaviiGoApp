@@ -12,7 +12,7 @@ class GuideItem {
   final List<String> languages;
   final double rating;
   final int reviewsCount;
-  final String licenseNumber;
+  final String experienceYears;
 
   const GuideItem({
     required this.id,
@@ -22,7 +22,7 @@ class GuideItem {
     required this.languages,
     required this.rating,
     required this.reviewsCount,
-    required this.licenseNumber,
+    required this.experienceYears,
   });
 
   String get initials =>
@@ -38,7 +38,7 @@ const List<GuideItem> kVerifiedGuides = [
     languages: ['English', 'Hindi', 'French'],
     rating: 4.9,
     reviewsCount: 142,
-    licenseNumber: 'MOT-IN-JP-2018-884',
+    experienceYears: '12+ Years Experience',
   ),
   GuideItem(
     id: 'g_2',
@@ -48,7 +48,7 @@ const List<GuideItem> kVerifiedGuides = [
     languages: ['English', 'Hindi', 'Sanskrit'],
     rating: 4.95,
     reviewsCount: 189,
-    licenseNumber: 'MOT-IN-VNS-2016-419',
+    experienceYears: '15+ Years Experience',
   ),
   GuideItem(
     id: 'g_3',
@@ -58,7 +58,7 @@ const List<GuideItem> kVerifiedGuides = [
     languages: ['English', 'Malayalam', 'Tamil'],
     rating: 4.88,
     reviewsCount: 96,
-    licenseNumber: 'MOT-IN-KL-2020-102',
+    experienceYears: '8+ Years Experience',
   ),
   GuideItem(
     id: 'g_4',
@@ -68,7 +68,7 @@ const List<GuideItem> kVerifiedGuides = [
     languages: ['English', 'Kannada', 'Hindi'],
     rating: 4.92,
     reviewsCount: 114,
-    licenseNumber: 'MOT-IN-KA-2017-632',
+    experienceYears: '10+ Years Experience',
   ),
 ];
 
@@ -235,7 +235,7 @@ class _LocalGuidesPageState extends State<LocalGuidesPage> {
                                                   BorderRadius.circular(4),
                                             ),
                                             child: Text(
-                                              'CERTIFIED',
+                                              'CURATED EXPERT',
                                               style: AppTypography.micro(
                                                 color: AppColors.teal,
                                               ),
@@ -245,7 +245,7 @@ class _LocalGuidesPageState extends State<LocalGuidesPage> {
                                       ),
                                       const SizedBox(height: 2),
                                       Text(
-                                        '${guide.destination} • MOT License ${guide.licenseNumber}',
+                                        '${guide.destination} • ${guide.experienceYears}',
                                         style: AppTypography.micro(
                                           color: AppColors.textTertiary,
                                         ),

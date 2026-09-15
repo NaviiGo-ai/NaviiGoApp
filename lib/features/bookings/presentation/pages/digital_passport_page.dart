@@ -39,7 +39,13 @@ class DigitalPassportPage extends ConsumerWidget {
             color: AppColors.textPrimary,
             size: 18,
           ),
-          onPressed: () => context.go('/home'),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/home');
+            }
+          },
         ),
         title: Text(
           'Passport',
