@@ -1,11 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../bookings/presentation/providers/passport_provider.dart';
+import '../../../trips/presentation/providers/trip_provider.dart';
+import '../../../trips/domain/models/trip_itinerary_model.dart';
 
-class PastTripsPage extends StatelessWidget {
+class PastTripsPage extends ConsumerWidget {
   const PastTripsPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final pastTrips = ref.watch(pastTripsProvider);
+    final userTripsAsync = ref.watch(userTripsStreamProvider);
+    final passportStatsAsync = ref.watch(passportStatsStreamProvider);
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
@@ -13,90 +21,135 @@ class PastTripsPage extends StatelessWidget {
         elevation: 0,
         scrolledUnderElevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.black),
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: Colors.black,
+            size: 20,
+          ),
           onPressed: () => context.go('/home'),
         ),
-        title: const Text('Past Trips', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18)),
+        title: const Text(
+          'Past Trips',
+          style: TextStyle(
+            color: Colors.black,
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+          ),
+        ),
         centerTitle: true,
       ),
-      body: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
+      body: userTripsAsync.when(
+        loading: () => const Center(
+          child: CircularProgressIndicator(color: Color(0xFFEC6426)),
+        ),
+        error: (err, _) => Center(child: Text('Error loading journeys: $err')),
+        data: (_) {
+          if (pastTrips.isEmpty) {
+            return _buildEmptyState(context);
+          }
+
+          final stats = passportStatsAsync.value;
+          final statesCount = stats?.statesVisited.length ?? 0;
+          final stampsCount = stats?.totalStamps ?? 0;
+
+          return SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 20.0,
+              vertical: 8.0,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Real Stats Banner
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF111827),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _buildStatItem('${pastTrips.length}', 'Past Journeys'),
+                      Container(width: 1, height: 40, color: Colors.white24),
+                      _buildStatItem('$statesCount', 'States Visited'),
+                      Container(width: 1, height: 40, color: Colors.white24),
+                      _buildStatItem('$stampsCount', 'Stamps Earned'),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                const Text(
+                  'Your Memories',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 16),
+
+                // Past Trip Cards
+                ...pastTrips.map((trip) => _buildPastTripCard(context, trip)),
+                const SizedBox(height: 40),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32.0),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Stats Banner
             Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: const Color(0xFF111827),
-                borderRadius: BorderRadius.circular(20),
+                color: const Color(0xFF24323A).withValues(alpha: 0.08),
+                shape: BoxShape.circle,
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  _buildStatItem('12', 'Trips'),
-                  Container(width: 1, height: 40, color: Colors.white24),
-                  _buildStatItem('8', 'Countries'),
-                  Container(width: 1, height: 40, color: Colors.white24),
-                  _buildStatItem('4,230', 'Km Traveled'),
-                ],
+              child: const Icon(
+                Icons.history_edu_rounded,
+                size: 54,
+                color: Color(0xFF24323A),
               ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'No completed journeys yet',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'When you conclude an expedition, its journal entries, photos, and passport stamps will be safely archived here.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey, fontSize: 14),
             ),
             const SizedBox(height: 24),
-
-            const Text('Your Memories', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 16),
-
-            // Past Trip Card 1
-            _buildPastTripCard(
-              context,
-              image: 'https://images.unsplash.com/photo-1524492412937-b28074a5d7da?auto=format&fit=crop&w=800&q=80',
-              title: 'Rajasthan Heritage Tour',
-              location: 'Jaipur, India',
-              dateRange: 'Mar 10 - Mar 18, 2024',
-              rating: 4.8,
-              photos: 142,
+            ElevatedButton(
+              onPressed: () => context.go('/explore'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFEC6426),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 14,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+              child: const Text(
+                'Discover Destinations',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
-            const SizedBox(height: 16),
-
-            // Past Trip Card 2
-            _buildPastTripCard(
-              context,
-              image: 'https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&w=800&q=80',
-              title: 'Kyoto Spring',
-              location: 'Kyoto, Japan',
-              dateRange: 'Apr 1 - Apr 8, 2024',
-              rating: 4.9,
-              photos: 238,
-            ),
-            const SizedBox(height: 16),
-
-            // Past Trip Card 3
-            _buildPastTripCard(
-              context,
-              image: 'https://images.unsplash.com/photo-1516483638261-f4dbaf036963?auto=format&fit=crop&w=800&q=80',
-              title: 'Italian Countryside',
-              location: 'Tuscany, Italy',
-              dateRange: 'Jan 15 - Jan 22, 2024',
-              rating: 4.7,
-              photos: 189,
-            ),
-            const SizedBox(height: 16),
-
-            // Past Trip Card 4
-            _buildPastTripCard(
-              context,
-              image: 'https://images.unsplash.com/photo-1548013146-72479768bada?auto=format&fit=crop&w=800&q=80',
-              title: 'Golden Triangle',
-              location: 'Agra, India',
-              dateRange: 'Dec 2 - Dec 7, 2023',
-              rating: 4.5,
-              photos: 97,
-            ),
-
-            const SizedBox(height: 100),
           ],
         ),
       ),
@@ -106,143 +159,89 @@ class PastTripsPage extends StatelessWidget {
   Widget _buildStatItem(String value, String label) {
     return Column(
       children: [
-        Text(value, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+        Text(
+          value,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         const SizedBox(height: 4),
-        Text(label, style: const TextStyle(color: Colors.white54, fontSize: 11)),
+        Text(
+          label,
+          style: const TextStyle(color: Colors.white60, fontSize: 11),
+        ),
       ],
     );
   }
 
-  Widget _buildPastTripCard(
-    BuildContext context, {
-    required String image,
-    required String title,
-    required String location,
-    required String dateRange,
-    required double rating,
-    required int photos,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          // Image with completed badge
-          Stack(
-            children: [
-              Container(
-                height: 160,
+  Widget _buildPastTripCard(BuildContext context, TripItineraryModel trip) {
+    return GestureDetector(
+      onTap: () => context.push('/itinerary', extra: trip),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(20),
+              ),
+              child: Image.network(
+                trip.heroImage,
+                height: 150,
                 width: double.infinity,
-                decoration: BoxDecoration(
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-                  image: DecorationImage(
-                    image: NetworkImage(image),
-                    fit: BoxFit.cover,
-                    colorFilter: ColorFilter.mode(
-                      Colors.black.withValues(alpha: 0.1),
-                      BlendMode.darken,
-                    ),
-                  ),
-                ),
+                fit: BoxFit.cover,
               ),
-              Container(
-                height: 160,
-                decoration: BoxDecoration(
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [Colors.transparent, Colors.black.withValues(alpha: 0.5)],
-                  ),
-                ),
-              ),
-              // Completed badge
-              Positioned(
-                top: 12,
-                right: 12,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF059669),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.check_circle_rounded, color: Colors.white, size: 14),
-                      SizedBox(width: 4),
-                      Text('Completed', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                ),
-              ),
-              // Title on image
-              Positioned(
-                bottom: 16,
-                left: 16,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(title, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 4),
-                    Row(
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.location_on_rounded, color: Colors.white70, size: 14),
-                        const SizedBox(width: 4),
-                        Text(location, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                        Text(
+                          trip.destName,
+                          style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${trip.totalDays} Days • ${trip.startDateFormatted}',
+                          style: const TextStyle(
+                            color: Colors.grey,
+                            fontSize: 13,
+                          ),
+                        ),
                       ],
                     ),
-                  ],
-                ),
+                  ),
+                  const Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 16,
+                    color: Colors.grey,
+                  ),
+                ],
               ),
-            ],
-          ),
-          // Bottom section
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Row(
-              children: [
-                const Icon(Icons.calendar_today_rounded, color: Colors.grey, size: 14),
-                const SizedBox(width: 8),
-                Text(dateRange, style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                const Spacer(),
-                // Rating
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFF3E0),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.star_rounded, color: Color(0xFFFF6B00), size: 14),
-                      const SizedBox(width: 4),
-                      Text('$rating', style: const TextStyle(color: Color(0xFFFF6B00), fontSize: 12, fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 12),
-                // Photos
-                Row(
-                  children: [
-                    Icon(Icons.photo_library_rounded, color: Colors.grey[400], size: 14),
-                    const SizedBox(width: 4),
-                    Text('$photos', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
-                  ],
-                ),
-              ],
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

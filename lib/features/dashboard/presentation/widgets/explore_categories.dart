@@ -4,11 +4,20 @@ class ExploreCategories extends StatelessWidget {
   ExploreCategories({super.key});
 
   final List<Map<String, dynamic>> categories = [
-    {'icon': Icons.directions_walk_rounded, 'color': Colors.orangeAccent.withAlpha(100)},
+    {
+      'icon': Icons.directions_walk_rounded,
+      'color': Colors.orangeAccent.withAlpha(100),
+    },
     {'icon': Icons.park_rounded, 'color': Colors.greenAccent.withAlpha(100)},
     {'icon': Icons.terrain_rounded, 'color': Colors.brown.withAlpha(100)},
-    {'icon': Icons.holiday_village_rounded, 'color': Colors.redAccent.withAlpha(100)},
-    {'icon': Icons.water_drop_rounded, 'color': Colors.blueAccent.withAlpha(100)},
+    {
+      'icon': Icons.holiday_village_rounded,
+      'color': Colors.redAccent.withAlpha(100),
+    },
+    {
+      'icon': Icons.water_drop_rounded,
+      'color': Colors.blueAccent.withAlpha(100),
+    },
   ];
 
   @override
@@ -22,10 +31,7 @@ class ExploreCategories extends StatelessWidget {
             padding: EdgeInsets.symmetric(horizontal: 20.0),
             child: Text(
               'Explore',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
           ),
           const SizedBox(height: 16),

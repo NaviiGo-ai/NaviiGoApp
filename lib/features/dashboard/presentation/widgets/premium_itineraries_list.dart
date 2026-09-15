@@ -31,10 +31,7 @@ class PremiumItinerariesList extends ConsumerWidget {
                 SizedBox(height: 4),
                 Text(
                   'Premium Itineraries',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
               ],
             ),
@@ -83,7 +80,11 @@ class PremiumItinerariesList extends ConsumerWidget {
                             ),
                             Row(
                               children: [
-                                const Icon(Icons.star_rounded, color: Colors.orange, size: 14),
+                                const Icon(
+                                  Icons.star_rounded,
+                                  color: Colors.orange,
+                                  size: 14,
+                                ),
                                 const SizedBox(width: 4),
                                 Text(
                                   itinerary.rating.toString(),
@@ -121,16 +122,26 @@ class PremiumItinerariesList extends ConsumerWidget {
                                         left: 0,
                                         child: CircleAvatar(
                                           radius: 12,
-                                          backgroundColor: Colors.grey.withAlpha(50),
-                                          child: const Icon(Icons.person, size: 14, color: Colors.grey),
+                                          backgroundColor: Colors.grey
+                                              .withAlpha(50),
+                                          child: const Icon(
+                                            Icons.person,
+                                            size: 14,
+                                            color: Colors.grey,
+                                          ),
                                         ),
                                       ),
                                       Positioned(
                                         left: 16,
                                         child: CircleAvatar(
                                           radius: 12,
-                                          backgroundColor: Colors.grey.withAlpha(80),
-                                          child: const Icon(Icons.person, size: 14, color: Colors.white),
+                                          backgroundColor: Colors.grey
+                                              .withAlpha(80),
+                                          child: const Icon(
+                                            Icons.person,
+                                            size: 14,
+                                            color: Colors.white,
+                                          ),
                                         ),
                                       ),
                                     ],
@@ -153,7 +164,11 @@ class PremiumItinerariesList extends ConsumerWidget {
                                 color: Color(0xFF6B5A24),
                                 shape: BoxShape.circle,
                               ),
-                              child: const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 16),
+                              child: const Icon(
+                                Icons.arrow_forward_rounded,
+                                color: Colors.white,
+                                size: 16,
+                              ),
                             ),
                           ],
                         ),
@@ -163,7 +178,9 @@ class PremiumItinerariesList extends ConsumerWidget {
                 },
               );
             },
-            loading: () => const Center(child: CircularProgressIndicator(color: Colors.orange)),
+            loading: () => const Center(
+              child: CircularProgressIndicator(color: Colors.orange),
+            ),
             error: (err, stack) => Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20.0),
               child: Text('Error: $err'),

@@ -38,7 +38,10 @@ class _SwipeToUnlockState extends State<SwipeToUnlock> {
           decoration: BoxDecoration(
             color: Colors.orange.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(32),
-            border: Border.all(color: Colors.orange.withValues(alpha: 0.3), width: 1),
+            border: Border.all(
+              color: Colors.orange.withValues(alpha: 0.3),
+              width: 1,
+            ),
           ),
           child: Stack(
             children: [
@@ -83,7 +86,10 @@ class _SwipeToUnlockState extends State<SwipeToUnlock> {
                       color: Colors.orange,
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.arrow_forward_rounded, color: Colors.white),
+                    child: const Icon(
+                      Icons.arrow_forward_rounded,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
               ),

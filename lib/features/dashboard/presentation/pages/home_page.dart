@@ -1,90 +1,177 @@
 import 'package:flutter/material.dart';
-import '../widgets/home_app_bar.dart';
-import '../widgets/hero_destination_card.dart';
-import '../widgets/explore_categories.dart';
-import '../widgets/top_destinations_list.dart';
-import '../widgets/whats_new_card.dart';
-import '../widgets/journal_section.dart';
-import '../widgets/premium_itineraries_list.dart';
-import '../widgets/newsletter_card.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_typography.dart';
+import '../providers/dashboard_providers.dart';
+import '../widgets/home_journal_widgets.dart';
+import '../../../trips/presentation/providers/trip_provider.dart';
+import '../../../trips/domain/models/trip_itinerary_model.dart';
 import '../../../navigation/presentation/widgets/custom_drawer.dart';
 
-import 'package:flutter_animate/flutter_animate.dart';
-import '../../../ai/presentation/widgets/voice_assistant_overlay.dart';
-
-class HomePage extends StatefulWidget {
+class HomePage extends ConsumerWidget {
   const HomePage({super.key});
 
   @override
-  State<HomePage> createState() => _HomePageState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    // 1. Lifecycle state providers
+    final activeTrip = ref.watch(activeTripProvider);
+    final upcomingTrips = ref.watch(upcomingTripsProvider);
+    final pastTrips = ref.watch(pastTripsProvider);
 
-class _HomePageState extends State<HomePage> {
-  bool _showVoiceAI = false;
+    // 2. Curated travel data
+    final destinationsAsync = ref.watch(topDestinationsProvider);
+    final articlesAsync = ref.watch(journalArticlesProvider);
 
-  @override
-  Widget build(BuildContext context) {
+    final destinations = destinationsAsync.valueOrNull ?? [];
+    final articles = articlesAsync.valueOrNull ?? [];
+
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: AppColors.background,
       drawer: const CustomDrawer(),
-      body: Stack(
-        children: [
-          SafeArea(
-            child: CustomScrollView(
-              physics: const BouncingScrollPhysics(),
-              slivers: [
-                const SliverToBoxAdapter(child: HomeAppBar()),
-                const SliverToBoxAdapter(child: SizedBox(height: 10)),
-                const SliverToBoxAdapter(child: HeroDestinationCard()),
-                SliverToBoxAdapter(child: ExploreCategories()),
-                SliverToBoxAdapter(child: TopDestinationsList()),
-                const SliverToBoxAdapter(child: WhatsNewCard()),
-                SliverToBoxAdapter(child: JournalSection()),
-                SliverToBoxAdapter(child: PremiumItinerariesList()),
-                const SliverToBoxAdapter(child: NewsletterCard()),
-                const SliverToBoxAdapter(child: SizedBox(height: 100)), // Padding for bottom nav bar
-              ],
-            ).animate().fadeIn(duration: 500.ms).slideY(begin: 0.1, curve: Curves.easeOutCubic),
+      body: SafeArea(
+        bottom: false,
+        child: CustomScrollView(
+          physics: const BouncingScrollPhysics(),
+          slivers: [
+            // Minimalist Editorial Header
+            const SliverToBoxAdapter(child: HomeJournalHeader()),
+
+            // Asymmetric Editorial Masthead
+            SliverToBoxAdapter(
+              child: HomeEditorialMasthead(
+                activeTrip: activeTrip,
+                upcomingTrip: upcomingTrips.isNotEmpty
+                    ? upcomingTrips.first
+                    : null,
+                pastTrip: pastTrips.isNotEmpty ? pastTrips.first : null,
+              ),
+            ),
+
+            // Dominant Photographic Moment (Bleeds off right edge)
+            SliverToBoxAdapter(
+              child: HomeDominantTravelVisual(
+                activeTrip: activeTrip,
+                upcomingTrip: upcomingTrips.isNotEmpty
+                    ? upcomingTrips.first
+                    : null,
+                pastTrip: pastTrips.isNotEmpty ? pastTrips.first : null,
+              ),
+            ),
+
+            // Active or Upcoming Journey Secondary Strip (if trip exists)
+            if (activeTrip != null || upcomingTrips.isNotEmpty)
+              SliverToBoxAdapter(
+                child: _buildTripProgressStrip(
+                  context,
+                  activeTrip ?? upcomingTrips.first,
+                  isLive: activeTrip != null,
+                ),
+              ),
+
+            // Exploration Section: Typography pills & alternating editorial aspect frames
+            SliverToBoxAdapter(
+              child: HomeEditorialExplorationRail(destinations: destinations),
+            ),
+
+            // Single Curated Travel Journal Moment
+            SliverToBoxAdapter(
+              child: HomeFeaturedJournalMoment(
+                article: articles.isNotEmpty ? articles.first : null,
+              ),
+            ),
+
+            // Quiet Editorial Footer
+            const SliverToBoxAdapter(child: HomeJournalFooter()),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Compact, tactile strip connecting to active or scheduled journey route
+  Widget _buildTripProgressStrip(
+    BuildContext context,
+    TripItineraryModel trip, {
+    required bool isLive,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 22),
+      child: InkWell(
+        onTap: () {
+          if (isLive) {
+            context.push('/ongoing-trips');
+          } else {
+            context.push('/itinerary', extra: trip);
+          }
+        },
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: isLive ? AppColors.teal.withAlpha(120) : AppColors.border,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.brown.withAlpha(8),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
+              ),
+            ],
           ),
-          
-          // AI Voice Orb
-          Positioned(
-            bottom: 32,
-            right: 24,
-            child: GestureDetector(
-              onTap: () {
-                setState(() => _showVoiceAI = true);
-              },
-              child: Container(
-                padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
                 decoration: BoxDecoration(
+                  color: isLive
+                      ? AppColors.teal.withAlpha(30)
+                      : AppColors.surfaceWarm,
                   shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    colors: [Theme.of(context).primaryColor, Colors.orangeAccent],
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Theme.of(context).primaryColor.withValues(alpha: 0.6),
-                      blurRadius: 20,
-                      spreadRadius: 4,
+                ),
+                child: Icon(
+                  isLive ? Icons.near_me_rounded : Icons.route_rounded,
+                  size: 18,
+                  color: isLive ? AppColors.teal : AppColors.primary,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isLive
+                          ? 'ACTIVE ROUTE IN PROGRESS'
+                          : 'SCHEDULED ITINERARY',
+                      style: AppTypography.micro(
+                        color: isLive ? AppColors.teal : AppColors.textTertiary,
+                      ).copyWith(fontWeight: FontWeight.w800),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${trip.destName} · ${trip.totalDays} Days',
+                      style: AppTypography.plusJakartaSans.copyWith(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.brown,
+                      ),
                     ),
                   ],
                 ),
-                child: const Icon(Icons.mic_rounded, color: Colors.white, size: 28),
-              ).animate(onPlay: (controller) => controller.repeat()).shimmer(duration: 2000.ms),
-            ),
-          ),
-          
-          // Voice Assistant Overlay
-          if (_showVoiceAI)
-            Positioned.fill(
-              child: VoiceAssistantOverlay(
-                onClose: () {
-                  setState(() => _showVoiceAI = false);
-                },
               ),
-            ),
-        ],
+              const Icon(
+                Icons.arrow_forward_ios_rounded,
+                size: 14,
+                color: AppColors.textTertiary,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

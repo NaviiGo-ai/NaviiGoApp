@@ -1,490 +1,425 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:flutter_animate/flutter_animate.dart';
-import 'dart:math' as math;
+import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_typography.dart';
+import '../../../trips/presentation/providers/trip_provider.dart';
+import '../../../trips/domain/models/trip_itinerary_model.dart';
 
-class LiveTrackingPage extends StatelessWidget {
+class LiveTrackingPage extends ConsumerStatefulWidget {
   const LiveTrackingPage({super.key});
 
   @override
+  ConsumerState<LiveTrackingPage> createState() => _LiveTrackingPageState();
+}
+
+class _LiveTrackingPageState extends ConsumerState<LiveTrackingPage> {
+  bool _isBuddyActive = true;
+  final String _buddyName = 'Rohan';
+  bool _isSosHolding = false;
+
+  @override
   Widget build(BuildContext context) {
+    TripItineraryModel? activeTrip = ref.watch(activeTripProvider);
+    if (activeTrip == null) {
+      final allTrips = ref.watch(userTripsStreamProvider).value ?? [];
+      if (allTrips.isNotEmpty) {
+        activeTrip = allTrips.first;
+      }
+    }
+
+    final destName = activeTrip?.destName ?? 'Current Waypoint';
+
     return Scaffold(
-      backgroundColor: const Color(0xFF0F1117),
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: AppColors.background,
         elevation: 0,
-        scrolledUnderElevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
-          onPressed: () => context.go('/home'),
+          icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/home');
+            }
+          },
         ),
-        title: const Text('Live Tracking', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+        title: Text(
+          'LIVE TRACKING & BUDDY',
+          style: AppTypography.eyebrow(color: AppColors.brown),
+        ),
         centerTitle: true,
         actions: [
           Container(
             margin: const EdgeInsets.only(right: 16),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: const Color(0xFF059669),
+              color: AppColors.teal.withAlpha(25),
               borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.teal.withAlpha(60)),
             ),
-            child: const Row(
+            child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.circle, color: Colors.white, size: 8),
-                SizedBox(width: 6),
-                Text('LIVE', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                const CircleAvatar(radius: 3, backgroundColor: AppColors.teal),
+                const SizedBox(width: 6),
+                Text(
+                  'ACTIVE',
+                  style: AppTypography.micro(color: AppColors.teal),
+                ),
               ],
             ),
           ),
         ],
       ),
       body: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: 20.0),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 16),
-
-            // Radar Map Widget
-            const SizedBox(
-              height: 260,
-              width: double.infinity,
-              child: RadarMapWidget(),
-            ),
-            const SizedBox(height: 24),
-
-            // Trip Progress Card
+            // Radar Map Card with Warm Editorial Styling
             Container(
+              height: 240,
               width: double.infinity,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: AppColors.border),
+                boxShadow: AppColors.cardShadow,
+              ),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  // Stylized topographic rings
+                  ...[60.0, 110.0, 160.0, 210.0].map((radius) {
+                    return Container(
+                      width: radius * 2,
+                      height: radius * 2,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: AppColors.primary.withAlpha(20),
+                          width: 1,
+                        ),
+                      ),
+                    );
+                  }),
+
+                  // User location indicator
+                  Container(
+                    width: 20,
+                    height: 20,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primary.withAlpha(80),
+                          blurRadius: 10,
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
+                    child: const Center(
+                      child: CircleAvatar(
+                        radius: 4,
+                        backgroundColor: Colors.white,
+                      ),
+                    ),
+                  ),
+
+                  // GPS telemetry overlay
+                  Positioned(
+                    bottom: 14,
+                    left: 14,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withAlpha(230),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.gps_fixed,
+                            size: 12,
+                            color: AppColors.teal,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'High Precision • 12m accuracy',
+                            style: AppTypography.micro(
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  Positioned(
+                    top: 14,
+                    right: 14,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withAlpha(230),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.battery_charging_full,
+                            size: 14,
+                            color: AppColors.primary,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Battery Saver On',
+                            style: AppTypography.micro(
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Active Destination Progress Card
+            Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: const Color(0xFF1A1D2E),
+                color: Colors.white,
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                border: Border.all(color: AppColors.border),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Row(
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Icon(Icons.near_me_rounded, color: Color(0xFF2563EB), size: 16),
-                      SizedBox(width: 8),
-                      Text('TRIP PROGRESS', style: TextStyle(color: Colors.white54, fontSize: 10, letterSpacing: 1.5, fontWeight: FontWeight.bold)),
+                      Text(
+                        'EN ROUTE TO',
+                        style: AppTypography.micro(color: AppColors.primary),
+                      ),
+                      Text(
+                        'SESSION #NV-4092',
+                        style: AppTypography.micro(
+                          color: AppColors.textTertiary,
+                        ),
+                      ),
                     ],
                   ),
+                  const SizedBox(height: 6),
+                  Text(
+                    destName,
+                    style: AppTypography.editorialTitle(
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
                   const SizedBox(height: 16),
+                  const Divider(color: AppColors.border, height: 1),
+                  const SizedBox(height: 14),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'NEXT WAYPOINT',
+                            style: AppTypography.micro(
+                              color: AppColors.textTertiary,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Historic City Gate',
+                            style: AppTypography.bodyMedium(
+                              color: AppColors.textPrimary,
+                            ).copyWith(fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            'EST. TIME',
+                            style: AppTypography.micro(
+                              color: AppColors.textTertiary,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '18 Mins',
+                            style: AppTypography.bodyMedium(
+                              color: AppColors.primary,
+                            ).copyWith(fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Buddy Sharing Mode Card
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceWarm,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   Row(
                     children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppColors.teal.withAlpha(25),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(
+                          Icons.people_alt_rounded,
+                          color: AppColors.teal,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('Mussoorie', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                            Text('Current Location', style: TextStyle(color: Colors.grey[600], fontSize: 11)),
-                          ],
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.05),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Icon(Icons.arrow_forward_rounded, color: Color(0xFFFF6B00), size: 20),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            const Text('Rishikesh', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                            Text('Next Destination', style: TextStyle(color: Colors.grey[600], fontSize: 11)),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  // Progress bar
-                  Container(
-                    height: 6,
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(3),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          flex: 65,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [Color(0xFFFF6B00), Color(0xFF2563EB)],
+                            Text(
+                              'BUDDY MODE',
+                              style: AppTypography.eyebrow(
+                                color: AppColors.teal,
                               ),
-                              borderRadius: BorderRadius.circular(3),
                             ),
-                          ),
+                            Text(
+                              _isBuddyActive
+                                  ? 'Sharing live location with $_buddyName'
+                                  : 'Location sharing inactive',
+                              style: AppTypography.caption(
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
                         ),
-                        const Expanded(flex: 35, child: SizedBox()),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('65% Complete', style: TextStyle(color: Colors.grey[500], fontSize: 11)),
-                      const Text('48 km remaining', style: TextStyle(color: Color(0xFFFF6B00), fontSize: 11, fontWeight: FontWeight.bold)),
+                      ),
+                      Switch.adaptive(
+                        value: _isBuddyActive,
+                        activeColor: AppColors.teal,
+                        onChanged: (val) {
+                          setState(() => _isBuddyActive = val);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                val
+                                    ? 'Live tracking shared with $_buddyName'
+                                    : 'Buddy tracking stopped.',
+                              ),
+                            ),
+                          );
+                        },
+                      ),
                     ],
                   ),
                 ],
               ),
-            ),
-            const SizedBox(height: 16),
-
-            // Quick Stats Row
-            Row(
-              children: [
-                Expanded(child: _buildQuickStat(Icons.speed_rounded, 'ETA', '2h 15m', const Color(0xFFFF6B00))),
-                const SizedBox(width: 12),
-                Expanded(child: _buildQuickStat(Icons.route_rounded, 'Distance', '132 km', const Color(0xFF2563EB))),
-                const SizedBox(width: 12),
-                Expanded(child: _buildQuickStat(Icons.speed_rounded, 'Speed', '45 km/h', const Color(0xFF059669))),
-              ],
             ),
             const SizedBox(height: 24),
 
-            // Quick Actions
-            const Text('Quick Actions', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 16),
-
-            Row(
-              children: [
-                Expanded(child: _buildActionButton(Icons.share_location_rounded, 'Share\nLocation', const Color(0xFF2563EB))),
-                const SizedBox(width: 12),
-                Expanded(child: _buildActionButton(Icons.sos_rounded, 'SOS\nEmergency', const Color(0xFFDC2626))),
-                const SizedBox(width: 12),
-                Expanded(child: _buildActionButton(Icons.navigation_rounded, 'Navigate\nRoute', const Color(0xFF059669))),
-              ],
-            ),
-            const SizedBox(height: 28),
-
-            // Activity Feed
-            const Text('Activity Feed', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 16),
-
-            _buildActivityFeedItem('Departed from Mussoorie', '10:30 AM', Icons.departure_board_rounded, const Color(0xFFFF6B00)),
-            _buildActivityFeedItem('Passed through Dehradun', '11:45 AM', Icons.location_on_rounded, const Color(0xFF2563EB)),
-            _buildActivityFeedItem('Rest stop at Highway Dhaba', '12:30 PM', Icons.restaurant_rounded, const Color(0xFF059669)),
-            _buildActivityFeedItem('Currently en route to Rishikesh', 'Now', Icons.directions_car_rounded, const Color(0xFFFFB74D)),
-
-            // Transport Info
-            const SizedBox(height: 28),
+            // Emergency Hold-for-SOS
             Container(
-              width: double.infinity,
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: const Color(0xFF1A1D2E),
+                color: Colors.red.withAlpha(10),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                border: Border.all(color: Colors.red.withAlpha(40)),
               ),
-              child: Row(
+              child: Column(
                 children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFF6B00).withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: const Icon(Icons.directions_car_rounded, color: Color(0xFFFF6B00), size: 22),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Private Car', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
-                        const SizedBox(height: 4),
-                        Text('Highway NH-7 • Next stop: Rishikesh', style: TextStyle(color: Colors.grey[600], fontSize: 11)),
-                      ],
-                    ),
-                  ),
-                  const Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
+                  Row(
                     children: [
-                      Text('45 km/h', style: TextStyle(color: Color(0xFFFF6B00), fontWeight: FontWeight.bold, fontSize: 16)),
-                      SizedBox(height: 4),
-                      Text('Current Speed', style: TextStyle(color: Colors.white54, fontSize: 10)),
+                      const Icon(Icons.shield, color: Colors.red, size: 22),
+                      const SizedBox(width: 10),
+                      Text(
+                        'EMERGENCY SOS',
+                        style: AppTypography.eyebrow(color: Colors.red),
+                      ),
                     ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Press and hold for 3 seconds to trigger emergency broadcast to your trusted buddies and emergency contact.',
+                    style: AppTypography.caption(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  GestureDetector(
+                    onLongPressStart: (_) {
+                      setState(() {
+                        _isSosHolding = true;
+                      });
+                    },
+                    onLongPressEnd: (_) {
+                      if (_isSosHolding) {
+                        setState(() {
+                          _isSosHolding = false;
+                        });
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'EMERGENCY BROADCAST SENT TO TRUSTED CONTACTS.',
+                            ),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    },
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Center(
+                        child: Text(
+                          _isSosHolding
+                              ? 'TRANSMITTING...'
+                              : 'HOLD 3S FOR EMERGENCY',
+                          style: AppTypography.button(color: Colors.white),
+                        ),
+                      ),
+                    ),
                   ),
                 ],
               ),
             ),
-
-            const SizedBox(height: 100),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildQuickStat(IconData icon, String label, String value, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1A1D2E),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: color, size: 20),
-          const SizedBox(height: 8),
-          Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
-          const SizedBox(height: 4),
-          Text(label, style: TextStyle(color: Colors.grey[600], fontSize: 10)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildActionButton(IconData icon, String label, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: color, size: 24),
-          const SizedBox(height: 8),
-          Text(label, style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildActivityFeedItem(String title, String time, IconData icon, Color color) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16.0),
-      child: Row(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.15),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: color, size: 16),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Text(title, style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w500, fontSize: 13)),
-          ),
-          Text(time, style: TextStyle(color: Colors.grey[600], fontSize: 11, fontWeight: FontWeight.bold)),
-        ],
-      ),
-    );
-  }
-}
-
-class _MapGridPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.03)
-      ..strokeWidth = 1;
-
-    // Horizontal lines
-    for (double y = 0; y < size.height; y += 30) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
-    }
-    // Vertical lines
-    for (double x = 0; x < size.width; x += 30) {
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class RadarMapWidget extends StatefulWidget {
-  const RadarMapWidget({super.key});
-
-  @override
-  State<RadarMapWidget> createState() => _RadarMapWidgetState();
-}
-
-class _RadarMapWidgetState extends State<RadarMapWidget> with SingleTickerProviderStateMixin {
-  late AnimationController _radarController;
-
-  @override
-  void initState() {
-    super.initState();
-    _radarController = AnimationController(vsync: this, duration: const Duration(seconds: 3))..repeat();
-  }
-
-  @override
-  void dispose() {
-    _radarController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF1A1D2E),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
-        child: Stack(
-          children: [
-            // Grid lines to simulate a map
-            CustomPaint(
-              size: const Size(double.infinity, 260),
-              painter: _MapGridPainter(),
-            ),
-            
-            // Sweeping Radar
-            AnimatedBuilder(
-              animation: _radarController,
-              builder: (context, child) {
-                return Positioned.fill(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: SweepGradient(
-                        colors: [
-                          Colors.transparent,
-                          const Color(0xFF059669).withValues(alpha: 0.1),
-                          const Color(0xFF059669).withValues(alpha: 0.4),
-                          Colors.transparent,
-                        ],
-                        stops: const [0.0, 0.5, 0.9, 1.0],
-                        transform: GradientRotation(_radarController.value * math.pi * 2),
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-
-            // Route line
-            Center(
-              child: Container(
-                width: 200,
-                height: 3,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFFFF6B00), Color(0xFF2563EB)],
-                  ),
-                  borderRadius: BorderRadius.circular(2),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFFFF6B00).withValues(alpha: 0.4),
-                      blurRadius: 8,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            // Start marker
-            Positioned(
-              left: 80,
-              top: 120,
-              child: Container(
-                width: 16,
-                height: 16,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFF6B00),
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFFFF6B00).withValues(alpha: 0.5),
-                      blurRadius: 12,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            // Current position (pulsing dot moving along line)
-            Positioned(
-              left: 190,
-              top: 115,
-              child: Container(
-                width: 26,
-                height: 26,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF2563EB).withValues(alpha: 0.2),
-                  shape: BoxShape.circle,
-                ),
-                child: Center(
-                  child: Container(
-                    width: 14,
-                    height: 14,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF2563EB),
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFF2563EB).withValues(alpha: 0.5),
-                          blurRadius: 12,
-                        ),
-                      ],
-                    ),
-                  ).animate(onPlay: (c) => c.repeat(reverse: true)).scale(begin: const Offset(1, 1), end: const Offset(1.5, 1.5), duration: 1.seconds),
-                ),
-              ).animate(onPlay: (c) => c.repeat(reverse: true)).moveX(begin: 0, end: 20, duration: 5.seconds).moveY(begin: 0, end: -5, duration: 5.seconds),
-            ),
-            // End marker
-            Positioned(
-              right: 80,
-              top: 120,
-              child: Container(
-                width: 16,
-                height: 16,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF059669),
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF059669).withValues(alpha: 0.5),
-                      blurRadius: 12,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            // Live Label
-            Positioned(
-              bottom: 16,
-              left: 16,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.6),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.radar_rounded, color: Color(0xFF059669), size: 14),
-                    SizedBox(width: 6),
-                    Text('LIVE RADAR ACTIVE', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)),
-                  ],
-                ),
-              ),
-            ),
+            const SizedBox(height: 40),
           ],
         ),
       ),

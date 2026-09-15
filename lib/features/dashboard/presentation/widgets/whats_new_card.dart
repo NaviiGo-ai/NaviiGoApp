@@ -12,10 +12,7 @@ class WhatsNewCard extends StatelessWidget {
         children: [
           const Text(
             "What's new",
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 16),
           Container(
@@ -31,7 +28,10 @@ class WhatsNewCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.orange.withAlpha(50),
                           borderRadius: BorderRadius.circular(8),
@@ -76,7 +76,11 @@ class WhatsNewCard extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(width: 4),
-                          const Icon(Icons.arrow_forward_rounded, color: Colors.orange, size: 14),
+                          const Icon(
+                            Icons.arrow_forward_rounded,
+                            color: Colors.orange,
+                            size: 14,
+                          ),
                         ],
                       ),
                     ],
@@ -90,7 +94,11 @@ class WhatsNewCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: const Center(
-                    child: Icon(Icons.account_balance_wallet_rounded, color: Colors.white54, size: 40),
+                    child: Icon(
+                      Icons.account_balance_wallet_rounded,
+                      color: Colors.white54,
+                      size: 40,
+                    ),
                   ),
                 ),
               ],

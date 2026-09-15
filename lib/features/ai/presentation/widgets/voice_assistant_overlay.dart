@@ -11,13 +11,17 @@ class VoiceAssistantOverlay extends StatefulWidget {
   State<VoiceAssistantOverlay> createState() => _VoiceAssistantOverlayState();
 }
 
-class _VoiceAssistantOverlayState extends State<VoiceAssistantOverlay> with SingleTickerProviderStateMixin {
+class _VoiceAssistantOverlayState extends State<VoiceAssistantOverlay>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
-  
+
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(vsync: this, duration: const Duration(seconds: 2))..repeat();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat();
   }
 
   @override
@@ -42,7 +46,7 @@ class _VoiceAssistantOverlayState extends State<VoiceAssistantOverlay> with Sing
               ),
             ),
           ).animate().fadeIn(duration: 400.ms),
-          
+
           // Voice Interface
           SafeArea(
             child: Center(
@@ -51,7 +55,11 @@ class _VoiceAssistantOverlayState extends State<VoiceAssistantOverlay> with Sing
                 children: [
                   const Text(
                     "I'm listening...",
-                    style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w900),
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 32,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ).animate().fadeIn(delay: 200.ms).slideY(begin: -0.2),
                   const SizedBox(height: 16),
                   const Text(
@@ -59,7 +67,7 @@ class _VoiceAssistantOverlayState extends State<VoiceAssistantOverlay> with Sing
                     style: TextStyle(color: Colors.white70, fontSize: 16),
                   ).animate().fadeIn(delay: 400.ms).slideY(begin: -0.2),
                   const SizedBox(height: 80),
-                  
+
                   // Glowing Orb Animation
                   AnimatedBuilder(
                     animation: _controller,
@@ -68,9 +76,19 @@ class _VoiceAssistantOverlayState extends State<VoiceAssistantOverlay> with Sing
                         alignment: Alignment.center,
                         children: [
                           _buildWaveRing(1.0 + (_controller.value * 0.5), 0.1),
-                          _buildWaveRing(1.2 + (math.sin(_controller.value * math.pi * 2) * 0.3), 0.3),
-                          _buildWaveRing(1.5 + (math.cos(_controller.value * math.pi * 2) * 0.4), 0.5),
-                          
+                          _buildWaveRing(
+                            1.2 +
+                                (math.sin(_controller.value * math.pi * 2) *
+                                    0.3),
+                            0.3,
+                          ),
+                          _buildWaveRing(
+                            1.5 +
+                                (math.cos(_controller.value * math.pi * 2) *
+                                    0.4),
+                            0.5,
+                          ),
+
                           // Core Orb
                           Container(
                             width: 100,
@@ -80,26 +98,38 @@ class _VoiceAssistantOverlayState extends State<VoiceAssistantOverlay> with Sing
                               gradient: LinearGradient(
                                 colors: [
                                   Theme.of(context).primaryColor,
-                                  Theme.of(context).primaryColor.withValues(alpha: 0.5),
+                                  Theme.of(
+                                    context,
+                                  ).primaryColor.withValues(alpha: 0.5),
                                 ],
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Theme.of(context).primaryColor.withValues(alpha: 0.8),
+                                  color: Theme.of(
+                                    context,
+                                  ).primaryColor.withValues(alpha: 0.8),
                                   blurRadius: 40,
                                   spreadRadius: 10,
                                 ),
                               ],
                             ),
-                            child: const Icon(Icons.mic_rounded, color: Colors.white, size: 40),
+                            child: const Icon(
+                              Icons.mic_rounded,
+                              color: Colors.white,
+                              size: 40,
+                            ),
                           ),
                         ],
                       );
                     },
-                  ).animate().scale(delay: 200.ms, duration: 600.ms, curve: Curves.elasticOut),
-                  
+                  ).animate().scale(
+                    delay: 200.ms,
+                    duration: 600.ms,
+                    curve: Curves.elasticOut,
+                  ),
+
                   const SizedBox(height: 120),
-                  
+
                   // Close Button
                   GestureDetector(
                     onTap: widget.onClose,
@@ -108,9 +138,14 @@ class _VoiceAssistantOverlayState extends State<VoiceAssistantOverlay> with Sing
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: Colors.white.withValues(alpha: 0.1),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.2),
+                        ),
                       ),
-                      child: const Icon(Icons.close_rounded, color: Colors.white),
+                      child: const Icon(
+                        Icons.close_rounded,
+                        color: Colors.white,
+                      ),
                     ),
                   ).animate().fadeIn(delay: 600.ms).scale(),
                 ],

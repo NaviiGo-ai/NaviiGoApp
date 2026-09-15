@@ -8,7 +8,7 @@ class HiveService {
 
   static Future<void> init() async {
     await Hive.initFlutter();
-    
+
     // Open cached data boxes
     await Hive.openBox(itineraryBoxName);
     await Hive.openBox(userProfileBoxName);
@@ -18,7 +18,10 @@ class HiveService {
   static Box get userProfileBox => Hive.box(userProfileBoxName);
 
   // Helper methods to cache and retrieve itinerary JSON structures
-  static Future<void> cacheItinerary(String key, Map<String, dynamic> data) async {
+  static Future<void> cacheItinerary(
+    String key,
+    Map<String, dynamic> data,
+  ) async {
     await itineraryBox.put(key, data);
   }
 

@@ -1,4 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../../../core/constants/master_destinations.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_typography.dart';
 
 class TransportationPage extends StatefulWidget {
   const TransportationPage({super.key});
@@ -8,297 +13,351 @@ class TransportationPage extends StatefulWidget {
 }
 
 class _TransportationPageState extends State<TransportationPage> {
-  int _selectedTabIndex = 0;
+  int _selectedCategoryIndex =
+      0; // 0: Cabs & Rides, 1: Trains & Rail, 2: Flights
+  MasterDestination _selectedDestination = kMasterDestinations[1]; // Jaipur
+
+  final List<String> _categories = [
+    'CABS & RIDES',
+    'TRAINS & RAIL',
+    'FLIGHTS & AIR',
+  ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFAF9F6),
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Transit', style: TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: AppColors.background,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/home');
+            }
+          },
+        ),
+        title: Text(
+          'TRANSIT & MOBILITY',
+          style: AppTypography.eyebrow(color: AppColors.brown),
+        ),
+        centerTitle: true,
       ),
-      body: Column(
-        children: [
-          // Custom Tab Bar
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-            child: Container(
-              height: 50,
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Target Destination Selector
+            Container(
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(25),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.border),
               ),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildTab(0, 'Flights', Icons.flight_takeoff_rounded),
-                  _buildTab(1, 'Trains', Icons.train_rounded),
-                  _buildTab(2, 'Cabs', Icons.local_taxi_rounded),
+                  Text(
+                    'DESTINATION HUB',
+                    style: AppTypography.micro(color: AppColors.primary),
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<MasterDestination>(
+                    value: _selectedDestination,
+                    decoration: InputDecoration(
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: AppColors.border),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: AppColors.border),
+                      ),
+                    ),
+                    items: kMasterDestinations.map((dest) {
+                      return DropdownMenuItem(
+                        value: dest,
+                        child: Text(
+                          '${dest.name}, ${dest.state}',
+                          style: AppTypography.bodyMedium(
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (val) {
+                      if (val != null) {
+                        setState(() => _selectedDestination = val);
+                      }
+                    },
+                  ),
                 ],
               ),
             ),
-          ),
+            const SizedBox(height: 20),
 
-          // Content
-          Expanded(
-            child: _selectedTabIndex == 0
-                ? _buildFlightsContent()
-                : _selectedTabIndex == 1
-                    ? _buildTrainsContent()
-                    : _buildCabsContent(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTab(int index, String text, IconData icon) {
-    final isSelected = _selectedTabIndex == index;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => setState(() => _selectedTabIndex = index),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 250),
-          decoration: BoxDecoration(
-            color: isSelected ? Theme.of(context).primaryColor : Colors.transparent,
-            borderRadius: BorderRadius.circular(25),
-          ),
-          child: Center(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(icon, size: 16, color: isSelected ? Colors.white : Colors.grey[600]),
-                const SizedBox(width: 6),
-                Text(
-                  text,
-                  style: TextStyle(
-                    color: isSelected ? Colors.white : Colors.grey[600],
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                    fontSize: 13,
-                  ),
-                ),
-              ],
+            // Category Segmented Control
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: List.generate(_categories.length, (index) {
+                  final isSelected = _selectedCategoryIndex == index;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: ChoiceChip(
+                      label: Text(
+                        _categories[index],
+                        style: AppTypography.eyebrow(
+                          color: isSelected
+                              ? Colors.white
+                              : AppColors.textSecondary,
+                        ),
+                      ),
+                      selected: isSelected,
+                      selectedColor: AppColors.primary,
+                      backgroundColor: Colors.white,
+                      side: BorderSide(
+                        color: isSelected
+                            ? AppColors.primary
+                            : AppColors.border,
+                      ),
+                      onSelected: (selected) {
+                        if (selected) {
+                          setState(() => _selectedCategoryIndex = index);
+                        }
+                      },
+                    ),
+                  );
+                }),
+              ),
             ),
-          ),
+            const SizedBox(height: 20),
+
+            // Dynamic Category Content
+            if (_selectedCategoryIndex == 0)
+              _buildCabsSection()
+            else if (_selectedCategoryIndex == 1)
+              _buildTrainsSection()
+            else
+              _buildFlightsSection(),
+
+            const SizedBox(height: 40),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildFlightsContent() {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      physics: const BouncingScrollPhysics(),
+  Widget _buildCabsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Upcoming Flights', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF2D3142))),
-        const SizedBox(height: 16),
-        _buildBoardingPass(
-          airline: 'Emirates',
-          flightNum: 'EK 412',
-          from: 'JFK',
-          to: 'DXB',
-          timeFrom: '10:45 PM',
-          timeTo: '08:20 PM',
-          date: '14 Aug',
-          status: 'ON TIME',
-          statusColor: const Color(0xFF059669),
+        Text(
+          'LOCAL RIDES & TAXIS',
+          style: AppTypography.sectionTitle(color: AppColors.textPrimary),
         ),
-        const SizedBox(height: 24),
-        const Text('Past Flights', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF2D3142))),
+        const SizedBox(height: 6),
+        Text(
+          'Connect directly with certified drivers or open verified ride apps to your destination.',
+          style: AppTypography.caption(color: AppColors.textSecondary),
+        ),
         const SizedBox(height: 16),
-        _buildBoardingPass(
-          airline: 'Delta',
-          flightNum: 'DL 901',
-          from: 'LHR',
-          to: 'JFK',
-          timeFrom: '08:00 AM',
-          timeTo: '11:30 AM',
-          date: '02 Aug',
-          status: 'COMPLETED',
-          statusColor: Colors.grey,
+
+        _buildTransitProviderCard(
+          title: 'Uber India',
+          subtitle: 'City cabs, rentals & airport drops',
+          badge: 'APP LAUNCH',
+          icon: Icons.local_taxi_rounded,
+          onTap: () async {
+            final uri = Uri.parse(
+              'https://m.uber.com/ul/?action=setPickup&pickup=my_location&dropoff[formatted_address]=${Uri.encodeComponent(_selectedDestination.name)}',
+            );
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+          },
+        ),
+        const SizedBox(height: 12),
+        _buildTransitProviderCard(
+          title: 'Ola Cabs & Autos',
+          subtitle: 'Autos, Prime Sedans & Outstation',
+          badge: 'APP LAUNCH',
+          icon: Icons.electric_rickshaw,
+          onTap: () async {
+            final uri = Uri.parse(
+              'https://book.olacabs.com/?pickup_name=Current%20Location&drop_name=${Uri.encodeComponent(_selectedDestination.name)}',
+            );
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+          },
+        ),
+        const SizedBox(height: 12),
+        _buildTransitProviderCard(
+          title: 'Prepaid Local Taxi Stand',
+          subtitle: 'Official railway station & airport fixed counter',
+          badge: 'MAP LOCATOR',
+          icon: Icons.local_shipping_outlined,
+          onTap: () async {
+            final target = _selectedDestination.station.isNotEmpty
+                ? _selectedDestination.station
+                : _selectedDestination.name;
+            final uri = Uri.parse(
+              'https://www.google.com/maps/search/prepaid+taxi+stand+near+${Uri.encodeComponent(target)}',
+            );
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+          },
         ),
       ],
     );
   }
 
-  Widget _buildTrainsContent() {
-    return const Center(child: Text('No upcoming train tickets.'));
+  Widget _buildTrainsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'RAILWAY TRANSIT',
+          style: AppTypography.sectionTitle(color: AppColors.textPrimary),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Primary Station: ${_selectedDestination.station} (${_selectedDestination.name} Junction)',
+          style: AppTypography.caption(color: AppColors.textSecondary),
+        ),
+        const SizedBox(height: 16),
+
+        _buildTransitProviderCard(
+          title: 'IRCTC Rail Connect',
+          subtitle:
+              'Book Vande Bharat, Rajdhani & Express trains to ${_selectedDestination.station}',
+          badge: 'OFFICIAL PORTAL',
+          icon: Icons.train_rounded,
+          onTap: () async {
+            final uri = Uri.parse('https://www.irctc.co.in/nget/train-search');
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+          },
+        ),
+        const SizedBox(height: 12),
+        _buildTransitProviderCard(
+          title: 'Live Train Running Status',
+          subtitle:
+              'Track incoming trains to ${_selectedDestination.station} in real-time',
+          badge: 'LIVE STATUS',
+          icon: Icons.access_time_filled,
+          onTap: () async {
+            final target = _selectedDestination.station.isNotEmpty
+                ? _selectedDestination.station
+                : _selectedDestination.name;
+            final uri = Uri.parse(
+              'https://www.google.com/search?q=live+train+status+${Uri.encodeComponent(target)}',
+            );
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+          },
+        ),
+      ],
+    );
   }
 
-  Widget _buildCabsContent() {
-    return const Center(child: Text('No upcoming cab rides.'));
+  Widget _buildFlightsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'FLIGHTS & AIR CONNECTIONS',
+          style: AppTypography.sectionTitle(color: AppColors.textPrimary),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Nearest Airport: ${_selectedDestination.iata} (${_selectedDestination.name})',
+          style: AppTypography.caption(color: AppColors.textSecondary),
+        ),
+        const SizedBox(height: 16),
+
+        _buildTransitProviderCard(
+          title: 'Compare Airfares to ${_selectedDestination.iata}',
+          subtitle:
+              'Direct & connecting flights across Indigo, Air India & Vistara',
+          badge: 'SEARCH & COMPARE',
+          icon: Icons.flight_takeoff_rounded,
+          onTap: () async {
+            final target = _selectedDestination.iata.isNotEmpty
+                ? _selectedDestination.iata
+                : _selectedDestination.name;
+            final uri = Uri.parse(
+              'https://www.google.com/travel/flights?q=flights+to+${Uri.encodeComponent(target)}',
+            );
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+          },
+        ),
+      ],
+    );
   }
 
-  Widget _buildBoardingPass({
-    required String airline,
-    required String flightNum,
-    required String from,
-    required String to,
-    required String timeFrom,
-    required String timeTo,
-    required String date,
-    required String status,
-    required Color statusColor,
+  Widget _buildTransitProviderCard({
+    required String title,
+    required String subtitle,
+    required String badge,
+    required IconData icon,
+    required VoidCallback onTap,
   }) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
       ),
-      child: Column(
-        children: [
-          // Top section
-          Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(airline, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: statusColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        status,
-                        style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 10, letterSpacing: 0.5),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(from, style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w800, color: Color(0xFF2D3142))),
-                        const SizedBox(height: 4),
-                        Text(timeFrom, style: TextStyle(color: Colors.grey[600], fontWeight: FontWeight.w500)),
-                      ],
-                    ),
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                        child: Row(
-                          children: [
-                            const CircleAvatar(radius: 4, backgroundColor: Colors.grey),
-                            Expanded(
-                              child: Container(
-                                height: 1,
-                                color: Colors.grey[300],
-                              ),
-                            ),
-                            Icon(Icons.flight_takeoff_rounded, color: Theme.of(context).primaryColor),
-                            Expanded(
-                              child: Container(
-                                height: 1,
-                                color: Colors.grey[300],
-                              ),
-                            ),
-                            const CircleAvatar(radius: 4, backgroundColor: Colors.grey),
-                          ],
-                        ),
-                      ),
-                    ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(to, style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w800, color: Color(0xFF2D3142))),
-                        const SizedBox(height: 4),
-                        Text(timeTo, style: TextStyle(color: Colors.grey[600], fontWeight: FontWeight.w500)),
-                      ],
-                    ),
-                  ],
-                ),
-              ],
+      child: ListTile(
+        contentPadding: const EdgeInsets.all(16),
+        leading: Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            color: AppColors.cream,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(icon, color: AppColors.primary, size: 24),
+        ),
+        title: Row(
+          children: [
+            Expanded(
+              child: Text(
+                title,
+                style: AppTypography.tripTitle(color: AppColors.textPrimary),
+              ),
             ),
-          ),
-          
-          // Divider with notches
-          Row(
-            children: [
-              Container(
-                width: 10,
-                height: 20,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFFAF9F6),
-                  borderRadius: BorderRadius.horizontal(right: Radius.circular(10)),
-                ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceWarm,
+                borderRadius: BorderRadius.circular(4),
               ),
-              Expanded(
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    return Flex(
-                      direction: Axis.horizontal,
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      mainAxisSize: MainAxisSize.max,
-                      children: List.generate(
-                        (constraints.constrainWidth() / 10).floor(),
-                        (index) => SizedBox(
-                          width: 5,
-                          height: 1,
-                          child: DecoratedBox(decoration: BoxDecoration(color: Colors.grey[300])),
-                        ),
-                      ),
-                    );
-                  },
-                ),
+              child: Text(
+                badge,
+                style: AppTypography.micro(color: AppColors.primary),
               ),
-              Container(
-                width: 10,
-                height: 20,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFFAF9F6),
-                  borderRadius: BorderRadius.horizontal(left: Radius.circular(10)),
-                ),
-              ),
-            ],
-          ),
-
-          // Bottom section
-          Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _buildPassDetail('Date', date),
-                _buildPassDetail('Flight', flightNum),
-                _buildPassDetail('Gate', 'C24'),
-                _buildPassDetail('Seat', '12A'),
-              ],
             ),
+          ],
+        ),
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: Text(
+            subtitle,
+            style: AppTypography.caption(color: AppColors.textSecondary),
           ),
-        ],
+        ),
+        trailing: const Icon(
+          Icons.arrow_forward_ios,
+          size: 14,
+          color: AppColors.textSecondary,
+        ),
+        onTap: onTap,
       ),
-    );
-  }
-
-  Widget _buildPassDetail(String label, String value) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: TextStyle(color: Colors.grey[500], fontSize: 12)),
-        const SizedBox(height: 4),
-        Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF2D3142))),
-      ],
     );
   }
 }

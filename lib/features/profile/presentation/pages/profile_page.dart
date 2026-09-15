@@ -1,333 +1,318 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import '../../../../core/auth/auth_provider.dart';
+import '../providers/user_provider.dart';
 
-class ProfilePage extends StatelessWidget {
+class ProfilePage extends ConsumerWidget {
   const ProfilePage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final bgColor = const Color(0xFFF0F4EF);
-    final cardColor = Colors.white;
-    final headerColor = const Color(0xFFE8EDE7);
-    final rowBgColor = const Color(0xFFEAF0EA);
-    final textDark = const Color(0xFF2D3A30);
-    
+  Widget build(BuildContext context, WidgetRef ref) {
+    final userProfileAsync = ref.watch(userProfileStreamProvider);
+    final currentUser = ref.watch(currentUserProvider);
+    final profile = userProfileAsync.value;
+
+    final displayName =
+        profile?.displayName ?? currentUser?.displayName ?? 'Nomad Explorer';
+    final email =
+        profile?.email ?? currentUser?.email ?? 'signed.out@naviigo.com';
+    final initials = profile?.initials ?? 'NV';
+    final totalTrips = profile?.totalTrips ?? 0;
+    final totalBookings = profile?.totalBookings ?? 0;
+
+    const bgColor = Color(0xFFF8F9FA);
+    const textDark = Color(0xFF24323A);
+
     return Scaffold(
       backgroundColor: bgColor,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        scrolledUnderElevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new, color: textDark, size: 20),
-          onPressed: () {},
+          icon: const Icon(Icons.arrow_back_ios_new, color: textDark, size: 20),
+          onPressed: () => context.go('/home'),
         ),
-        title: Text(
-          'Profile',
-          style: TextStyle(color: textDark, fontSize: 16, fontWeight: FontWeight.w600),
+        title: const Text(
+          'Profile & Account',
+          style: TextStyle(
+            color: textDark,
+            fontSize: 17,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         centerTitle: true,
-        actions: [
-          IconButton(
-            icon: Icon(Icons.edit_outlined, color: textDark, size: 22),
-            onPressed: () {},
-          ),
-        ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.only(left: 20, right: 20, top: 10, bottom: 100),
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 10,
+          bottom: 100,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // User Header
+            // User Header Card
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: headerColor,
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: SizedBox(
-                  width: 80,
-                  height: 80,
-                  child: Stack(
-                    alignment: Alignment.bottomRight,
-                    children: [
-                      CircleAvatar(
-                        radius: 40,
-                        backgroundColor: const Color(0xFF1E2420),
-                        child: const Text('DK', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF6A866E),
-                          shape: BoxShape.circle,
-                          border: Border.all(color: headerColor, width: 2),
-                        ),
-                        child: const Icon(Icons.camera_alt, color: Colors.white, size: 12),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-            
-            // Travel Stats
-            Text('Travel Stats', style: TextStyle(color: textDark.withValues(alpha: 0.7), fontSize: 14)),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(child: _buildStatCard(Icons.flight_takeoff, '5', 'Total Trips', cardColor, const Color(0xFF4C6B52))),
-                const SizedBox(width: 12),
-                Expanded(child: _buildStatCard(Icons.location_on_outlined, '2', 'Places Visited', cardColor, const Color(0xFF4C6B52))),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(child: _buildStatCard(Icons.emoji_events_outlined, '3', 'Badges Earned', cardColor, const Color(0xFF4C6B52))),
-                const SizedBox(width: 12),
-                Expanded(child: _buildStatCard(Icons.menu_book_outlined, '65%', 'Passport Progress', cardColor, const Color(0xFF4C6B52))),
-              ],
-            ),
-            
-            const SizedBox(height: 24),
-            Text('Saved Content', style: TextStyle(color: textDark.withValues(alpha: 0.7), fontSize: 14)),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: cardColor,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Column(
-                children: [
-                  _buildIconRow(Icons.favorite_border, 'Saved Destinations', '8', rowBgColor, textDark),
-                  const SizedBox(height: 8),
-                  _buildIconRow(Icons.calendar_today_outlined, 'Draft Itineraries', '3', rowBgColor, textDark),
-                  const SizedBox(height: 8),
-                  _buildIconRow(Icons.account_balance_outlined, 'Cultural Events', '12', rowBgColor, textDark),
-                ],
-              ),
-            ),
-            
-            const SizedBox(height: 24),
-            Text('Community & Sharing', style: TextStyle(color: textDark.withValues(alpha: 0.7), fontSize: 14)),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: cardColor,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Column(
-                children: [
-                  _buildListTile(Icons.book_outlined, 'Travel Diary', textDark),
-                  const SizedBox(height: 8),
-                  _buildListTile(Icons.share_outlined, 'Share on Social Media', textDark),
-                  const SizedBox(height: 8),
-                  _buildListTile(Icons.person_add_outlined, 'Invite Travel Buddy', textDark),
-                ],
-              ),
-            ),
-            
-            const SizedBox(height: 24),
-            // My Rewards Banner
-            Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: const Color(0xFFFDE9B7),
-                borderRadius: BorderRadius.circular(20),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.04),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.emoji_events_outlined, color: Color(0xFFB58017), size: 32),
+                  CircleAvatar(
+                    radius: 36,
+                    backgroundColor: const Color(0xFF632713),
+                    backgroundImage:
+                        (profile?.photoURL != null &&
+                            profile!.photoURL!.isNotEmpty)
+                        ? NetworkImage(profile.photoURL!)
+                        : null,
+                    child:
+                        (profile?.photoURL == null ||
+                            profile!.photoURL!.isEmpty)
+                        ? Text(
+                            initials,
+                            style: const TextStyle(
+                              color: Color(0xFFFDE3CF),
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          )
+                        : null,
+                  ),
                   const SizedBox(width: 16),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('My Rewards', style: TextStyle(color: Color(0xFF2D3A30), fontSize: 16, fontWeight: FontWeight.bold)),
-                        Text('View badges & achieve...', style: TextStyle(color: const Color(0xFF2D3A30).withValues(alpha: 0.7), fontSize: 12)),
+                        Text(
+                          displayName,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: textDark,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          email,
+                          style: const TextStyle(
+                            color: Colors.grey,
+                            fontSize: 13,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(
+                              0xFFEC6426,
+                            ).withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Text(
+                            'NAVIIGO CLOUD SYNCED',
+                            style: TextStyle(
+                              color: Color(0xFFEC6426),
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.8,
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFD69A23),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Text('View All', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Real Metrics
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.04),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
                   ),
                 ],
-              ),
-            ),
-            
-            const SizedBox(height: 24),
-            Text('Settings & Preferences', style: TextStyle(color: textDark.withValues(alpha: 0.7), fontSize: 14)),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: cardColor,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Column(
-                children: [
-                  _buildIconRowSetting(Icons.language, 'Language', 'English', rowBgColor, textDark),
-                  const SizedBox(height: 8),
-                  _buildIconRowSetting(Icons.attach_money, 'Currency', 'INR', rowBgColor, textDark),
-                  const SizedBox(height: 8),
-                  _buildIconRowSetting(Icons.accessibility_new, 'Accessibility', 'Standard', rowBgColor, textDark),
-                  const SizedBox(height: 8),
-                  _buildIconRowSetting(Icons.palette_outlined, 'Theme', 'Light', rowBgColor, textDark),
-                ],
-              ),
-            ),
-            
-            const SizedBox(height: 24),
-            // Emergency Contacts
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF9DADB),
-                borderRadius: BorderRadius.circular(20),
               ),
               child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  const Icon(Icons.phone_in_talk_outlined, color: Color(0xFFDF4B50), size: 24),
-                  const SizedBox(width: 16),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Emergency Contacts', style: TextStyle(color: Color(0xFFDF4B50), fontSize: 16, fontWeight: FontWeight.bold)),
-                      Text('SOS & Safety', style: TextStyle(color: const Color(0xFFDF4B50).withValues(alpha: 0.7), fontSize: 12)),
-                    ],
-                  ),
+                  _buildMetric('$totalTrips', 'Total Trips'),
+                  Container(width: 1, height: 36, color: Colors.grey[200]),
+                  _buildMetric('$totalBookings', 'Bookings'),
+                  Container(width: 1, height: 36, color: Colors.grey[200]),
+                  _buildMetric('Active', 'Cloud Sync'),
                 ],
               ),
             ),
-            
-            const SizedBox(height: 16),
-            // Account Settings
-            _buildSettingCard(Icons.security, 'Account Settings', 'Privacy & Security', cardColor, textDark),
-            const SizedBox(height: 16),
-            // Help & Support
-            _buildSettingCard(Icons.help_outline, 'Help & Support', 'Contact us', cardColor, textDark),
-            
             const SizedBox(height: 24),
+
+            // Quick Links
+            _buildSectionHeader('TRAVEL PASSPORT & MEMORIES'),
+            _buildOptionTile(
+              icon: Icons.card_travel_rounded,
+              title: 'Digital Passport',
+              subtitle: 'Stamps, XP level & visited regions',
+              onTap: () => context.push('/digital-passport'),
+            ),
+            _buildOptionTile(
+              icon: Icons.bookmark_border_rounded,
+              title: 'Saved Places',
+              subtitle: 'Bucket list items & monuments',
+              onTap: () => context.push('/saved-places'),
+            ),
+            _buildOptionTile(
+              icon: Icons.confirmation_number_outlined,
+              title: 'Bookings & Wallet',
+              subtitle: 'Transport tickets & hotel references',
+              onTap: () => context.push('/bookings'),
+            ),
+            const SizedBox(height: 20),
+
+            _buildSectionHeader('SECURITY & PREFERENCES'),
+            _buildOptionTile(
+              icon: Icons.security_rounded,
+              title: 'Safety & Trusted Contacts',
+              subtitle: 'Emergency contacts & sharing settings',
+              onTap: () => context.push('/help-support'),
+            ),
+            _buildOptionTile(
+              icon: Icons.settings_outlined,
+              title: 'Settings & Cache',
+              subtitle: 'Offline data, notifications & preferences',
+              onTap: () => context.push('/settings'),
+            ),
+            const SizedBox(height: 32),
+
+            // Sign Out Button
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: OutlinedButton.icon(
+                onPressed: () async {
+                  await ref.read(authControllerProvider.notifier).signOut();
+                  if (context.mounted) {
+                    context.go('/login');
+                  }
+                },
+                icon: const Icon(Icons.logout_rounded, color: Colors.redAccent),
+                label: const Text(
+                  'Sign Out',
+                  style: TextStyle(
+                    color: Colors.redAccent,
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Colors.redAccent),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 40),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildStatCard(IconData icon, String value, String label, Color bgColor, Color iconColor) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: iconColor, size: 28),
-          const SizedBox(height: 12),
-          Text(value, style: const TextStyle(color: Color(0xFF2D3A30), fontSize: 24, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 4),
-          Text(label, style: TextStyle(color: const Color(0xFF2D3A30).withValues(alpha: 0.5), fontSize: 12)),
-        ],
+  Widget _buildMetric(String value, String label) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF24323A),
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+      ],
+    );
+  }
+
+  Widget _buildSectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4, bottom: 8),
+      child: Text(
+        title,
+        style: const TextStyle(
+          color: Colors.grey,
+          fontSize: 11,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 1.2,
+        ),
       ),
     );
   }
-  
-  Widget _buildIconRow(IconData icon, String title, String badgeValue, Color bg, Color textC) {
+
+  Widget _buildOptionTile({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: bg,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: textC.withValues(alpha: 0.6), size: 20),
-          const SizedBox(width: 16),
-          Expanded(child: Text(title, style: TextStyle(color: textC, fontSize: 14))),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: textC.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(badgeValue, style: TextStyle(color: textC, fontWeight: FontWeight.bold, fontSize: 12)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
-    );
-  }
-  
-  Widget _buildListTile(IconData icon, String title, Color textC) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      decoration: BoxDecoration(
-        border: Border.all(color: textC.withValues(alpha: 0.05)),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: textC.withValues(alpha: 0.6), size: 20),
-          const SizedBox(width: 16),
-          Expanded(child: Text(title, style: TextStyle(color: textC, fontSize: 14))),
-          Icon(Icons.chevron_right, color: textC.withValues(alpha: 0.4), size: 20),
-        ],
-      ),
-    );
-  }
-  
-  Widget _buildIconRowSetting(IconData icon, String title, String value, Color bg, Color textC) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: textC.withValues(alpha: 0.6), size: 20),
-          const SizedBox(width: 16),
-          Expanded(child: Text(title, style: TextStyle(color: textC, fontSize: 14))),
-          Text(value, style: TextStyle(color: textC.withValues(alpha: 0.6), fontSize: 12)),
-        ],
-      ),
-    );
-  }
-  
-  Widget _buildSettingCard(IconData icon, String title, String subtitle, Color bg, Color textC) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: textC.withValues(alpha: 0.6), size: 24),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: TextStyle(color: textC, fontSize: 14, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 2),
-                Text(subtitle, style: TextStyle(color: textC.withValues(alpha: 0.6), fontSize: 12)),
-              ],
-            ),
+      child: ListTile(
+        onTap: onTap,
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: const Color(0xFFEC6426).withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(10),
           ),
-          Icon(Icons.chevron_right, color: textC.withValues(alpha: 0.4), size: 20),
-        ],
+          child: Icon(icon, color: const Color(0xFFEC6426), size: 22),
+        ),
+        title: Text(
+          title,
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+        ),
+        subtitle: Text(
+          subtitle,
+          style: const TextStyle(color: Colors.grey, fontSize: 12),
+        ),
+        trailing: const Icon(Icons.chevron_right_rounded, color: Colors.grey),
       ),
     );
   }

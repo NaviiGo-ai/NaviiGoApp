@@ -19,7 +19,8 @@ class NaviiGoApp extends StatelessWidget {
           debugShowCheckedModeBanner: false,
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
-          themeMode: ThemeMode.dark, // Default to dark premium aesthetic
+          themeMode: ThemeMode
+              .light, // Default to warm paper Naviigo editorial aesthetic
           routerConfig: appRouter,
         );
       },

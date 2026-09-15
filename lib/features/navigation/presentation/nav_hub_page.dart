@@ -1,22 +1,45 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_typography.dart';
+import '../../../core/auth/auth_provider.dart';
 
-class NavHubPage extends StatelessWidget {
+class NavHubPage extends ConsumerWidget {
   final Widget child;
 
-  const NavHubPage({
-    super.key,
-    required this.child,
-  });
+  const NavHubPage({super.key, required this.child});
 
   int _calculateSelectedIndex(BuildContext context) {
     final String location = GoRouterState.of(context).uri.path;
-    if (location.startsWith('/map')) return 1;
-    if (location.startsWith('/explore') || location.startsWith('/restaurants')) return 2;
-    if (location.startsWith('/trips')) return 3;
-    if (location.startsWith('/profile') || location.startsWith('/digital-passport')) return 4;
-    return 0; // Default to Home
+    if (location.startsWith('/explore') ||
+        location.startsWith('/explore-discover') ||
+        location.startsWith('/hidden-gems') ||
+        location.startsWith('/restaurants') ||
+        location.startsWith('/transportation')) {
+      return 1;
+    }
+    if (location.startsWith('/trips') ||
+        location.startsWith('/itinerary') ||
+        location.startsWith('/upcoming-trips') ||
+        location.startsWith('/ongoing-trips') ||
+        location.startsWith('/live-tracking') ||
+        location.startsWith('/trip-planner')) {
+      return 2;
+    }
+    if (location.startsWith('/digital-passport') ||
+        location.startsWith('/passport') ||
+        location.startsWith('/saved-places') ||
+        location.startsWith('/bookings') ||
+        location.startsWith('/payment-history')) {
+      return 3;
+    }
+    if (location.startsWith('/profile') ||
+        location.startsWith('/settings') ||
+        location.startsWith('/help-support')) {
+      return 4;
+    }
+    return 0; // Default: Home
   }
 
   void _onItemTapped(int index, BuildContext context) {
@@ -25,13 +48,13 @@ class NavHubPage extends StatelessWidget {
         context.go('/home');
         break;
       case 1:
-        context.go('/map');
+        context.go('/explore-discover');
         break;
       case 2:
-        context.go('/explore');
+        context.go('/trips');
         break;
       case 3:
-        context.go('/trips');
+        context.go('/digital-passport');
         break;
       case 4:
         context.go('/profile');
@@ -40,67 +63,63 @@ class NavHubPage extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final int currentIndex = _calculateSelectedIndex(context);
-    final String location = GoRouterState.of(context).uri.path;
-    final bool isLightMode = currentIndex == 2 || currentIndex == 3 || currentIndex == 4
-        || location.startsWith('/ongoing-trips')
-        || location.startsWith('/upcoming-trips')
-        || location.startsWith('/past-trips')
-        || location.startsWith('/explore-discover')
-        || location.startsWith('/digital-passport')
-        || location.startsWith('/bookings')
-        || location.startsWith('/saved-places')
-        || location.startsWith('/payment-history')
-        || location.startsWith('/restaurants')
-        || location.startsWith('/hidden-gems')
-        || location.startsWith('/transportation');
 
     return Scaffold(
-      extendBody: true,
+      backgroundColor: AppColors.background,
       body: child,
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _onItemTapped(2, context),
-        backgroundColor: const Color(0xFFFF6B00), // Orange
-        shape: const CircleBorder(),
-        elevation: 8,
-        child: const Icon(Icons.explore, color: Colors.white, size: 28),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
-              blurRadius: 20,
-              offset: const Offset(0, -5),
-            ),
-          ],
+        decoration: const BoxDecoration(
+          color: AppColors.surface,
+          border: Border(top: BorderSide(color: AppColors.border, width: 1)),
         ),
-        child: BottomAppBar(
-          color: isLightMode ? Colors.white : const Color(0xFF1E1E1E),
-          elevation: 0,
-          shape: const CircularNotchedRectangle(),
-          notchMargin: 8.0,
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+        child: SafeArea(
+          top: false,
           child: SizedBox(
-            height: 60,
+            height: 62,
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                Row(
-                  children: [
-                    _buildNavItem(context, 0, Icons.home_filled, 'HOME', currentIndex, isLightMode),
-                    const SizedBox(width: 24),
-                    _buildNavItem(context, 1, Icons.map_rounded, 'MAP', currentIndex, isLightMode),
-                  ],
+                _buildNavItem(
+                  context,
+                  0,
+                  Icons.cottage_outlined,
+                  Icons.cottage_rounded,
+                  'Home',
+                  currentIndex,
                 ),
-                Row(
-                  children: [
-                    _buildNavItem(context, 3, Icons.flight_takeoff_rounded, 'TRIPS', currentIndex, isLightMode),
-                    const SizedBox(width: 24),
-                    _buildNavItem(context, 4, Icons.person, 'PROFILE', currentIndex, isLightMode),
-                  ],
+                _buildNavItem(
+                  context,
+                  1,
+                  Icons.explore_outlined,
+                  Icons.explore_rounded,
+                  'Explore',
+                  currentIndex,
+                ),
+                _buildNavItem(
+                  context,
+                  2,
+                  Icons.alt_route_outlined,
+                  Icons.alt_route_rounded,
+                  'Trips',
+                  currentIndex,
+                ),
+                _buildNavItem(
+                  context,
+                  3,
+                  Icons.card_membership_outlined,
+                  Icons.card_membership_rounded,
+                  'Passport',
+                  currentIndex,
+                ),
+                _buildNavItem(
+                  context,
+                  4,
+                  Icons.person_outline_rounded,
+                  Icons.person_rounded,
+                  'Profile',
+                  currentIndex,
                 ),
               ],
             ),
@@ -110,121 +129,309 @@ class NavHubPage extends StatelessWidget {
     );
   }
 
-  Widget _buildNavItem(BuildContext context, int index, IconData icon, String label, int currentIndex, bool isLightMode) {
+  Widget _buildNavItem(
+    BuildContext context,
+    int index,
+    IconData inactiveIcon,
+    IconData activeIcon,
+    String label,
+    int currentIndex,
+  ) {
     final bool isSelected = currentIndex == index;
-    final Color selectedColor = const Color(0xFFFF6B00);
-    final Color unselectedColor = isLightMode ? Colors.grey[400]! : Colors.grey;
-    final Color color = isSelected ? selectedColor : unselectedColor;
+    final Color color = isSelected
+        ? AppColors.primary
+        : AppColors.textSecondary;
 
-    return GestureDetector(
-      onTap: () => _onItemTapped(index, context),
-      behavior: HitTestBehavior.opaque,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, color: color, size: 24),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              color: color,
-              fontSize: 10,
-              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+    return Expanded(
+      child: InkWell(
+        onTap: () => _onItemTapped(index, context),
+        splashColor: Colors.transparent,
+        highlightColor: Colors.transparent,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? AppColors.cream.withAlpha(120)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Icon(
+                isSelected ? activeIcon : inactiveIcon,
+                color: color,
+                size: 22,
+              ),
             ),
-          ),
-        ],
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: AppTypography.micro(color: color).copyWith(
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                fontSize: 10.5,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-class NavDrawer extends StatelessWidget {
+class NavDrawer extends ConsumerWidget {
   const NavDrawer({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final currentRoute = GoRouterState.of(context).uri.path;
 
     return Drawer(
-      backgroundColor: AppColors.darkSurface,
+      backgroundColor: AppColors.surface,
+      surfaceTintColor: Colors.transparent,
       child: SafeArea(
-        child: ListView(
-          padding: EdgeInsets.zero,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Padding(
-              padding: EdgeInsets.all(16.0),
-              child: Text(
-                'DASHBOARD',
-                style: TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.bold),
+            // Drawer Header with Naviigo Brand
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
+              child: Row(
+                children: [
+                  Image.asset(
+                    'assets/brand/naviigo-mark-primary.png',
+                    width: 36,
+                    height: 36,
+                    errorBuilder: (_, __, ___) => const Icon(
+                      Icons.navigation_rounded,
+                      color: AppColors.primary,
+                      size: 32,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'NaviiGo',
+                    style: AppTypography.editorialTitle(
+                      color: AppColors.brown,
+                    ).copyWith(fontSize: 22),
+                  ),
+                ],
               ),
             ),
-            _buildNavItem(context, 'Home', Icons.home_rounded, '/home', currentRoute),
-            _buildNavItem(context, 'Upcoming Trips', Icons.calendar_today_rounded, '/upcoming-trips', currentRoute),
-            _buildNavItem(context, 'Ongoing Trips', Icons.directions_run_rounded, '/ongoing-trips', currentRoute),
-            _buildNavItem(context, 'Live Tracking', Icons.my_location_rounded, '/live-tracking', currentRoute),
-            _buildNavItem(context, 'Analytics', Icons.bar_chart_rounded, '/analytics', currentRoute),
+            const Divider(color: AppColors.border, height: 1),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                children: [
+                  _buildSectionHeader('JOURNEYS'),
+                  _buildDrawerItem(
+                    context,
+                    'Home',
+                    Icons.cottage_outlined,
+                    '/home',
+                    currentRoute,
+                  ),
+                  _buildDrawerItem(
+                    context,
+                    'Upcoming Journeys',
+                    Icons.calendar_today_rounded,
+                    '/upcoming-trips',
+                    currentRoute,
+                  ),
+                  _buildDrawerItem(
+                    context,
+                    'Live Trip Companion',
+                    Icons.navigation_rounded,
+                    '/ongoing-trips',
+                    currentRoute,
+                  ),
+                  _buildDrawerItem(
+                    context,
+                    'Past Journeys',
+                    Icons.history_rounded,
+                    '/past-trips',
+                    currentRoute,
+                  ),
 
-            const Divider(color: Colors.white10),
-            const Padding(
-              padding: EdgeInsets.all(16.0),
-              child: Text(
-                'EXPLORE',
-                style: TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.bold),
-              ),
-            ),
-            _buildNavItem(context, 'Hidden Gems', Icons.diamond_rounded, '/hidden-gems', currentRoute),
-            _buildNavItem(context, 'Restaurants', Icons.restaurant_rounded, '/restaurants', currentRoute),
-            _buildNavItem(context, 'Transportation', Icons.directions_transit_rounded, '/transportation', currentRoute),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Divider(color: AppColors.border, height: 1),
+                  ),
 
-            const Divider(color: Colors.white10),
-            const Padding(
-              padding: EdgeInsets.all(16.0),
-              child: Text(
-                'MY BOOKINGS',
-                style: TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.bold),
-              ),
-            ),
-            _buildNavItem(context, 'Saved Places', Icons.bookmark_rounded, '/saved-places', currentRoute),
-            _buildNavItem(context, 'Payment History', Icons.receipt_long_rounded, '/payment-history', currentRoute),
-            _buildNavItem(context, 'Digital passport', Icons.military_tech_rounded, '/digital-passport', currentRoute),
+                  _buildSectionHeader('DISCOVER'),
+                  _buildDrawerItem(
+                    context,
+                    'Explore Atlas',
+                    Icons.explore_outlined,
+                    '/explore-discover',
+                    currentRoute,
+                  ),
+                  _buildDrawerItem(
+                    context,
+                    'Hidden Gems',
+                    Icons.wb_twilight_rounded,
+                    '/hidden-gems',
+                    currentRoute,
+                  ),
+                  _buildDrawerItem(
+                    context,
+                    'Local Dining',
+                    Icons.restaurant_rounded,
+                    '/restaurants',
+                    currentRoute,
+                  ),
+                  _buildDrawerItem(
+                    context,
+                    'Transit & Commute',
+                    Icons.directions_transit_rounded,
+                    '/transportation',
+                    currentRoute,
+                  ),
+                  _buildDrawerItem(
+                    context,
+                    'Certified Local Guides',
+                    Icons.badge_outlined,
+                    '/local-guides',
+                    currentRoute,
+                  ),
 
-            const Divider(color: Colors.white10),
-            const Padding(
-              padding: EdgeInsets.all(16.0),
-              child: Text(
-                'MORE',
-                style: TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.bold),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Divider(color: AppColors.border, height: 1),
+                  ),
+
+                  _buildSectionHeader('TRAVEL WALLET'),
+                  _buildDrawerItem(
+                    context,
+                    'Wallet & Credits',
+                    Icons.account_balance_wallet_outlined,
+                    '/payment-history',
+                    currentRoute,
+                  ),
+                  _buildDrawerItem(
+                    context,
+                    'Digital Passport',
+                    Icons.card_membership_rounded,
+                    '/digital-passport',
+                    currentRoute,
+                  ),
+                  _buildDrawerItem(
+                    context,
+                    'Saved Places',
+                    Icons.bookmark_border_rounded,
+                    '/saved-places',
+                    currentRoute,
+                  ),
+                  _buildDrawerItem(
+                    context,
+                    'Bookings & Vouchers',
+                    Icons.confirmation_number_outlined,
+                    '/bookings',
+                    currentRoute,
+                  ),
+                  _buildDrawerItem(
+                    context,
+                    'Story Creator',
+                    Icons.auto_awesome_rounded,
+                    '/story-creator',
+                    currentRoute,
+                  ),
+
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Divider(color: AppColors.border, height: 1),
+                  ),
+
+                  _buildSectionHeader('ACCOUNT'),
+                  _buildDrawerItem(
+                    context,
+                    'Profile & Preferences',
+                    Icons.person_outline_rounded,
+                    '/profile',
+                    currentRoute,
+                  ),
+                  _buildDrawerItem(
+                    context,
+                    'Settings',
+                    Icons.tune_rounded,
+                    '/settings',
+                    currentRoute,
+                  ),
+                  _buildDrawerItem(
+                    context,
+                    'Help & Support',
+                    Icons.support_agent_rounded,
+                    '/help-support',
+                    currentRoute,
+                  ),
+                ],
               ),
             ),
-            _buildNavItem(context, 'Story Creator', Icons.movie_creation_rounded, '/story-creator', currentRoute),
-            _buildNavItem(context, 'Settings', Icons.settings_rounded, '/settings', currentRoute),
-            _buildNavItem(context, 'Help & Support', Icons.help_outline_rounded, '/help-support', currentRoute),
-            _buildNavItem(context, 'Logout', Icons.logout_rounded, '/login', currentRoute, isLogout: true),
+            const Divider(color: AppColors.border, height: 1),
+            ListTile(
+              leading: const Icon(
+                Icons.logout_rounded,
+                color: AppColors.error,
+                size: 22,
+              ),
+              title: Text(
+                'Log Out',
+                style: AppTypography.button(color: AppColors.error),
+              ),
+              onTap: () async {
+                Navigator.of(context).pop();
+                await ref.read(authControllerProvider.notifier).signOut();
+                if (context.mounted) {
+                  context.go('/login');
+                }
+              },
+            ),
+            const SizedBox(height: 8),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildNavItem(BuildContext context, String title, IconData icon, String route, String currentRoute, {bool isLogout = false}) {
-    final isSelected = currentRoute == route && !isLogout;
-    final color = isLogout ? Colors.redAccent : (isSelected ? AppColors.primary : Colors.white70);
+  Widget _buildSectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 6),
+      child: Text(
+        title,
+        style: AppTypography.eyebrow(
+          color: AppColors.textTertiary,
+        ).copyWith(fontSize: 10),
+      ),
+    );
+  }
+
+  Widget _buildDrawerItem(
+    BuildContext context,
+    String title,
+    IconData icon,
+    String route,
+    String currentRoute,
+  ) {
+    final bool isSelected = currentRoute == route;
+    final Color color = isSelected ? AppColors.primary : AppColors.textPrimary;
 
     return ListTile(
-      leading: Icon(icon, color: color, size: 22),
+      dense: true,
+      visualDensity: VisualDensity.compact,
+      leading: Icon(icon, color: color, size: 20),
       title: Text(
         title,
-        style: TextStyle(
+        style: AppTypography.bodyMedium(
           color: color,
-          fontSize: 14,
-          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-        ),
+        ).copyWith(fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500),
       ),
       selected: isSelected,
-      selectedTileColor: AppColors.primary.withAlpha((0.1 * 255).round()),
+      selectedTileColor: AppColors.cream.withAlpha(90),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
       onTap: () {
-        context.pop(); // Close drawer
+        Navigator.of(context).pop();
         context.go(route);
       },
     );

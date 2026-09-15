@@ -1,293 +1,363 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_typography.dart';
+import '../../../../core/auth/auth_provider.dart';
+import '../../../bookings/presentation/providers/saved_places_provider.dart';
+import '../../../bookings/domain/models/saved_place_model.dart';
 
-class RestaurantDetailsPage extends StatelessWidget {
+class RestaurantDetailsPage extends ConsumerWidget {
   final String id;
   const RestaurantDetailsPage({super.key, required this.id});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Curated regional dining profiles for Naviigo Explorer
+    final title = id == '2' ? '1135 AD, Amer' : 'Baradari Heritage Dining';
+    final vicinity = id == '2'
+        ? 'Amer Palace Complex, Jaipur, Rajasthan'
+        : 'City Palace Courtyard, Jaipur, Rajasthan';
+    final cuisine = id == '2'
+        ? 'Royal Rajasthani & Mughlai'
+        : 'Heritage Continental & Indian Contemporary';
+    final rating = id == '2' ? 4.9 : 4.8;
+    final reviewsCount = id == '2' ? 840 : 1240;
+    final description = id == '2'
+        ? 'Perched high within the ancient ramparts of Amer Fort, 1135 AD serves royal Rajput banquets with silver thalis, hand-painted murals, and candlelit courtyard acoustics.'
+        : 'Set inside the historic City Palace of Jaipur, Baradari combines centuries-old Mughal arches with contemporary artisanal dining, celebrating seasonal produce of Rajasthan.';
+
+    final specialities = id == '2'
+        ? [
+            {
+              'name': 'Laal Maas',
+              'desc': 'Fiery slow-braised mutton in Mathania red chilies.',
+            },
+            {
+              'name': 'Dal Baati Churma',
+              'desc':
+                  'Wood-fired wheat baatis drenched in pure ghee with spiced lentils.',
+            },
+            {
+              'name': 'Shahi Tukda',
+              'desc':
+                  'Crisp saffron bread pudding infused with cardamom and rabri.',
+            },
+          ]
+        : [
+            {
+              'name': 'Kachori Chaat Tart',
+              'desc':
+                  'Deconstructed Rajasthani street kachori with mint emulsion.',
+            },
+            {
+              'name': 'Smoked Paneer Tikka',
+              'desc':
+                  'Cottage cheese charred over mesquite with wild pomegranate chutney.',
+            },
+            {
+              'name': 'Ghevar Mille-Feuille',
+              'desc': 'Honeycomb pastry with pistachio mousse and silver leaf.',
+            },
+          ];
+
     return Scaffold(
-      backgroundColor: Colors.white,
-      body: Stack(
-        children: [
-          SingleChildScrollView(
-            padding: const EdgeInsets.only(bottom: 100),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Hero Image Header
-                Container(
-                  height: 350,
-                  width: double.infinity,
-                  decoration: const BoxDecoration(
-                    image: DecorationImage(
-                      image: NetworkImage('https://images.unsplash.com/photo-1550966871-3ed3cdb5ed0c?auto=format&fit=crop&w=800&q=80'),
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.transparent,
-                          Colors.transparent,
-                          Colors.black.withValues(alpha: 0.8),
-                        ],
-                      ),
-                    ),
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.location_on_outlined, color: Colors.white70, size: 16),
-                            const SizedBox(width: 4),
-                            Text('Lorem ipsum dolor.', style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 12)),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        const Text('Lorem ipsum dolor.', style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 16),
-                        Row(
-                          children: [
-                            Container(width: 24, height: 3, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(2))),
-                            const SizedBox(width: 4),
-                            Container(width: 24, height: 3, decoration: BoxDecoration(color: Colors.white38, borderRadius: BorderRadius.circular(2))),
-                            const SizedBox(width: 4),
-                            Container(width: 24, height: 3, decoration: BoxDecoration(color: Colors.white38, borderRadius: BorderRadius.circular(2))),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                
-                // Info Row
-                Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: const BoxDecoration(
-                              color: Color(0xFFDBEAFE), // Light blue
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(Icons.location_on, color: Color(0xFF2563EB), size: 20),
-                          ),
-                          const SizedBox(width: 12),
-                          const Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('2.4 Km', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                              Text('Distance', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                            ],
-                          ),
-                        ],
-                      ),
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: const BoxDecoration(
-                              color: Color(0xFFD1FAE5), // Light green
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(Icons.star, color: Color(0xFF059669), size: 20),
-                          ),
-                          const SizedBox(width: 12),
-                          const Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('4.8 (500+)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                              Text('Reviews', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                
-                // Tabs
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF2563EB),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: const Text('Details', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
-                      ),
-                      const SizedBox(width: 12),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[100],
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text('Menu', style: TextStyle(color: Colors.grey[700], fontWeight: FontWeight.bold, fontSize: 14)),
-                      ),
-                      const SizedBox(width: 12),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[100],
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text('Reviews', style: TextStyle(color: Colors.grey[700], fontWeight: FontWeight.bold, fontSize: 14)),
-                      ),
-                    ],
-                  ),
-                ),
-                
-                const SizedBox(height: 32),
-                
-                // About
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 24),
-                  child: Text('About', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                ),
-                const SizedBox(height: 12),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Text(
-                    'Lorem ipsum dolor sit amet consectetur adipiscing elit Ut et massa mi. Aliquam in hendrerit urna. Pellentesque sit amet sapien fringilla, mattis ligula consectetur, ultrices mauris. Maecenas vitae mattis tellus. Nullam quis imperdiet augue. Vestibulum auctor ornare leo, non suscipit.',
-                    style: TextStyle(color: Colors.grey[600], height: 1.6, fontSize: 14),
-                  ),
-                ),
-                
-                const SizedBox(height: 32),
-                
-                // Gallery
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Gallery', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                      TextButton(
-                        onPressed: () {},
-                        child: const Text('View all', style: TextStyle(color: Color(0xFF1A56DB), fontWeight: FontWeight.bold, fontSize: 12)),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _buildGalleryImage('https://images.unsplash.com/photo-1414235077428-338988a2e8c0?auto=format&fit=crop&w=400&q=80'),
-                      _buildGalleryImage('https://images.unsplash.com/photo-1544148103-0773bf10d330?auto=format&fit=crop&w=400&q=80'),
-                      _buildGalleryImage('https://images.unsplash.com/photo-1537047902294-62a40c20a6ae?auto=format&fit=crop&w=400&q=80'),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 40),
-              ],
+      backgroundColor: AppColors.canvas,
+      appBar: AppBar(
+        backgroundColor: AppColors.surface,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded, color: AppColors.brown),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/home');
+            }
+          },
+        ),
+        title: Text(
+          'HERITAGE DINING',
+          style: AppTypography.editorialTitle(
+            color: AppColors.brown,
+          ).copyWith(fontSize: 18),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(
+              Icons.bookmark_add_outlined,
+              color: AppColors.brown,
             ),
-          ),
-          
-          // Back Button & Heart
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  GestureDetector(
-                    onTap: () => context.pop(),
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
+            onPressed: () async {
+              HapticFeedback.lightImpact();
+              final user = ref.read(currentUserProvider);
+              if (user == null) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Please sign in to save dining places to your bucket list.',
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.2),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.favorite_border, color: Colors.white, size: 20),
+                );
+                return;
+              }
+
+              final place = SavedPlaceModel(
+                id: 'rest_$id',
+                name: title,
+                type: 'Dining',
+                location: vicinity,
+                createdAt: DateTime.now(),
+              );
+
+              await ref
+                  .read(savedPlacesRepositoryProvider)
+                  .toggleSavedPlace(user.uid, place);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Added $title to your Saved Places'),
+                    backgroundColor: AppColors.teal,
+                  ),
+                );
+              }
+            },
+          ),
+        ],
+      ),
+      body: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Restaurant Banner Card
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: AppColors.border),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.brown.withAlpha(12),
+                    blurRadius: 14,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.warmCream,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          cuisine.toUpperCase(),
+                          style: AppTypography.micro(color: AppColors.brown),
+                        ),
+                      ),
+                      const Spacer(),
+                      const Icon(
+                        Icons.star_rounded,
+                        color: AppColors.yellow,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        rating.toStringAsFixed(1),
+                        style: AppTypography.caption(
+                          color: AppColors.brown,
+                        ).copyWith(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '($reviewsCount reviews)',
+                        style: AppTypography.micro(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    title,
+                    style: AppTypography.editorialTitle(
+                      color: AppColors.brown,
+                    ).copyWith(fontSize: 24),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.location_on_outlined,
+                        color: AppColors.primary,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          vicinity,
+                          style: AppTypography.bodySmall(
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  const Divider(color: AppColors.border, height: 1),
+                  const SizedBox(height: 16),
+                  Text(
+                    'About this Table',
+                    style: AppTypography.caption(
+                      color: AppColors.brown,
+                    ).copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    description,
+                    style: AppTypography.bodySmall(
+                      color: AppColors.textPrimary,
+                    ).copyWith(height: 1.5),
                   ),
                 ],
               ),
             ),
-          ),
-          
-          // Sticky Bottom Button
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.white.withValues(alpha: 0.0),
-                    Colors.white.withValues(alpha: 0.8),
-                    Colors.white,
-                  ],
-                ),
-              ),
-              child: Container(
-                width: double.infinity,
-                height: 56,
+            const SizedBox(height: 24),
+
+            // Signature Dishes
+            Text(
+              'Signature Offerings',
+              style: AppTypography.tripTitle(color: AppColors.brown),
+            ),
+            const SizedBox(height: 12),
+            ...specialities.map(
+              (dish) => Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF2563EB),
-                  borderRadius: BorderRadius.circular(28),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF2563EB).withValues(alpha: 0.3),
-                      blurRadius: 20,
-                      offset: const Offset(0, 10),
-                    ),
-                  ],
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppColors.border),
                 ),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Book a Table', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                    const SizedBox(width: 8),
-                    const Icon(Icons.arrow_forward, color: Colors.white, size: 20),
+                    const Icon(
+                      Icons.restaurant_menu_rounded,
+                      color: AppColors.primary,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            dish['name']!,
+                            style: AppTypography.caption(
+                              color: AppColors.brown,
+                            ).copyWith(fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            dish['desc']!,
+                            style: AppTypography.bodySmall(
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
+            const SizedBox(height: 24),
 
-  Widget _buildGalleryImage(String url) {
-    return Container(
-      width: 100,
-      height: 100,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        image: DecorationImage(
-          image: NetworkImage(url),
-          fit: BoxFit.cover,
+            // Action Buttons
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      HapticFeedback.lightImpact();
+                      final uri = Uri.parse('tel:+911412530135');
+                      if (await canLaunchUrl(uri)) {
+                        await launchUrl(uri);
+                      } else {
+                        final webSearchUri = Uri.parse(
+                          'https://www.google.com/search?q=${Uri.encodeComponent('$title $vicinity contact number')}',
+                        );
+                        await launchUrl(
+                          webSearchUri,
+                          mode: LaunchMode.externalApplication,
+                        );
+                      }
+                    },
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.brown,
+                      side: const BorderSide(color: AppColors.border),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    icon: const Icon(Icons.call_outlined, size: 18),
+                    label: Text(
+                      'Call Restaurant',
+                      style: AppTypography.button(color: AppColors.brown),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      HapticFeedback.lightImpact();
+                      final query = Uri.encodeComponent(
+                        '$title $vicinity'.trim(),
+                      );
+                      final uri = Uri.parse(
+                        'https://www.google.com/maps/search/?api=1&query=$query',
+                      );
+                      await launchUrl(
+                        uri,
+                        mode: LaunchMode.externalApplication,
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 0,
+                    ),
+                    icon: const Icon(Icons.directions_outlined, size: 18),
+                    label: Text(
+                      'Directions',
+                      style: AppTypography.button(color: Colors.white),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );

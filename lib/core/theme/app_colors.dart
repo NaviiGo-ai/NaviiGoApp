@@ -1,65 +1,64 @@
 import 'package:flutter/material.dart';
 
+/// Official Naviigo Brand Design Tokens
+/// Source: Naviigo Website Brand System & Mobile Design Tokens
 class AppColors {
   AppColors._();
 
-  // Dark Theme Colors (Primary Choice for NaviiGo)
-  static const Color darkBg = Color(0xFF0F111A);
-  static const Color darkSurface = Color(0xFF161926);
-  static const Color darkCard = Color(0xFF1E2235);
-  
-  // Light Theme Colors (Clean, Premium, High Contrast)
-  static const Color lightBg = Color(0xFFF7F8FC);
-  static const Color lightSurface = Color(0xFFFFFFFF);
-  static const Color lightCard = Color(0xFFEFF1F8);
+  // Core Brand Colors
+  static const Color primary = Color(0xFFEC6426); // Primary Action Orange
+  static const Color primaryDark = Color(0xFFC84F18); // Pressed/Dark Orange
+  static const Color yellow = Color(0xFFF8A91F); // Accent Highlight / Stars
+  static const Color secondary = yellow;
+  static const Color brown = Color(0xFF632713); // Editorial Depth / Mastheads
+  static const Color cream = Color(
+    0xFFFDE3CF,
+  ); // Warm Material / Pills / Highlights
+  static const Color warmCream = cream;
+  static const Color teal = Color(
+    0xFF00666A,
+  ); // Live State / Genuine Travel / Safe Status
 
-  // Brand Accents
-  static const Color primary = Color(0xFF6366F1); // Royal Indigo
-  static const Color secondary = Color(0xFFEC4899); // Electric Pink
-  static const Color accent = Color(0xFF06B6D4); // Cyber Cyan
-  
-  // Functional Colors
+  // Neutral & Atmosphere Palette
+  static const Color background = Color(0xFFFDF8F5); // Warm Paper Atmosphere
+  static const Color canvas = background;
+  static const Color surface = Color(0xFFFFFFFF); // Clean Card/Sheet Surface
+  static const Color surfaceWarm = Color(
+    0xFFF8F2EC,
+  ); // Subtle Warm Paper Container
+  static const Color surfaceMuted = Color(0xFFF1EAE2); // Elevated Surface
+
+  // Typography Colors
+  static const Color textPrimary = Color(0xFF24323A); // Editorial Dark Charcoal
+  static const Color textSecondary = Color(0xFF6E7A82); // Muted Editorial Grey
+  static const Color textTertiary = Color(0xFF9EAAB2); // Micro-metadata
+  static const Color textInverse = Color(0xFFFFFFFF); // On dark/photo overlays
+
+  // Borders & Dividers
+  static const Color border = Color(0xFFEFE6DD); // Subtle Hairline Border
+  static const Color borderStrong = Color(
+    0xFFDCCFC4,
+  ); // Focused / Emphasized Border
+
+  // Semantic Status
   static const Color success = Color(0xFF10B981);
   static const Color warning = Color(0xFFF59E0B);
   static const Color error = Color(0xFFEF4444);
-  
-  // Gradients for Premium Glassmorphic feel
-  static const Gradient primaryGradient = LinearGradient(
-    colors: [primary, secondary],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-  );
 
-  static const Gradient cyberGradient = LinearGradient(
-    colors: [accent, primary],
-    begin: Alignment.centerLeft,
-    end: Alignment.centerRight,
-  );
-
-  static Gradient darkGlassGradient = LinearGradient(
-    colors: [
-      Colors.white.withOpacity(0.08),
-      Colors.white.withOpacity(0.03),
-    ],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-  );
-
-  static Gradient lightGlassGradient = LinearGradient(
-    colors: [
-      Colors.white.withOpacity(0.7),
-      Colors.white.withOpacity(0.4),
-    ],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-  );
-
-  static const List<BoxShadow> glassShadow = [
+  // Intentional Shadows (Soft, Warm, Minimal - No Heavy FinTech Drops)
+  static List<BoxShadow> get cardShadow => [
     BoxShadow(
-      color: Colors.black12,
+      color: const Color(0xFF632713).withAlpha((0.04 * 255).round()),
       blurRadius: 16,
-      spreadRadius: -4,
-      offset: Offset(0, 8),
+      offset: const Offset(0, 4),
+    ),
+  ];
+
+  static List<BoxShadow> get floatingShadow => [
+    BoxShadow(
+      color: const Color(0xFF24323A).withAlpha((0.08 * 255).round()),
+      blurRadius: 24,
+      offset: const Offset(0, 8),
     ),
   ];
 }

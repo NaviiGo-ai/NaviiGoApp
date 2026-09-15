@@ -1,315 +1,402 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_typography.dart';
+import '../providers/bookings_provider.dart';
+import '../../domain/models/booking_model.dart';
 
-class BookingsPage extends StatelessWidget {
+class BookingsPage extends ConsumerWidget {
   const BookingsPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final bookingsAsync = ref.watch(bookingsStreamProvider);
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: AppColors.background,
         elevation: 0,
-        scrolledUnderElevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.black),
-          onPressed: () => context.go('/home'),
+          icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/home');
+            }
+          },
         ),
-        title: const Text('Bookings', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18)),
+        title: Text(
+          'BOOKINGS & VOUCHERS',
+          style: AppTypography.eyebrow(color: AppColors.brown),
+        ),
         centerTitle: true,
-        actions: [
-          IconButton(icon: const Icon(Icons.filter_list_rounded, color: Colors.black), onPressed: () {}),
-        ],
       ),
-      body: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
+      body: bookingsAsync.when(
+        loading: () => const Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
+        ),
+        error: (err, _) => Center(
+          child: Text(
+            'Error loading bookings: $err',
+            style: AppTypography.bodyMedium(),
+          ),
+        ),
+        data: (bookings) {
+          if (bookings.isEmpty) {
+            return _buildEmptyBookingsState(context);
+          }
+
+          return ListView.separated(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            itemCount: bookings.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 16),
+            itemBuilder: (context, index) {
+              final booking = bookings[index];
+              return _buildBookingCard(context, booking);
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildEmptyBookingsState(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32.0),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Summary Stats
             Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFFF6B00), Color(0xFFFF8F3F)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(20),
+              padding: const EdgeInsets.all(22),
+              decoration: const BoxDecoration(
+                color: AppColors.cream,
+                shape: BoxShape.circle,
               ),
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  Column(
-                    children: [
-                      Text('5', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
-                      SizedBox(height: 4),
-                      Text('Active', style: TextStyle(color: Colors.white70, fontSize: 11)),
-                    ],
-                  ),
-                  Column(
-                    children: [
-                      Text('₹24,500', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
-                      SizedBox(height: 4),
-                      Text('This Month', style: TextStyle(color: Colors.white70, fontSize: 11)),
-                    ],
-                  ),
-                  Column(
-                    children: [
-                      Text('18', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
-                      SizedBox(height: 4),
-                      Text('Total', style: TextStyle(color: Colors.white70, fontSize: 11)),
-                    ],
-                  ),
-                ],
+              child: const Icon(
+                Icons.confirmation_number_outlined,
+                size: 48,
+                color: AppColors.primary,
               ),
+            ),
+            const SizedBox(height: 18),
+            Text(
+              'No Active Bookings',
+              style: AppTypography.sectionTitle(color: AppColors.textPrimary),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Tickets, rail confirmations, and hotel vouchers for your journeys will appear here.',
+              textAlign: TextAlign.center,
+              style: AppTypography.caption(color: AppColors.textSecondary),
             ),
             const SizedBox(height: 24),
-
-            // Quick Access Cards
-            Row(
-              children: [
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () => context.push('/saved-places'),
-                    child: Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.04),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        children: [
-                          Container(
-                            width: 48,
-                            height: 48,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFFF3E0),
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: const Icon(Icons.bookmark_rounded, color: Color(0xFFFF6B00), size: 24),
-                          ),
-                          const SizedBox(height: 12),
-                          const Text('Saved Places', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                          const SizedBox(height: 4),
-                          Text('12 places', style: TextStyle(color: Colors.grey[500], fontSize: 11)),
-                        ],
-                      ),
-                    ),
-                  ),
+            ElevatedButton(
+              onPressed: () => context.go('/transportation'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 14,
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () => context.push('/payment-history'),
-                    child: Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.04),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        children: [
-                          Container(
-                            width: 48,
-                            height: 48,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFE8F5E9),
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: const Icon(Icons.receipt_long_rounded, color: Color(0xFF059669), size: 24),
-                          ),
-                          const SizedBox(height: 12),
-                          const Text('Payment History', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                          const SizedBox(height: 4),
-                          Text('18 transactions', style: TextStyle(color: Colors.grey[500], fontSize: 11)),
-                        ],
-                      ),
-                    ),
-                  ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
                 ),
-              ],
+              ),
+              child: Text(
+                'SEARCH TRANSIT & STAYS',
+                style: AppTypography.button(),
+              ),
             ),
-            const SizedBox(height: 28),
-
-            // Active Bookings
-            const Text('Active Bookings', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 16),
-
-            _buildBookingCard(
-              icon: Icons.hotel_rounded,
-              title: 'Grand Hyatt Resort',
-              subtitle: 'Dubai, UAE • Jul 20 - Jul 23',
-              amount: '₹12,500',
-              status: 'Confirmed',
-              statusColor: const Color(0xFF059669),
-              iconBgColor: const Color(0xFF2563EB),
-            ),
-            const SizedBox(height: 12),
-
-            _buildBookingCard(
-              icon: Icons.flight_rounded,
-              title: 'Emirates EK524',
-              subtitle: 'DEL → DXB • Jul 20, 08:30 AM',
-              amount: '₹8,200',
-              status: 'Confirmed',
-              statusColor: const Color(0xFF059669),
-              iconBgColor: const Color(0xFFFF6B00),
-            ),
-            const SizedBox(height: 12),
-
-            _buildBookingCard(
-              icon: Icons.directions_car_rounded,
-              title: 'Airport Transfer',
-              subtitle: 'DXB Airport → Hotel • Jul 20',
-              amount: '₹1,800',
-              status: 'Pending',
-              statusColor: const Color(0xFFD97706),
-              iconBgColor: const Color(0xFF8B5CF6),
-            ),
-            const SizedBox(height: 12),
-
-            _buildBookingCard(
-              icon: Icons.local_activity_rounded,
-              title: 'Desert Safari',
-              subtitle: 'Dubai Desert • Jul 22, 04:00 PM',
-              amount: '₹3,500',
-              status: 'Confirmed',
-              statusColor: const Color(0xFF059669),
-              iconBgColor: const Color(0xFFDC2626),
-            ),
-            const SizedBox(height: 28),
-
-            // Recent Bookings
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Recent Bookings', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                Text('View all', style: TextStyle(color: Colors.grey[500], fontSize: 13)),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            _buildRecentBookingItem('Taj Palace Hotel', 'Jaipur • Mar 10-18', '₹9,800', Icons.hotel_rounded),
-            _buildRecentBookingItem('Shinkansen Ticket', 'Kyoto → Tokyo • Apr 6', '₹4,200', Icons.train_rounded),
-            _buildRecentBookingItem('Gondola Ride', 'Venice • Jan 19', '₹2,100', Icons.sailing_rounded),
-
-            const SizedBox(height: 100),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildBookingCard({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required String amount,
-    required String status,
-    required Color statusColor,
-    required Color iconBgColor,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: iconBgColor,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(icon, color: Colors.white, size: 22),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildBookingCard(BuildContext context, BookingModel booking) {
+    return GestureDetector(
+      onTap: () => _showBookingDetails(context, booking),
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                const SizedBox(height: 4),
-                Text(subtitle, style: TextStyle(color: Colors.grey[500], fontSize: 11)),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.cream,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    _getIconForType(booking.type),
+                    color: AppColors.primary,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        booking.providerName,
+                        style: AppTypography.tripTitle(
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      if (booking.providerCode != null)
+                        Text(
+                          booking.providerCode!,
+                          style: AppTypography.caption(
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.teal.withAlpha(20),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    booking.status.toUpperCase(),
+                    style: AppTypography.micro(color: AppColors.teal),
+                  ),
+                ),
               ],
             ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(amount, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-              const SizedBox(height: 4),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
+            const SizedBox(height: 14),
+            const Divider(color: AppColors.border, height: 1),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'ROUTE',
+                      style: AppTypography.micro(color: AppColors.textTertiary),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${booking.from} → ${booking.to}',
+                      style: AppTypography.bodyMedium(
+                        color: AppColors.textPrimary,
+                      ).copyWith(fontWeight: FontWeight.bold),
+                    ),
+                  ],
                 ),
-                child: Text(status, style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.bold)),
-              ),
-            ],
-          ),
-        ],
+                if (booking.pnr != null && booking.pnr!.isNotEmpty)
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        'PNR / REFERENCE',
+                        style: AppTypography.micro(
+                          color: AppColors.textTertiary,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        booking.pnr!,
+                        style: AppTypography.bodyMedium(
+                          color: AppColors.primary,
+                        ).copyWith(fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Date: ${booking.date}',
+                  style: AppTypography.caption(color: AppColors.textSecondary),
+                ),
+                Text(
+                  '${booking.travelers} Traveler${booking.travelers > 1 ? 's' : ''}',
+                  style: AppTypography.caption(color: AppColors.textSecondary),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildRecentBookingItem(String title, String subtitle, String amount, IconData icon) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16.0),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: Colors.grey[100],
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: Colors.grey[600], size: 18),
+  void _showBookingDetails(BuildContext context, BookingModel booking) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                const SizedBox(height: 2),
-                Text(subtitle, style: TextStyle(color: Colors.grey[500], fontSize: 11)),
-              ],
-            ),
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.border,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'BOOKING VOUCHER',
+                    style: AppTypography.eyebrow(color: AppColors.primary),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, size: 20),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                booking.providerName,
+                style: AppTypography.editorialTitle(
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceWarm,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Column(
+                  children: [
+                    _buildDetailRow('Status', booking.status.toUpperCase()),
+                    const Divider(color: AppColors.border, height: 16),
+                    _buildDetailRow('Leg', '${booking.from} to ${booking.to}'),
+                    const Divider(color: AppColors.border, height: 16),
+                    _buildDetailRow('Travel Date', booking.date),
+                    if (booking.pnr != null) ...[
+                      const Divider(color: AppColors.border, height: 16),
+                      _buildDetailRow('PNR / Ref', booking.pnr!),
+                    ],
+                    if (booking.totalPrice > 0) ...[
+                      const Divider(color: AppColors.border, height: 16),
+                      _buildDetailRow(
+                        'Total Paid',
+                        '₹${booking.totalPrice.toStringAsFixed(0)}',
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    Navigator.pop(context);
+                    final text =
+                        'NaviiGo Voucher: ${booking.providerName}\nLeg: ${booking.from} to ${booking.to}\nDate: ${booking.date}\nPNR: ${booking.pnr ?? "Confirmed"}\nAmount: ₹${booking.totalPrice.toStringAsFixed(0)}';
+                    await Clipboard.setData(ClipboardData(text: text));
+                    HapticFeedback.lightImpact();
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            'Voucher copied to clipboard for ${booking.providerName}',
+                          ),
+                          backgroundColor: AppColors.teal,
+                        ),
+                      );
+                    }
+                  },
+                  icon: const Icon(Icons.share, size: 18, color: Colors.white),
+                  label: Text(
+                    'SHARE / OFFLINE VOUCHER',
+                    style: AppTypography.button(),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
           ),
-          Text(amount, style: TextStyle(color: Colors.grey[700], fontSize: 13, fontWeight: FontWeight.bold)),
-        ],
-      ),
+        );
+      },
     );
+  }
+
+  Widget _buildDetailRow(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: AppTypography.caption(color: AppColors.textSecondary),
+        ),
+        Text(
+          value,
+          style: AppTypography.bodyMedium(
+            color: AppColors.textPrimary,
+          ).copyWith(fontWeight: FontWeight.bold),
+        ),
+      ],
+    );
+  }
+
+  IconData _getIconForType(String type) {
+    switch (type.toLowerCase()) {
+      case 'flight':
+        return Icons.flight_takeoff_rounded;
+      case 'train':
+      case 'rail':
+        return Icons.train_rounded;
+      case 'hotel':
+      case 'stay':
+        return Icons.hotel_rounded;
+      case 'taxi':
+      case 'cab':
+        return Icons.local_taxi_rounded;
+      default:
+        return Icons.confirmation_number_outlined;
+    }
   }
 }

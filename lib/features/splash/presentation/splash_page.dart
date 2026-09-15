@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_typography.dart';
+import '../../../core/network/firebase_client.dart';
 
 class SplashPage extends StatefulWidget {
   const SplashPage({super.key});
@@ -18,103 +20,77 @@ class _SplashPageState extends State<SplashPage> {
   }
 
   void _navigateToNext() async {
-    await Future.delayed(const Duration(milliseconds: 2500));
+    await Future.delayed(const Duration(milliseconds: 1800));
     if (mounted) {
-      context.go('/login');
+      final user = FirebaseClient.auth.currentUser;
+      if (user != null) {
+        context.go('/home');
+      } else {
+        context.go('/login');
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          color: AppColors.darkBg,
-        ),
-        child: Stack(
-          children: [
-            // Ambient glow using BoxShadow blur
-            Positioned(
-              top: -100,
-              right: -100,
-              child: Container(
-                width: 200,
-                height: 200,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.primary.withAlpha((0.15 * 255).round()),
-                      blurRadius: 120,
-                      spreadRadius: 60,
-                    ),
-                  ],
-                ),
+      backgroundColor: AppColors.background,
+      body: Stack(
+        children: [
+          // Subtle warm atmosphere corner tint
+          Positioned(
+            top: -60,
+            right: -60,
+            child: Container(
+              width: 220,
+              height: 220,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.cream.withAlpha(80),
               ),
             ),
-            Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // Logo Container
-                  Container(
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: AppColors.primaryGradient,
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.primary.withAlpha((0.4 * 255).round()),
-                          blurRadius: 32,
-                          spreadRadius: 2,
-                        ),
-                      ],
-                    ),
-                    child: const Icon(
-                      Icons.explore_rounded,
-                      size: 64,
-                      color: Colors.white,
-                    ),
-                  )
-                      .animate()
-                      .scale(
-                        duration: 800.ms,
-                        curve: Curves.elasticOut,
-                      )
-                      .rotate(
-                        duration: 1200.ms,
-                        begin: -0.5,
-                        end: 0,
-                        curve: Curves.elasticOut,
+          ),
+          Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Authentic Naviigo Brand Mark
+                Image.asset(
+                      'assets/brand/naviigo-mark-primary.png',
+                      width: 88,
+                      height: 88,
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stackTrace) => Image.asset(
+                        'assets/brand/naviigo-mark-orange.png',
+                        width: 88,
+                        height: 88,
+                        fit: BoxFit.contain,
                       ),
-                  const SizedBox(height: 24),
-                  Text(
-                    'NaviiGo',
-                    style: Theme.of(context).textTheme.displayLarge?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 2,
-                        ),
-                  )
-                      .animate()
-                      .fadeIn(delay: 400.ms, duration: 600.ms)
-                      .slideY(begin: 0.2, end: 0, curve: Curves.easeOutQuad),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Gamified AI Travel Planner',
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: Colors.white70,
-                          letterSpacing: 1,
-                        ),
-                  )
-                      .animate()
-                      .fadeIn(delay: 700.ms, duration: 600.ms)
-                      .slideY(begin: 0.2, end: 0, curve: Curves.easeOutQuad),
-                ],
-              ),
+                    )
+                    .animate()
+                    .scale(duration: 700.ms, curve: Curves.easeOutCubic)
+                    .fadeIn(duration: 500.ms),
+                const SizedBox(height: 24),
+                Text(
+                      'NaviiGo',
+                      style: AppTypography.displayHero(
+                        color: AppColors.brown,
+                      ).copyWith(fontSize: 34, letterSpacing: -0.5),
+                    )
+                    .animate()
+                    .fadeIn(delay: 250.ms, duration: 500.ms)
+                    .slideY(begin: 0.15, end: 0, curve: Curves.easeOutCubic),
+                const SizedBox(height: 6),
+                Text(
+                  'Every journey has a story.',
+                  style: AppTypography.bodyMedium(
+                    color: AppColors.textSecondary,
+                  ).copyWith(letterSpacing: 0.2),
+                ).animate().fadeIn(delay: 450.ms, duration: 500.ms),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

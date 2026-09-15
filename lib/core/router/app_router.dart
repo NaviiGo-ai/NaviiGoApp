@@ -17,6 +17,7 @@ import '../../features/explore/presentation/pages/trip_planner_page.dart';
 import '../../features/explore/presentation/pages/explore_discover_page.dart';
 import '../../features/explore/presentation/pages/map_page.dart';
 import '../../features/trips/presentation/pages/generated_itinerary_page.dart';
+import '../../features/trips/domain/models/trip_itinerary_model.dart';
 import '../../features/explore/presentation/pages/restaurants_page.dart';
 import '../../features/explore/presentation/pages/restaurant_details_page.dart';
 import '../../features/explore/presentation/pages/transportation_page.dart';
@@ -29,44 +30,124 @@ import '../../features/more/presentation/pages/story_creator_page.dart';
 import '../../features/more/presentation/pages/settings_page.dart';
 import '../../features/more/presentation/pages/help_support_page.dart';
 import '../../features/destinations/presentation/pages/destination_details_page.dart';
+import '../../features/places/domain/models/place_model.dart';
+import '../../features/places/presentation/pages/place_details_page.dart';
+import '../../features/explore/presentation/pages/local_guides_page.dart';
 
 import '../../features/navigation/presentation/nav_hub_page.dart';
 
-final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
-final GlobalKey<NavigatorState> _shellNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'shell');
+final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>(
+  debugLabel: 'root',
+);
+final GlobalKey<NavigatorState> _shellNavigatorKey = GlobalKey<NavigatorState>(
+  debugLabel: 'shell',
+);
+
+Page<dynamic> _buildFadeSlideTransition({
+  required GoRouterState state,
+  required Widget child,
+}) {
+  return CustomTransitionPage<void>(
+    key: ValueKey('${state.uri}_${child.runtimeType}_slide'),
+    child: child,
+    transitionDuration: const Duration(milliseconds: 260),
+    reverseTransitionDuration: const Duration(milliseconds: 200),
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      final curved = CurvedAnimation(
+        parent: animation,
+        curve: Curves.easeOutCubic,
+      );
+      return FadeTransition(
+        opacity: curved,
+        child: SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0.04, 0),
+            end: Offset.zero,
+          ).animate(curved),
+          child: child,
+        ),
+      );
+    },
+  );
+}
+
+Page<dynamic> _buildFadeThroughTransition({
+  required GoRouterState state,
+  required Widget child,
+}) {
+  return CustomTransitionPage<void>(
+    key: ValueKey('${state.uri}_${child.runtimeType}_fade'),
+    child: child,
+    transitionDuration: const Duration(milliseconds: 180),
+    reverseTransitionDuration: const Duration(milliseconds: 160),
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      return FadeTransition(
+        opacity: CurvedAnimation(parent: animation, curve: Curves.easeInOut),
+        child: child,
+      );
+    },
+  );
+}
 
 final GoRouter appRouter = GoRouter(
   navigatorKey: _rootNavigatorKey,
   initialLocation: '/',
   routes: <RouteBase>[
-    GoRoute(
-      path: '/',
-      builder: (context, state) => const SplashPage(),
-    ),
+    GoRoute(path: '/', builder: (context, state) => const SplashPage()),
     GoRoute(
       path: '/login',
-      builder: (context, state) => const LoginPage(),
+      pageBuilder: (context, state) =>
+          _buildFadeSlideTransition(state: state, child: const LoginPage()),
     ),
     GoRoute(
       path: '/onboarding',
-      builder: (context, state) => const OnboardingWizardPage(),
+      pageBuilder: (context, state) => _buildFadeSlideTransition(
+        state: state,
+        child: const OnboardingWizardPage(),
+      ),
     ),
     GoRoute(
       path: '/vibe-match',
-      builder: (context, state) => const VibeMatchPage(),
+      pageBuilder: (context, state) =>
+          _buildFadeSlideTransition(state: state, child: const VibeMatchPage()),
     ),
     GoRoute(
       path: '/destination/:id',
-      builder: (context, state) {
+      pageBuilder: (context, state) {
         final id = state.pathParameters['id'] ?? 'george_everest';
-        return DestinationDetailsPage(id: id);
+        return _buildFadeSlideTransition(
+          state: state,
+          child: DestinationDetailsPage(id: id),
+        );
       },
     ),
     GoRoute(
+      path: '/place-details',
+      pageBuilder: (context, state) {
+        final place = state.extra is PlaceModel
+            ? state.extra as PlaceModel
+            : const PlaceModel(id: 'place_default', name: 'Curated Place');
+        return _buildFadeSlideTransition(
+          state: state,
+          child: PlaceDetailsPage(place: place),
+        );
+      },
+    ),
+    GoRoute(
+      path: '/trip-planner',
+      pageBuilder: (context, state) => _buildFadeSlideTransition(
+        state: state,
+        child: const TripPlannerPage(),
+      ),
+    ),
+    GoRoute(
       path: '/restaurant/:id',
-      builder: (context, state) {
+      pageBuilder: (context, state) {
         final id = state.pathParameters['id'] ?? '1';
-        return RestaurantDetailsPage(id: id);
+        return _buildFadeSlideTransition(
+          state: state,
+          child: RestaurantDetailsPage(id: id),
+        );
       },
     ),
     ShellRoute(
@@ -78,99 +159,192 @@ final GoRouter appRouter = GoRouter(
         // DASHBOARD
         GoRoute(
           path: '/home',
-          builder: (context, state) => const HomePage(),
+          pageBuilder: (context, state) => _buildFadeThroughTransition(
+            state: state,
+            child: const HomePage(),
+          ),
         ),
         GoRoute(
           path: '/map',
-          builder: (context, state) => const MapPage(),
+          pageBuilder: (context, state) =>
+              _buildFadeThroughTransition(state: state, child: const MapPage()),
         ),
         GoRoute(
           path: '/ar-explore',
-          builder: (context, state) => const ARExplorePage(),
+          pageBuilder: (context, state) => _buildFadeSlideTransition(
+            state: state,
+            child: const ARExplorePage(),
+          ),
         ),
         GoRoute(
           path: '/upcoming-trips',
-          builder: (context, state) => const UpcomingTripsPage(),
+          pageBuilder: (context, state) => _buildFadeThroughTransition(
+            state: state,
+            child: const UpcomingTripsPage(),
+          ),
         ),
         GoRoute(
           path: '/ongoing-trips',
-          builder: (context, state) => const OngoingTripsPage(),
+          pageBuilder: (context, state) => _buildFadeThroughTransition(
+            state: state,
+            child: const OngoingTripsPage(),
+          ),
         ),
         GoRoute(
           path: '/live-tracking',
-          builder: (context, state) => const LiveTrackingPage(),
+          pageBuilder: (context, state) => _buildFadeSlideTransition(
+            state: state,
+            child: const LiveTrackingPage(),
+          ),
         ),
         GoRoute(
           path: '/analytics',
-          builder: (context, state) => const AnalyticsPage(),
+          pageBuilder: (context, state) => _buildFadeThroughTransition(
+            state: state,
+            child: const AnalyticsPage(),
+          ),
         ),
         GoRoute(
           path: '/past-trips',
-          builder: (context, state) => const PastTripsPage(),
+          pageBuilder: (context, state) => _buildFadeThroughTransition(
+            state: state,
+            child: const PastTripsPage(),
+          ),
         ),
 
         // MAIN BOTTOM NAV ROUTES
         GoRoute(
           path: '/explore',
-          builder: (context, state) => const TripPlannerPage(),
+          pageBuilder: (context, state) => _buildFadeThroughTransition(
+            state: state,
+            child: const ExploreDiscoverPage(),
+          ),
         ),
         GoRoute(
           path: '/explore-discover',
-          builder: (context, state) => const ExploreDiscoverPage(),
+          pageBuilder: (context, state) => _buildFadeThroughTransition(
+            state: state,
+            child: const ExploreDiscoverPage(),
+          ),
+        ),
+        GoRoute(
+          path: '/places',
+          pageBuilder: (context, state) => _buildFadeThroughTransition(
+            state: state,
+            child: const ExploreDiscoverPage(),
+          ),
         ),
         GoRoute(
           path: '/trips',
-          builder: (context, state) => const GeneratedItineraryPage(),
+          pageBuilder: (context, state) => _buildFadeThroughTransition(
+            state: state,
+            child: GeneratedItineraryPage(
+              trip: state.extra is TripItineraryModel
+                  ? state.extra as TripItineraryModel
+                  : null,
+            ),
+          ),
+        ),
+        GoRoute(
+          path: '/itinerary',
+          pageBuilder: (context, state) => _buildFadeThroughTransition(
+            state: state,
+            child: GeneratedItineraryPage(
+              trip: state.extra is TripItineraryModel
+                  ? state.extra as TripItineraryModel
+                  : null,
+            ),
+          ),
         ),
 
         // EXPLORE
         GoRoute(
           path: '/hidden-gems',
-          builder: (context, state) => const HiddenGemsPage(),
+          pageBuilder: (context, state) => _buildFadeThroughTransition(
+            state: state,
+            child: const HiddenGemsPage(),
+          ),
         ),
         GoRoute(
           path: '/restaurants',
-          builder: (context, state) => const RestaurantsPage(),
+          pageBuilder: (context, state) => _buildFadeThroughTransition(
+            state: state,
+            child: const RestaurantsPage(),
+          ),
         ),
         GoRoute(
           path: '/transportation',
-          builder: (context, state) => const TransportationPage(),
+          pageBuilder: (context, state) => _buildFadeThroughTransition(
+            state: state,
+            child: const TransportationPage(),
+          ),
+        ),
+        GoRoute(
+          path: '/local-guides',
+          pageBuilder: (context, state) => _buildFadeThroughTransition(
+            state: state,
+            child: const LocalGuidesPage(),
+          ),
         ),
 
         // MY BOOKINGS
         GoRoute(
           path: '/saved-places',
-          builder: (context, state) => const SavedPlacesPage(),
+          pageBuilder: (context, state) => _buildFadeThroughTransition(
+            state: state,
+            child: const SavedPlacesPage(),
+          ),
         ),
         GoRoute(
           path: '/payment-history',
-          builder: (context, state) => const PaymentHistoryPage(),
+          pageBuilder: (context, state) => _buildFadeThroughTransition(
+            state: state,
+            child: const PaymentHistoryPage(),
+          ),
         ),
         GoRoute(
           path: '/digital-passport',
-          builder: (context, state) => const DigitalPassportPage(),
+          pageBuilder: (context, state) => _buildFadeThroughTransition(
+            state: state,
+            child: const DigitalPassportPage(),
+          ),
         ),
         GoRoute(
           path: '/bookings',
-          builder: (context, state) => const BookingsPage(),
+          pageBuilder: (context, state) => _buildFadeThroughTransition(
+            state: state,
+            child: const BookingsPage(),
+          ),
         ),
         GoRoute(
           path: '/profile',
-          builder: (context, state) => const ProfilePage(),
+          pageBuilder: (context, state) => _buildFadeThroughTransition(
+            state: state,
+            child: const ProfilePage(),
+          ),
         ),
 
         // MORE
         GoRoute(
           path: '/story-creator',
-          builder: (context, state) => const StoryCreatorPage(),
+          pageBuilder: (context, state) => _buildFadeSlideTransition(
+            state: state,
+            child: const StoryCreatorPage(),
+          ),
         ),
         GoRoute(
           path: '/settings',
-          builder: (context, state) => const SettingsPage(),
+          pageBuilder: (context, state) => _buildFadeThroughTransition(
+            state: state,
+            child: const SettingsPage(),
+          ),
         ),
         GoRoute(
           path: '/help-support',
-          builder: (context, state) => const HelpSupportPage(),
+          pageBuilder: (context, state) => _buildFadeThroughTransition(
+            state: state,
+            child: const HelpSupportPage(),
+          ),
         ),
       ],
     ),
