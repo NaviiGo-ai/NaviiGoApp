@@ -28,6 +28,7 @@ void main() {
       expect(account.availableInr, 0.0);
       expect(account.formattedBalance, '₹0.00');
       expect(account.currency, 'INR');
+      expect(account.rewardPoints, 0);
     });
   });
 

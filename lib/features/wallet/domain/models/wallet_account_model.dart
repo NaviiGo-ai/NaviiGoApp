@@ -18,13 +18,13 @@ class WalletAccountModel {
   factory WalletAccountModel.fromFirestore(
     DocumentSnapshot<Map<String, dynamic>> doc,
   ) {
-    if (!doc.exists) return const WalletAccountModel(rewardPoints: 150);
+    if (!doc.exists) return const WalletAccountModel();
     final data = doc.data() ?? {};
     return WalletAccountModel(
       availableMinor: (data['availableMinor'] as num?)?.toInt() ?? 0,
       pendingMinor: (data['pendingMinor'] as num?)?.toInt() ?? 0,
       currency: (data['currency'] ?? 'INR').toString(),
-      rewardPoints: (data['rewardPoints'] as num?)?.toInt() ?? 150,
+      rewardPoints: (data['rewardPoints'] as num?)?.toInt() ?? 0,
       updatedAt: (data['updatedAt'] as Timestamp?)?.toDate(),
     );
   }
