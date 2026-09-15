@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/constants/master_destinations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
@@ -234,36 +235,56 @@ class _MapPageState extends State<MapPage> {
             ),
           ),
 
-          // Floating Controls (Compass & My Location)
+          // Floating Controls (External Google Maps & Center Navigation)
           Positioned(
             right: 16,
             bottom: 230,
             child: Column(
               children: [
                 _buildMapControl(
-                  icon: Icons.layers_rounded,
-                  onTap: () {
-                    HapticFeedback.lightImpact();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Switched to Topographic Heritage view'),
-                        duration: Duration(seconds: 1),
-                      ),
+                  icon: Icons.open_in_new_rounded,
+                  onTap: () async {
+                    if (destinations.isEmpty) return;
+                    final activeDest =
+                        destinations[_activeCardIndex.clamp(0, destinations.length - 1)];
+                    final uri = Uri.parse(
+                      'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent('${activeDest.name}, ${activeDest.state}, India')}',
                     );
+                    HapticFeedback.lightImpact();
+                    if (await canLaunchUrl(uri)) {
+                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                    } else if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Coordinates: ${activeDest.lat}, ${activeDest.lng}'),
+                          duration: const Duration(seconds: 2),
+                        ),
+                      );
+                    }
                   },
                 ),
                 const SizedBox(height: 10),
                 _buildMapControl(
-                  icon: Icons.my_location_rounded,
+                  icon: Icons.navigation_rounded,
                   isPrimary: true,
-                  onTap: () {
-                    HapticFeedback.lightImpact();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Centered on your active India waypoint'),
-                        duration: Duration(seconds: 1),
-                      ),
+                  onTap: () async {
+                    if (destinations.isEmpty) return;
+                    final activeDest =
+                        destinations[_activeCardIndex.clamp(0, destinations.length - 1)];
+                    final uri = Uri.parse(
+                      'https://www.google.com/maps/dir/?api=1&destination=${activeDest.lat},${activeDest.lng}&travelmode=driving',
                     );
+                    HapticFeedback.lightImpact();
+                    if (await canLaunchUrl(uri)) {
+                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                    } else if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Route to ${activeDest.name}: ${activeDest.lat}, ${activeDest.lng}'),
+                          duration: const Duration(seconds: 2),
+                        ),
+                      );
+                    }
                   },
                 ),
               ],
@@ -317,23 +338,21 @@ class _MapPageState extends State<MapPage> {
                                 borderRadius: const BorderRadius.horizontal(
                                   left: Radius.circular(19),
                                 ),
-                                child: Image.network(
-                                  dest.image,
-                                  width: 120,
-                                  height: double.infinity,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => Container(
-                                    width: 120,
-                                    color: AppColors.surfaceWarm,
-                                    child: const Center(
-                                      child: Icon(
-                                        Icons.photo_library_outlined,
-                                        color: AppColors.border,
-                                        size: 32,
+                                child: dest.image.startsWith('assets/')
+                                    ? Image.asset(
+                                        dest.image,
+                                        width: 120,
+                                        height: double.infinity,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) => _buildImagePlaceholder(),
+                                      )
+                                    : Image.network(
+                                        dest.image,
+                                        width: 120,
+                                        height: double.infinity,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) => _buildImagePlaceholder(),
                                       ),
-                                    ),
-                                  ),
-                                ),
                               ),
                               Expanded(
                                 child: Padding(
@@ -479,6 +498,20 @@ class _MapPageState extends State<MapPage> {
     );
   }
 
+  Widget _buildImagePlaceholder() {
+    return Container(
+      width: 120,
+      color: AppColors.surfaceWarm,
+      child: const Center(
+        child: Icon(
+          Icons.photo_library_outlined,
+          color: AppColors.border,
+          size: 32,
+        ),
+      ),
+    );
+  }
+
   Widget _buildMapControl({
     required IconData icon,
     required VoidCallback onTap,
@@ -507,6 +540,20 @@ class _MapPageState extends State<MapPage> {
           icon,
           color: isPrimary ? Colors.white : AppColors.brown,
           size: 20,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildImagePlaceholder() {
+    return Container(
+      width: 120,
+      color: AppColors.surfaceWarm,
+      child: const Center(
+        child: Icon(
+          Icons.photo_library_outlined,
+          color: AppColors.border,
+          size: 32,
         ),
       ),
     );
