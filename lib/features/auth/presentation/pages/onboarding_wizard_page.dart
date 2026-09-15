@@ -1,15 +1,22 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import '../../../../core/auth/auth_provider.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_typography.dart';
+import '../../../profile/domain/models/user_preferences_model.dart';
+import '../../../profile/presentation/providers/user_provider.dart';
 
-class OnboardingWizardPage extends StatefulWidget {
+class OnboardingWizardPage extends ConsumerStatefulWidget {
   const OnboardingWizardPage({super.key});
 
   @override
-  State<OnboardingWizardPage> createState() => _OnboardingWizardPageState();
+  ConsumerState<OnboardingWizardPage> createState() =>
+      _OnboardingWizardPageState();
 }
 
-class _OnboardingWizardPageState extends State<OnboardingWizardPage> {
+class _OnboardingWizardPageState extends ConsumerState<OnboardingWizardPage> {
   final List<String> _styles = [
     'Backpacker',
     'Luxury',
@@ -21,22 +28,60 @@ class _OnboardingWizardPageState extends State<OnboardingWizardPage> {
     'Nature',
   ];
   final Set<String> _selectedStyles = {};
+  bool _isSaving = false;
+
+  Future<void> _handleContinue() async {
+    if (_isSaving) return;
+    setState(() => _isSaving = true);
+
+    try {
+      final uid = ref.read(currentUserProvider)?.uid;
+      if (uid != null && _selectedStyles.isNotEmpty) {
+        await ref
+            .read(userRepositoryProvider)
+            .updateUserPreferences(
+              uid,
+              UserPreferencesModel(interests: _selectedStyles.toList()),
+            );
+      }
+    } catch (_) {
+      // Non-blocking preference persistence
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+        context.go('/vibe-match');
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFAF9F6),
+      backgroundColor: AppColors.background,
       appBar: AppBar(
+        backgroundColor: AppColors.background,
+        elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: Colors.black87),
-          onPressed: () => Navigator.of(context).pop(),
+          icon: const Icon(
+            Icons.arrow_back_rounded,
+            color: AppColors.textPrimary,
+          ),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/login');
+            }
+          },
         ),
         actions: [
           TextButton(
             onPressed: () => context.go('/vibe-match'),
-            child: const Text(
+            child: Text(
               'Skip',
-              style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold),
+              style: AppTypography.button(
+                color: AppColors.textSecondary,
+              ).copyWith(fontWeight: FontWeight.bold),
             ),
           ),
         ],
@@ -47,19 +92,16 @@ class _OnboardingWizardPageState extends State<OnboardingWizardPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'What is your travel style?',
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.w900,
-                  color: Color(0xFF2D3142),
-                  height: 1.2,
-                ),
+                style: AppTypography.editorialTitle(
+                  color: AppColors.brown,
+                ).copyWith(fontSize: 32, height: 1.2),
               ).animate().fadeIn(delay: 100.ms).slideX(begin: -0.1),
               const SizedBox(height: 12),
-              const Text(
-                'Select at least 3 styles so our AI can personalize your itineraries.',
-                style: TextStyle(fontSize: 16, color: Colors.grey),
+              Text(
+                'Select at least 3 styles to personalize your curated itineraries.',
+                style: AppTypography.bodyMedium(color: AppColors.textSecondary),
               ).animate().fadeIn(delay: 200.ms).slideX(begin: -0.1),
               const SizedBox(height: 40),
 
@@ -86,21 +128,21 @@ class _OnboardingWizardPageState extends State<OnboardingWizardPage> {
                           ),
                           decoration: BoxDecoration(
                             color: isSelected
-                                ? Theme.of(context).primaryColor
-                                : Colors.white,
+                                ? AppColors.primary
+                                : AppColors.surface,
                             borderRadius: BorderRadius.circular(30),
                             border: Border.all(
                               color: isSelected
-                                  ? Theme.of(context).primaryColor
-                                  : Colors.grey.withValues(alpha: 0.2),
+                                  ? AppColors.primary
+                                  : AppColors.border,
                               width: 2,
                             ),
                             boxShadow: isSelected
                                 ? [
                                     BoxShadow(
-                                      color: Theme.of(
-                                        context,
-                                      ).primaryColor.withValues(alpha: 0.3),
+                                      color: AppColors.primary.withValues(
+                                        alpha: 0.3,
+                                      ),
                                       blurRadius: 10,
                                       offset: const Offset(0, 4),
                                     ),
@@ -109,13 +151,11 @@ class _OnboardingWizardPageState extends State<OnboardingWizardPage> {
                           ),
                           child: Text(
                             style,
-                            style: TextStyle(
+                            style: AppTypography.bodyMedium(
                               color: isSelected
                                   ? Colors.white
-                                  : const Color(0xFF2D3142),
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
+                                  : AppColors.textPrimary,
+                            ).copyWith(fontWeight: FontWeight.bold),
                           ),
                         ),
                       )
@@ -131,25 +171,30 @@ class _OnboardingWizardPageState extends State<OnboardingWizardPage> {
                 width: double.infinity,
                 height: 56,
                 child: ElevatedButton(
-                  onPressed: _selectedStyles.length >= 3
-                      ? () => context.go('/vibe-match')
+                  onPressed: _selectedStyles.length >= 3 && !_isSaving
+                      ? _handleContinue
                       : null,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Theme.of(context).primaryColor,
+                    backgroundColor: AppColors.primary,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),
                     elevation: 0,
-                    disabledBackgroundColor: Colors.grey[300],
+                    disabledBackgroundColor: AppColors.border,
                   ),
-                  child: const Text(
-                    'Continue to Vibe Match',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
+                  child: _isSaving
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Text(
+                          'Continue to Vibe Match',
+                          style: AppTypography.button(color: Colors.white),
+                        ),
                 ),
               ).animate().fadeIn(delay: 500.ms).slideY(begin: 0.2),
             ],

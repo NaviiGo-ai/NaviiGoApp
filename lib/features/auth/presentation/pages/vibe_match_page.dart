@@ -1,31 +1,74 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/auth/auth_provider.dart';
 import '../../../../core/constants/master_destinations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
+import '../../../profile/domain/models/user_preferences_model.dart';
+import '../../../profile/presentation/providers/user_provider.dart';
 
-class VibeMatchPage extends StatefulWidget {
+class VibeMatchPage extends ConsumerStatefulWidget {
   const VibeMatchPage({super.key});
 
   @override
-  State<VibeMatchPage> createState() => _VibeMatchPageState();
+  ConsumerState<VibeMatchPage> createState() => _VibeMatchPageState();
 }
 
-class _VibeMatchPageState extends State<VibeMatchPage> {
-  final List<MasterDestination> _vibes = [
-    kMasterDestinations.firstWhere((d) => d.id == 'jaipur'),
-    kMasterDestinations.firstWhere((d) => d.id == 'varanasi'),
-    kMasterDestinations.firstWhere((d) => d.id == 'kerala'),
-    kMasterDestinations.firstWhere((d) => d.id == 'ladakh'),
+class _VibeMatchPageState extends ConsumerState<VibeMatchPage> {
+  static const List<String> _vibeIds = [
+    'jaipur',
+    'varanasi',
+    'kerala',
+    'ladakh',
   ];
 
+  late final List<MasterDestination> _vibes = _vibeIds
+      .map((id) => kMasterDestinations.where((d) => d.id == id).firstOrNull)
+      .whereType<MasterDestination>()
+      .toList();
+
+  final Set<String> _likedIds = {};
   int _currentIndex = 0;
   bool _isLiked = false;
   bool _isPassed = false;
+  bool _isCompleting = false;
+
+  Future<void> _completeOnboarding() async {
+    if (_isCompleting) return;
+    _isCompleting = true;
+
+    try {
+      final uid = ref.read(currentUserProvider)?.uid;
+      if (uid != null && _likedIds.isNotEmpty) {
+        await ref
+            .read(userRepositoryProvider)
+            .updateUserPreferences(
+              uid,
+              UserPreferencesModel(interests: _likedIds.toList()),
+            );
+      }
+    } catch (_) {
+      // Non-blocking preference persistence
+    } finally {
+      if (mounted) {
+        context.go('/home');
+      }
+    }
+  }
 
   void _handleSwipe(bool liked) {
+    if (_vibes.isEmpty) {
+      context.go('/home');
+      return;
+    }
+
     HapticFeedback.lightImpact();
+    if (liked) {
+      _likedIds.add(_vibes[_currentIndex].id);
+    }
+
     setState(() {
       if (liked) {
         _isLiked = true;
@@ -43,7 +86,7 @@ class _VibeMatchPageState extends State<VibeMatchPage> {
           _isPassed = false;
         });
       } else {
-        context.go('/home');
+        _completeOnboarding();
       }
     });
   }

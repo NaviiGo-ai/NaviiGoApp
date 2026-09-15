@@ -16,13 +16,17 @@ class NavHubPage extends ConsumerWidget {
         location.startsWith('/explore-discover') ||
         location.startsWith('/hidden-gems') ||
         location.startsWith('/restaurants') ||
-        location.startsWith('/transportation')) {
+        location.startsWith('/transportation') ||
+        location.startsWith('/local-guides') ||
+        location.startsWith('/map') ||
+        location.startsWith('/ar-explore')) {
       return 1;
     }
     if (location.startsWith('/trips') ||
         location.startsWith('/itinerary') ||
         location.startsWith('/upcoming-trips') ||
         location.startsWith('/ongoing-trips') ||
+        location.startsWith('/past-trips') ||
         location.startsWith('/live-tracking') ||
         location.startsWith('/trip-planner')) {
       return 2;
@@ -31,7 +35,8 @@ class NavHubPage extends ConsumerWidget {
         location.startsWith('/passport') ||
         location.startsWith('/saved-places') ||
         location.startsWith('/bookings') ||
-        location.startsWith('/payment-history')) {
+        location.startsWith('/payment-history') ||
+        location.startsWith('/story-creator')) {
       return 3;
     }
     if (location.startsWith('/profile') ||
@@ -432,7 +437,9 @@ class NavDrawer extends ConsumerWidget {
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
       onTap: () {
         Navigator.of(context).pop();
-        context.go(route);
+        if (context.mounted) {
+          context.go(route);
+        }
       },
     );
   }

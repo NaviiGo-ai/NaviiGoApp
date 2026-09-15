@@ -17,6 +17,24 @@ class UserPreferencesModel {
     this.homeCity,
   });
 
+  UserPreferencesModel copyWith({
+    String? travelStyle,
+    String? preferredGroup,
+    List<String>? interests,
+    List<String>? dietaryPreferences,
+    List<String>? accessibilityNeeds,
+    String? homeCity,
+  }) {
+    return UserPreferencesModel(
+      travelStyle: travelStyle ?? this.travelStyle,
+      preferredGroup: preferredGroup ?? this.preferredGroup,
+      interests: interests ?? this.interests,
+      dietaryPreferences: dietaryPreferences ?? this.dietaryPreferences,
+      accessibilityNeeds: accessibilityNeeds ?? this.accessibilityNeeds,
+      homeCity: homeCity ?? this.homeCity,
+    );
+  }
+
   factory UserPreferencesModel.fromMap(Map<String, dynamic> data) {
     return UserPreferencesModel(
       travelStyle: data['travelStyle'] as String?,
@@ -47,13 +65,15 @@ class UserPreferencesModel {
     return UserPreferencesModel.fromMap(doc.data() ?? {});
   }
 
-  Map<String, dynamic> toMap() {
+  Map<String, dynamic> toMap({bool includeEmptyLists = false}) {
     return {
       if (travelStyle != null) 'travelStyle': travelStyle,
       if (preferredGroup != null) 'preferredGroup': preferredGroup,
-      'interests': interests,
-      'dietaryPreferences': dietaryPreferences,
-      'accessibilityNeeds': accessibilityNeeds,
+      if (includeEmptyLists || interests.isNotEmpty) 'interests': interests,
+      if (includeEmptyLists || dietaryPreferences.isNotEmpty)
+        'dietaryPreferences': dietaryPreferences,
+      if (includeEmptyLists || accessibilityNeeds.isNotEmpty)
+        'accessibilityNeeds': accessibilityNeeds,
       if (homeCity != null) 'homeCity': homeCity,
     };
   }

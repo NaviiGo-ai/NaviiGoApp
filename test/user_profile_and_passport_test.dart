@@ -1,11 +1,42 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:naviigo_app/features/profile/domain/models/user_profile_model.dart';
+import 'package:naviigo_app/features/profile/domain/models/user_preferences_model.dart';
 import 'package:naviigo_app/features/bookings/domain/models/passport_model.dart';
 import 'package:naviigo_app/features/bookings/domain/models/saved_place_model.dart';
 import 'package:naviigo_app/features/bookings/domain/models/booking_model.dart';
 
 void main() {
   group('Domain Models Unit Tests', () {
+    test('UserPreferencesModel partial merge and serialization', () {
+      const emptyPrefs = UserPreferencesModel();
+      expect(emptyPrefs.toMap(), isEmpty);
+      expect(emptyPrefs.toMap(includeEmptyLists: true), {
+        'interests': <String>[],
+        'dietaryPreferences': <String>[],
+        'accessibilityNeeds': <String>[],
+      });
+
+      const prefs = UserPreferencesModel(
+        interests: ['culture', 'nature'],
+        homeCity: 'Jaipur',
+      );
+      final map = prefs.toMap();
+      expect(map['interests'], ['culture', 'nature']);
+      expect(map['homeCity'], 'Jaipur');
+      expect(map.containsKey('travelStyle'), isFalse);
+      expect(map.containsKey('dietaryPreferences'), isFalse);
+      expect(map.containsKey('accessibilityNeeds'), isFalse);
+
+      final updated = prefs.copyWith(
+        travelStyle: 'luxury',
+        dietaryPreferences: ['Vegetarian'],
+      );
+      expect(updated.travelStyle, 'luxury');
+      expect(updated.interests, ['culture', 'nature']);
+      expect(updated.homeCity, 'Jaipur');
+      expect(updated.dietaryPreferences, ['Vegetarian']);
+    });
+
     test('UserProfileModel calculates initials correctly', () {
       const user1 = UserProfileModel(
         uid: 'user_1',
