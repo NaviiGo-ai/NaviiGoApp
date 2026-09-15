@@ -10,6 +10,7 @@ import '../../../trips/domain/models/trip_itinerary_model.dart';
 import '../../../bookings/presentation/providers/passport_provider.dart';
 import '../../../bookings/domain/models/passport_model.dart';
 import '../../../../core/auth/auth_provider.dart';
+import '../../../../core/widgets/no_journey_state.dart';
 
 class OngoingTripsPage extends ConsumerStatefulWidget {
   const OngoingTripsPage({super.key});
@@ -51,8 +52,36 @@ class _OngoingTripsPageState extends ConsumerState<OngoingTripsPage>
       }
     }
 
-    // Always provide authentic fallback trip so companion never renders a blank screen
-    activeTrip ??= TripItineraryModel.sampleVaranasiTrip();
+    // No trip means no companion — never invent a journey to fill the screen.
+    if (activeTrip == null) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          backgroundColor: AppColors.background,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(
+              Icons.arrow_back_ios_new_rounded,
+              color: AppColors.textPrimary,
+              size: 18,
+            ),
+            onPressed: () {
+              if (context.canPop()) {
+                context.pop();
+              } else {
+                context.go('/home');
+              }
+            },
+          ),
+        ),
+        body: const NoJourneyState(
+          title: 'No Live Journey',
+          message:
+              'The Live Companion wakes up on the day your journey begins.',
+          icon: Icons.route_outlined,
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -83,11 +112,15 @@ class _OngoingTripsPageState extends ConsumerState<OngoingTripsPage>
                   width: 8,
                   height: 8,
                   decoration: BoxDecoration(
-                    color: AppColors.teal.withAlpha((180 + 75 * _pulseController.value).round()),
+                    color: AppColors.teal.withAlpha(
+                      (180 + 75 * _pulseController.value).round(),
+                    ),
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.teal.withAlpha((100 * _pulseController.value).round()),
+                        color: AppColors.teal.withAlpha(
+                          (100 * _pulseController.value).round(),
+                        ),
                         blurRadius: 6,
                         spreadRadius: 2,
                       ),
@@ -99,7 +132,9 @@ class _OngoingTripsPageState extends ConsumerState<OngoingTripsPage>
             const SizedBox(width: 8),
             Text(
               'Live Companion',
-              style: AppTypography.tripTitle(color: AppColors.brown).copyWith(fontSize: 18),
+              style: AppTypography.tripTitle(
+                color: AppColors.brown,
+              ).copyWith(fontSize: 18),
             ),
           ],
         ),
@@ -120,14 +155,19 @@ class _OngoingTripsPageState extends ConsumerState<OngoingTripsPage>
     );
   }
 
-  Widget _buildLiveCompanionContent(BuildContext context, TripItineraryModel trip) {
+  Widget _buildLiveCompanionContent(
+    BuildContext context,
+    TripItineraryModel trip,
+  ) {
     final firstDay = trip.dayPlans.isNotEmpty ? trip.dayPlans.first : null;
     final activities = firstDay?.activities ?? [];
     final currentActivity = activities.isNotEmpty ? activities.first : null;
     final nextActivity = activities.length > 1 ? activities[1] : null;
 
     final totalStops = activities.length;
-    final progressPercent = totalStops > 0 ? (_completedStopsCount / totalStops).clamp(0.0, 1.0) : 0.33;
+    final progressPercent = totalStops > 0
+        ? (_completedStopsCount / totalStops).clamp(0.0, 1.0)
+        : 0.33;
 
     final now = DateTime.now();
     final timeString =
@@ -159,18 +199,18 @@ class _OngoingTripsPageState extends ConsumerState<OngoingTripsPage>
                       children: [
                         Text(
                           'EXPEDITION IN MOTION · DAY 01',
-                          style: AppTypography.micro(color: AppColors.primary).copyWith(
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.8,
-                          ),
+                          style: AppTypography.micro(color: AppColors.primary)
+                              .copyWith(
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.8,
+                              ),
                         ),
                         const SizedBox(height: 2),
                         Text(
                           trip.destName,
-                          style: AppTypography.displayHero(color: AppColors.brown).copyWith(
-                            fontSize: 26,
-                            height: 1.15,
-                          ),
+                          style: AppTypography.displayHero(
+                            color: AppColors.brown,
+                          ).copyWith(fontSize: 26, height: 1.15),
                         ),
                       ],
                     ),
@@ -179,20 +219,25 @@ class _OngoingTripsPageState extends ConsumerState<OngoingTripsPage>
                       children: [
                         Text(
                           timeString,
-                          style: AppTypography.caption(color: AppColors.textPrimary).copyWith(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 16,
-                          ),
+                          style: AppTypography.caption(
+                            color: AppColors.textPrimary,
+                          ).copyWith(fontWeight: FontWeight.w800, fontSize: 16),
                         ),
                         const SizedBox(height: 2),
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.wb_sunny_outlined, size: 12, color: AppColors.yellow),
+                            const Icon(
+                              Icons.wb_sunny_outlined,
+                              size: 12,
+                              color: AppColors.yellow,
+                            ),
                             const SizedBox(width: 4),
                             Text(
                               '28°C · CLEAR',
-                              style: AppTypography.micro(color: AppColors.textTertiary).copyWith(fontSize: 10),
+                              style: AppTypography.micro(
+                                color: AppColors.textTertiary,
+                              ).copyWith(fontSize: 10),
                             ),
                           ],
                         ),
@@ -208,17 +253,15 @@ class _OngoingTripsPageState extends ConsumerState<OngoingTripsPage>
                   children: [
                     Text(
                       'DAY PROGRESS',
-                      style: AppTypography.micro(color: AppColors.textTertiary).copyWith(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 9,
-                      ),
+                      style: AppTypography.micro(
+                        color: AppColors.textTertiary,
+                      ).copyWith(fontWeight: FontWeight.w700, fontSize: 9),
                     ),
                     Text(
                       '${(progressPercent * 100).toInt()}% COMPLETED',
-                      style: AppTypography.micro(color: AppColors.teal).copyWith(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 10,
-                      ),
+                      style: AppTypography.micro(
+                        color: AppColors.teal,
+                      ).copyWith(fontWeight: FontWeight.w800, fontSize: 10),
                     ),
                   ],
                 ),
@@ -228,7 +271,9 @@ class _OngoingTripsPageState extends ConsumerState<OngoingTripsPage>
                   child: LinearProgressIndicator(
                     value: progressPercent,
                     backgroundColor: AppColors.cream.withAlpha(100),
-                    valueColor: const AlwaysStoppedAnimation<Color>(AppColors.teal),
+                    valueColor: const AlwaysStoppedAnimation<Color>(
+                      AppColors.teal,
+                    ),
                     minHeight: 6,
                   ),
                 ),
@@ -248,15 +293,20 @@ class _OngoingTripsPageState extends ConsumerState<OngoingTripsPage>
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.people_alt_outlined, color: AppColors.teal, size: 18),
+                  const Icon(
+                    Icons.people_alt_outlined,
+                    color: AppColors.teal,
+                    size: 18,
+                  ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       '● LIVE WITH $_buddyName · Coordinates & ETA synced',
-                      style: AppTypography.micro(color: AppColors.teal).copyWith(
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.4,
-                      ),
+                      style: AppTypography.micro(color: AppColors.teal)
+                          .copyWith(
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.4,
+                          ),
                     ),
                   ),
                   GestureDetector(
@@ -266,9 +316,9 @@ class _OngoingTripsPageState extends ConsumerState<OngoingTripsPage>
                     },
                     child: Text(
                       'PAUSE',
-                      style: AppTypography.micro(color: AppColors.primary).copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
+                      style: AppTypography.micro(
+                        color: AppColors.primary,
+                      ).copyWith(fontWeight: FontWeight.w800),
                     ),
                   ),
                 ],
@@ -298,29 +348,37 @@ class _OngoingTripsPageState extends ConsumerState<OngoingTripsPage>
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 9,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: AppColors.primary,
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
                         'WHAT NOW?',
-                        style: AppTypography.micro(color: Colors.white).copyWith(
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 1.0,
-                        ),
+                        style: AppTypography.micro(color: Colors.white)
+                            .copyWith(
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 1.0,
+                            ),
                       ),
                     ),
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.pin_drop_rounded, size: 14, color: AppColors.yellow),
+                        const Icon(
+                          Icons.pin_drop_rounded,
+                          size: 14,
+                          color: AppColors.yellow,
+                        ),
                         const SizedBox(width: 4),
                         Text(
                           'ACTIVE WAYPOINT',
-                          style: AppTypography.micro(color: AppColors.yellow).copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
+                          style: AppTypography.micro(
+                            color: AppColors.yellow,
+                          ).copyWith(fontWeight: FontWeight.w800),
                         ),
                       ],
                     ),
@@ -329,11 +387,11 @@ class _OngoingTripsPageState extends ConsumerState<OngoingTripsPage>
                 const SizedBox(height: 14),
 
                 Text(
-                  currentActivity?.title ?? '${trip.destName} Historic Quarter Walk',
-                  style: AppTypography.tripTitle(color: Colors.white).copyWith(
-                    fontSize: 22,
-                    height: 1.2,
-                  ),
+                  currentActivity?.title ??
+                      '${trip.destName} Historic Quarter Walk',
+                  style: AppTypography.tripTitle(
+                    color: Colors.white,
+                  ).copyWith(fontSize: 22, height: 1.2),
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -344,10 +402,9 @@ class _OngoingTripsPageState extends ConsumerState<OngoingTripsPage>
                   const SizedBox(height: 10),
                   Text(
                     currentActivity!.description!,
-                    style: AppTypography.bodyMedium(color: Colors.white.withAlpha(220)).copyWith(
-                      fontSize: 13,
-                      height: 1.4,
-                    ),
+                    style: AppTypography.bodyMedium(
+                      color: Colors.white.withAlpha(220),
+                    ).copyWith(fontSize: 13, height: 1.4),
                   ),
                 ],
                 const SizedBox(height: 18),
@@ -360,17 +417,27 @@ class _OngoingTripsPageState extends ConsumerState<OngoingTripsPage>
                       child: ElevatedButton.icon(
                         onPressed: () async {
                           HapticFeedback.lightImpact();
-                          final target = '${currentActivity?.title ?? trip.destName}, ${trip.destName}';
+                          final target =
+                              '${currentActivity?.title ?? trip.destName}, ${trip.destName}';
                           final uri = Uri.parse(
                             'https://www.google.com/maps/dir/?api=1&destination=${Uri.encodeComponent(target)}&travelmode=walking',
                           );
-                          await launchUrl(uri, mode: LaunchMode.externalApplication);
+                          await launchUrl(
+                            uri,
+                            mode: LaunchMode.externalApplication,
+                          );
                         },
-                        icon: const Icon(Icons.directions_outlined, size: 16, color: Colors.white),
+                        icon: const Icon(
+                          Icons.directions_outlined,
+                          size: 16,
+                          color: Colors.white,
+                        ),
                         label: const Text('NAVIGATE NOW'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primary,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           elevation: 0,
                         ),
@@ -389,16 +456,30 @@ class _OngoingTripsPageState extends ConsumerState<OngoingTripsPage>
                           });
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text('Waypoint stamped into your Passport!'),
+                              content: Text(
+                                'Waypoint stamped into your Passport!',
+                              ),
                               backgroundColor: AppColors.teal,
                             ),
                           );
                         },
-                        icon: const Icon(Icons.check_circle_outline_rounded, size: 16, color: Colors.white),
-                        label: Text('CHECK IN', style: AppTypography.button(color: Colors.white)),
+                        icon: const Icon(
+                          Icons.check_circle_outline_rounded,
+                          size: 16,
+                          color: Colors.white,
+                        ),
+                        label: Text(
+                          'CHECK IN',
+                          style: AppTypography.button(color: Colors.white),
+                        ),
                         style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: Colors.white38, width: 1.5),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          side: const BorderSide(
+                            color: Colors.white38,
+                            width: 1.5,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
                           padding: const EdgeInsets.symmetric(vertical: 12),
                         ),
                       ),
@@ -427,29 +508,37 @@ class _OngoingTripsPageState extends ConsumerState<OngoingTripsPage>
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
                       decoration: BoxDecoration(
                         color: AppColors.cream,
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
                         'WHAT NEXT?',
-                        style: AppTypography.micro(color: AppColors.brown).copyWith(
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.8,
-                        ),
+                        style: AppTypography.micro(color: AppColors.brown)
+                            .copyWith(
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.8,
+                            ),
                       ),
                     ),
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.schedule_rounded, size: 12, color: AppColors.primary),
+                        const Icon(
+                          Icons.schedule_rounded,
+                          size: 12,
+                          color: AppColors.primary,
+                        ),
                         const SizedBox(width: 4),
                         Text(
                           nextActivity?.time ?? '02:30 PM',
-                          style: AppTypography.micro(color: AppColors.primary).copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
+                          style: AppTypography.micro(
+                            color: AppColors.primary,
+                          ).copyWith(fontWeight: FontWeight.w800),
                         ),
                       ],
                     ),
@@ -459,15 +548,16 @@ class _OngoingTripsPageState extends ConsumerState<OngoingTripsPage>
 
                 Text(
                   nextActivity?.title ?? 'Central Landmark Exploration',
-                  style: AppTypography.tripTitle(color: AppColors.textPrimary).copyWith(fontSize: 18),
+                  style: AppTypography.tripTitle(
+                    color: AppColors.textPrimary,
+                  ).copyWith(fontSize: 18),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   '15 MIN · 3.2 KM TRANSIT ESTIMATED · AUTO / CAB',
-                  style: AppTypography.micro(color: AppColors.textSecondary).copyWith(
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.4,
-                  ),
+                  style: AppTypography.micro(
+                    color: AppColors.textSecondary,
+                  ).copyWith(fontWeight: FontWeight.w700, letterSpacing: 0.4),
                 ),
               ],
             ),
@@ -490,7 +580,11 @@ class _OngoingTripsPageState extends ConsumerState<OngoingTripsPage>
                     color: AppColors.cream,
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(Icons.camera_alt_outlined, color: AppColors.brown, size: 22),
+                  child: const Icon(
+                    Icons.camera_alt_outlined,
+                    color: AppColors.brown,
+                    size: 22,
+                  ),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -499,13 +593,15 @@ class _OngoingTripsPageState extends ConsumerState<OngoingTripsPage>
                     children: [
                       Text(
                         'Capture a Moment',
-                        style: AppTypography.caption(color: AppColors.textPrimary).copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
+                        style: AppTypography.caption(
+                          color: AppColors.textPrimary,
+                        ).copyWith(fontWeight: FontWeight.w800),
                       ),
                       Text(
                         'Attach a photo & note to ${trip.destName}',
-                        style: AppTypography.micro(color: AppColors.textSecondary),
+                        style: AppTypography.micro(
+                          color: AppColors.textSecondary,
+                        ),
                       ),
                     ],
                   ),
@@ -514,15 +610,20 @@ class _OngoingTripsPageState extends ConsumerState<OngoingTripsPage>
                   onPressed: () => _openAddMomentDialog(context, trip),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.brown,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 8,
+                    ),
                     elevation: 0,
                   ),
                   child: Text(
                     'ADD MOMENT',
-                    style: AppTypography.micro(color: Colors.white).copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
+                    style: AppTypography.micro(
+                      color: Colors.white,
+                    ).copyWith(fontWeight: FontWeight.w800),
                   ),
                 ),
               ],
@@ -549,7 +650,9 @@ class _OngoingTripsPageState extends ConsumerState<OngoingTripsPage>
                 color: AppColors.surface,
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
-                  color: isCurrent ? AppColors.primary.withAlpha(120) : AppColors.border,
+                  color: isCurrent
+                      ? AppColors.primary.withAlpha(120)
+                      : AppColors.border,
                   width: isCurrent ? 1.5 : 1.0,
                 ),
               ),
@@ -561,21 +664,31 @@ class _OngoingTripsPageState extends ConsumerState<OngoingTripsPage>
                     decoration: BoxDecoration(
                       color: isCompleted
                           ? AppColors.teal
-                          : (isCurrent ? AppColors.primary : AppColors.surfaceWarm),
+                          : (isCurrent
+                                ? AppColors.primary
+                                : AppColors.surfaceWarm),
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: isCompleted || isCurrent ? Colors.transparent : AppColors.borderStrong,
+                        color: isCompleted || isCurrent
+                            ? Colors.transparent
+                            : AppColors.borderStrong,
                       ),
                     ),
                     child: Center(
                       child: isCompleted
-                          ? const Icon(Icons.check_rounded, color: Colors.white, size: 14)
+                          ? const Icon(
+                              Icons.check_rounded,
+                              color: Colors.white,
+                              size: 14,
+                            )
                           : Text(
                               '${idx + 1}',
                               style: TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.bold,
-                                color: isCurrent ? Colors.white : AppColors.textSecondary,
+                                color: isCurrent
+                                    ? Colors.white
+                                    : AppColors.textSecondary,
                               ),
                             ),
                     ),
@@ -584,15 +697,17 @@ class _OngoingTripsPageState extends ConsumerState<OngoingTripsPage>
                   Expanded(
                     child: Text(
                       act.title,
-                      style: AppTypography.caption(color: AppColors.textPrimary).copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                      style: AppTypography.caption(
+                        color: AppColors.textPrimary,
+                      ).copyWith(fontWeight: FontWeight.w600),
                     ),
                   ),
                   Text(
                     act.time ?? '',
                     style: AppTypography.micro(
-                      color: isCurrent ? AppColors.primary : AppColors.textTertiary,
+                      color: isCurrent
+                          ? AppColors.primary
+                          : AppColors.textTertiary,
                     ).copyWith(fontWeight: FontWeight.w700),
                   ),
                 ],
@@ -609,13 +724,33 @@ class _OngoingTripsPageState extends ConsumerState<OngoingTripsPage>
           const SizedBox(height: 10),
           Row(
             children: [
-              _buildEssentialButton(Icons.local_hospital_outlined, 'Hospital', '1.2 km', trip.destName),
+              _buildEssentialButton(
+                Icons.local_hospital_outlined,
+                'Hospital',
+                '1.2 km',
+                trip.destName,
+              ),
               const SizedBox(width: 8),
-              _buildEssentialButton(Icons.local_pharmacy_outlined, 'Pharmacy', '300m', trip.destName),
+              _buildEssentialButton(
+                Icons.local_pharmacy_outlined,
+                'Pharmacy',
+                '300m',
+                trip.destName,
+              ),
               const SizedBox(width: 8),
-              _buildEssentialButton(Icons.local_police_outlined, 'Police', '2.0 km', trip.destName),
+              _buildEssentialButton(
+                Icons.local_police_outlined,
+                'Police',
+                '2.0 km',
+                trip.destName,
+              ),
               const SizedBox(width: 8),
-              _buildEssentialButton(Icons.call_outlined, 'Help 112', 'Direct', trip.destName),
+              _buildEssentialButton(
+                Icons.call_outlined,
+                'Help 112',
+                'Direct',
+                trip.destName,
+              ),
             ],
           ),
           const SizedBox(height: 26),
@@ -628,23 +763,32 @@ class _OngoingTripsPageState extends ConsumerState<OngoingTripsPage>
                 _triggerSosFlow(context);
               },
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 14,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.error.withAlpha(20),
                   borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: AppColors.error.withAlpha(120), width: 1.5),
+                  border: Border.all(
+                    color: AppColors.error.withAlpha(120),
+                    width: 1.5,
+                  ),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.warning_amber_rounded, color: AppColors.error, size: 20),
+                    const Icon(
+                      Icons.warning_amber_rounded,
+                      color: AppColors.error,
+                      size: 20,
+                    ),
                     const SizedBox(width: 10),
                     Text(
                       'HOLD FOR SOS & SAFETY SHIELD',
-                      style: AppTypography.button(color: AppColors.error).copyWith(
-                        fontSize: 12,
-                        letterSpacing: 0.8,
-                      ),
+                      style: AppTypography.button(
+                        color: AppColors.error,
+                      ).copyWith(fontSize: 12, letterSpacing: 0.8),
                     ),
                   ],
                 ),
@@ -657,7 +801,12 @@ class _OngoingTripsPageState extends ConsumerState<OngoingTripsPage>
     );
   }
 
-  Widget _buildEssentialButton(IconData icon, String label, String distance, String destName) {
+  Widget _buildEssentialButton(
+    IconData icon,
+    String label,
+    String distance,
+    String destName,
+  ) {
     return Expanded(
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
@@ -667,13 +816,19 @@ class _OngoingTripsPageState extends ConsumerState<OngoingTripsPage>
             final uri = Uri.parse('tel:112');
             if (await canLaunchUrl(uri)) await launchUrl(uri);
           } else if (label == 'Hospital') {
-            final uri = Uri.parse('https://www.google.com/maps/search/hospitals+near+${Uri.encodeComponent(destName)}');
+            final uri = Uri.parse(
+              'https://www.google.com/maps/search/hospitals+near+${Uri.encodeComponent(destName)}',
+            );
             await launchUrl(uri, mode: LaunchMode.externalApplication);
           } else if (label == 'Pharmacy') {
-            final uri = Uri.parse('https://www.google.com/maps/search/pharmacies+chemist+near+${Uri.encodeComponent(destName)}');
+            final uri = Uri.parse(
+              'https://www.google.com/maps/search/pharmacies+chemist+near+${Uri.encodeComponent(destName)}',
+            );
             await launchUrl(uri, mode: LaunchMode.externalApplication);
           } else if (label == 'Police') {
-            final uri = Uri.parse('https://www.google.com/maps/search/police+station+near+${Uri.encodeComponent(destName)}');
+            final uri = Uri.parse(
+              'https://www.google.com/maps/search/police+station+near+${Uri.encodeComponent(destName)}',
+            );
             await launchUrl(uri, mode: LaunchMode.externalApplication);
           }
         },
@@ -691,11 +846,15 @@ class _OngoingTripsPageState extends ConsumerState<OngoingTripsPage>
               const SizedBox(height: 6),
               Text(
                 label,
-                style: AppTypography.micro(color: AppColors.textPrimary).copyWith(fontWeight: FontWeight.w700),
+                style: AppTypography.micro(
+                  color: AppColors.textPrimary,
+                ).copyWith(fontWeight: FontWeight.w700),
               ),
               Text(
                 distance,
-                style: AppTypography.micro(color: AppColors.textTertiary).copyWith(fontSize: 9),
+                style: AppTypography.micro(
+                  color: AppColors.textTertiary,
+                ).copyWith(fontSize: 9),
               ),
             ],
           ),
@@ -729,7 +888,8 @@ class _OngoingTripsPageState extends ConsumerState<OngoingTripsPage>
               maxLines: 3,
               style: AppTypography.bodyMedium(),
               decoration: InputDecoration(
-                hintText: 'Describe the scents, temple bells, or river breeze...',
+                hintText:
+                    'Describe the scents, temple bells, or river breeze...',
                 hintStyle: AppTypography.caption(),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(14),
@@ -759,7 +919,9 @@ class _OngoingTripsPageState extends ConsumerState<OngoingTripsPage>
                   activities: [noteController.text.trim()],
                   visitedDate: DateTime.now(),
                 );
-                await ref.read(passportRepositoryProvider).addPassportStamp(uid, stamp);
+                await ref
+                    .read(passportRepositoryProvider)
+                    .addPassportStamp(uid, stamp);
                 if (ctx.mounted) Navigator.pop(ctx);
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -773,9 +935,14 @@ class _OngoingTripsPageState extends ConsumerState<OngoingTripsPage>
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
             ),
-            child: const Text('Save Moment', style: TextStyle(color: Colors.white)),
+            child: const Text(
+              'Save Moment',
+              style: TextStyle(color: Colors.white),
+            ),
           ),
         ],
       ),
@@ -798,7 +965,11 @@ class _OngoingTripsPageState extends ConsumerState<OngoingTripsPage>
           children: [
             Row(
               children: [
-                const Icon(Icons.shield_rounded, color: AppColors.error, size: 28),
+                const Icon(
+                  Icons.shield_rounded,
+                  color: AppColors.error,
+                  size: 28,
+                ),
                 const SizedBox(width: 10),
                 Text(
                   'EMERGENCY MODE ACTIVE',
@@ -825,7 +996,9 @@ class _OngoingTripsPageState extends ConsumerState<OngoingTripsPage>
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.error,
                 minimumSize: const Size(double.infinity, 48),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
               ),
             ),
             const SizedBox(height: 10),
@@ -833,7 +1006,9 @@ class _OngoingTripsPageState extends ConsumerState<OngoingTripsPage>
               onPressed: () => Navigator.pop(ctx),
               style: OutlinedButton.styleFrom(
                 minimumSize: const Size(double.infinity, 48),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
               ),
               child: const Text('DISMISS EMERGENCY MODE'),
             ),
@@ -878,7 +1053,10 @@ class _OngoingTripsPageState extends ConsumerState<OngoingTripsPage>
               ),
             ),
             ListTile(
-              leading: const Icon(Icons.contact_phone_outlined, color: AppColors.brown),
+              leading: const Icon(
+                Icons.contact_phone_outlined,
+                color: AppColors.brown,
+              ),
               title: const Text('Emergency Contacts'),
               subtitle: const Text('2 contacts registered'),
               onTap: () => Navigator.pop(ctx),

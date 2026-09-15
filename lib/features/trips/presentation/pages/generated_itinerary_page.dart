@@ -9,6 +9,7 @@ import '../../../../core/network/firebase_client.dart';
 import '../providers/trip_provider.dart';
 import '../../domain/models/trip_itinerary_model.dart';
 import '../widgets/itinerary_overview_widgets.dart';
+import '../../../../core/widgets/no_journey_state.dart';
 
 class GeneratedItineraryPage extends ConsumerStatefulWidget {
   final TripItineraryModel? trip;
@@ -39,8 +40,35 @@ class _GeneratedItineraryPageState
       }
     }
 
-    // Always provide authentic flagship expedition if no trip exists
-    activeTrip ??= TripItineraryModel.sampleVaranasiTrip();
+    // No trip means nothing to show — never invent an itinerary.
+    if (activeTrip == null) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          backgroundColor: AppColors.background,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(
+              Icons.arrow_back_ios_new_rounded,
+              color: AppColors.textPrimary,
+              size: 18,
+            ),
+            onPressed: () {
+              if (context.canPop()) {
+                context.pop();
+              } else {
+                context.go('/home');
+              }
+            },
+          ),
+        ),
+        body: const NoJourneyState(
+          title: 'No Itinerary Yet',
+          message:
+              'Craft a journey and NaviiGo will lay out every chapter, day by day.',
+        ),
+      );
+    }
 
     return _buildItineraryView(context, activeTrip);
   }

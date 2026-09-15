@@ -119,6 +119,7 @@ class TripRepository {
       'dayPlans': dayPlansData,
       'generatedData': genData,
       'isActive': trip.isActive,
+      'isPublic': trip.isPublic,
       'updatedAt': now,
     };
 
@@ -143,17 +144,28 @@ class TripRepository {
 
     await userDocRef.set(data, SetOptions(merge: true));
 
-    // Mirror to root itineraries collection for web & share link compatibility
-    try {
-      final rootData = {...data, 'userId': uid, 'isPublic': true};
-      await _firestore
-          .collection('itineraries')
-          .doc(trip.id)
-          .set(rootData, SetOptions(merge: true));
-    } catch (e) {
-      debugPrint(
-        '[TripRepository] Non-fatal mirror to root itineraries failed: $e',
-      );
+    // Only mirror to the public root collection when the traveller has
+    // explicitly shared this journey. Mirroring unconditionally made every
+    // private itinerary world-readable at `itineraries/{id}`.
+    if (trip.isPublic) {
+      try {
+        final rootData = {...data, 'userId': uid, 'isPublic': true};
+        await _firestore
+            .collection('itineraries')
+            .doc(trip.id)
+            .set(rootData, SetOptions(merge: true));
+      } catch (e) {
+        debugPrint(
+          '[TripRepository] Non-fatal mirror to root itineraries failed: $e',
+        );
+      }
+    } else {
+      // Clear any previously public copy so un-sharing actually un-publishes.
+      try {
+        await _firestore.collection('itineraries').doc(trip.id).delete();
+      } catch (e) {
+        debugPrint('[TripRepository] Could not clear public mirror: $e');
+      }
     }
 
     // Cache locally

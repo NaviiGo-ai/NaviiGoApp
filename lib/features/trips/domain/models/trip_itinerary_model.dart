@@ -98,6 +98,10 @@ class TripItineraryModel {
   final Map<String, dynamic> form;
   final Map<String, dynamic>? generatedData;
   final bool isActive;
+
+  /// Whether the traveller has explicitly shared this journey. Private trips
+  /// never leave `users/{uid}/itineraries`.
+  final bool isPublic;
   final DateTime? createdAt;
   final DateTime? updatedAt;
   final List<TripDayPlanModel> dayPlans;
@@ -110,6 +114,7 @@ class TripItineraryModel {
     this.form = const {},
     this.generatedData,
     this.isActive = false,
+    this.isPublic = false,
     this.createdAt,
     this.updatedAt,
     this.dayPlans = const [],
@@ -177,18 +182,6 @@ class TripItineraryModel {
       }
     }
 
-    // If day plans are still empty, synthesize authentic curated chapters for the destination
-    if (plans.isEmpty) {
-      int totalDaysCount = 3;
-      final formDays = form['days'] ?? data['days'] ?? data['totalDays'];
-      if (formDays is num) {
-        totalDaysCount = formDays.toInt();
-      } else if (formDays is String) {
-        totalDaysCount = int.tryParse(formDays) ?? 3;
-      }
-      plans = _generateCuratedDayPlans(destinationName, totalDaysCount);
-    }
-
     return TripItineraryModel(
       id: docId,
       uuid: stableId,
@@ -197,159 +190,11 @@ class TripItineraryModel {
       form: form,
       generatedData: genData,
       isActive: data['isActive'] == true || form['isActive'] == true,
+      isPublic: data['isPublic'] == true,
       createdAt: _parseDate(data['createdAt']),
       updatedAt: _parseDate(data['updatedAt']),
       dayPlans: plans,
     );
-  }
-
-  static List<TripDayPlanModel> _generateCuratedDayPlans(
-    String dest,
-    int days,
-  ) {
-    final List<TripDayPlanModel> generated = [];
-    final dName = dest.replaceAll(' Expedition', '').trim();
-
-    for (int day = 1; day <= days; day++) {
-      if (day == 1) {
-        generated.add(
-          TripDayPlanModel(
-            dayNumber: 1,
-            theme: 'Arrival & Historic Old Quarter',
-            dateFormatted: 'Day 01',
-            activities: [
-              TripActivityModel(
-                title: '$dName Orientation & Heritage Walk',
-                time: '09:00 AM',
-                category: 'Heritage',
-                description:
-                    'Check-in, morning stroll along the iconic ancient quarter, and local street orientation.',
-                location: dName,
-              ),
-              TripActivityModel(
-                title: 'Central Landmark Exploration',
-                time: '02:30 PM',
-                category: 'Sightseeing',
-                description:
-                    'Explore the central palace courtyards, architecture, and sacred ghats/monuments.',
-                location: dName,
-              ),
-              TripActivityModel(
-                title: 'Twilight Tea & Regional Dinner',
-                time: '06:30 PM',
-                category: 'Dining',
-                description:
-                    'Sunset riverside views followed by traditional thali and spiced chai.',
-                location: dName,
-              ),
-            ],
-          ),
-        );
-      } else if (day == 2) {
-        generated.add(
-          TripDayPlanModel(
-            dayNumber: 2,
-            theme: 'Sacred Temples & Local Artisans',
-            dateFormatted: 'Day 02',
-            activities: [
-              TripActivityModel(
-                title: 'Sunrise Chants & River Ghats',
-                time: '06:30 AM',
-                category: 'Spiritual',
-                description:
-                    'Witness the dawn aarti and sacred river chants along the ancient stone steps.',
-                location: dName,
-              ),
-              TripActivityModel(
-                title: 'Handicraft & Textile Bazaar',
-                time: '11:00 AM',
-                category: 'Culture',
-                description:
-                    'Interact with multigenerational master weavers, block printers, and brass artisans.',
-                location: dName,
-              ),
-              TripActivityModel(
-                title: 'Sunset Panorama Lookout',
-                time: '05:30 PM',
-                category: 'Nature',
-                description:
-                    'Climb to the scenic viewpoint overlooking the valley and evening skyline.',
-                location: dName,
-              ),
-            ],
-          ),
-        );
-      } else if (day == 3) {
-        generated.add(
-          TripDayPlanModel(
-            dayNumber: 3,
-            theme: 'Hidden Sanctuaries & River Solitude',
-            dateFormatted: 'Day 03',
-            activities: [
-              TripActivityModel(
-                title: 'Morning Nature & Forest Trail',
-                time: '08:00 AM',
-                category: 'Outdoors',
-                description:
-                    'Gentle morning trek across secluded pine paths and tranquil waterfalls.',
-                location: dName,
-              ),
-              TripActivityModel(
-                title: 'Artisan Cafe & Journaling',
-                time: '01:00 PM',
-                category: 'Leisure',
-                description:
-                    'Relax at a scenic riverside cafe with regional coffees and traveler tales.',
-                location: dName,
-              ),
-              TripActivityModel(
-                title: 'Evening Sacred Chants & Farewell Aarti',
-                time: '06:00 PM',
-                category: 'Spiritual',
-                description:
-                    'Final twilight gathering with floating oil lamps and musical hymns.',
-                location: dName,
-              ),
-            ],
-          ),
-        );
-      } else {
-        generated.add(
-          TripDayPlanModel(
-            dayNumber: day,
-            theme: 'Day $day · Offbeat Expedition',
-            dateFormatted: 'Day 0$day',
-            activities: [
-              TripActivityModel(
-                title: '$dName Countryside Excursion',
-                time: '09:30 AM',
-                category: 'Adventure',
-                description:
-                    'Explore neighboring rural hamlets, ancient stepwells, and terraced fields.',
-                location: dName,
-              ),
-              TripActivityModel(
-                title: 'Authentic Village Lunch',
-                time: '01:30 PM',
-                category: 'Dining',
-                description:
-                    'Wood-fired organic lunch prepared with local herbs and farm produce.',
-                location: dName,
-              ),
-              TripActivityModel(
-                title: 'Stargazing & Campfire Gathering',
-                time: '07:30 PM',
-                category: 'Leisure',
-                description:
-                    'Clear Himalayan night sky observations with fellow travelers.',
-                location: dName,
-              ),
-            ],
-          ),
-        );
-      }
-    }
-    return generated;
   }
 
   static DateTime? _parseDate(dynamic value) {
@@ -463,31 +308,5 @@ class TripItineraryModel {
       'Dec',
     ];
     return (month >= 1 && month <= 12) ? months[month - 1] : '';
-  }
-
-  static TripItineraryModel sampleVaranasiTrip() {
-    return TripItineraryModel(
-      id: 'sample_varanasi_flagship',
-      uuid: 'sample_varanasi_flagship',
-      destId: 'varanasi',
-      destName: 'Varanasi',
-      isActive: true,
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-      form: {
-        'destination': 'Varanasi',
-        'destName': 'Varanasi',
-        'days': 3,
-        'startDate': DateTime.now()
-            .add(const Duration(days: 2))
-            .toIso8601String(),
-        'group': 'Duo Exploration',
-        'purpose': 'Heritage & Spiritual',
-        'pace': 'Balanced Expedition',
-        'budget': 18500,
-        'heroImage': 'assets/brand/varanasi-dawn-hero.jpg',
-      },
-      dayPlans: _generateCuratedDayPlans('Varanasi', 3),
-    );
   }
 }

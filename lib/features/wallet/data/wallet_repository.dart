@@ -1,9 +1,20 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/network/api_exceptions.dart';
 import '../../../core/network/firebase_client.dart';
 import '../domain/models/wallet_account_model.dart';
 import '../domain/models/wallet_transaction_model.dart';
 
+/// Read-only view of the server-authoritative Naviigo Credit ledger.
+///
+/// Every mutation — debit, refund, coupon redemption — is performed by the
+/// Naviigo backend, which owns the balance and enforces idempotency. This
+/// client never writes `availableMinor`, so a tampered or repackaged app
+/// cannot mint credit or spend the same rupees twice.
+///
+/// The wallet owner is always derived from the caller's verified Firebase ID
+/// token on the server. No method here takes a `uid` to act on, because a
+/// client must never get to nominate whose balance it is moving.
 class WalletRepository {
   final FirebaseFirestore _firestore;
   final ApiClient _apiClient;
@@ -43,151 +54,90 @@ class WalletRepository {
         });
   }
 
-  /// Validate coupon code against backend coupon rules
+  /// Validate a coupon against the server.
+  ///
+  /// There is deliberately no local fallback. The server owns the eligibility
+  /// rules, the per-user usage limits and the expiry; evaluating coupons on
+  /// the device would let anyone with the APK grant themselves a discount and
+  /// redeem the same code repeatedly.
   Future<Map<String, dynamic>> validateCoupon({
     required String code,
     required int bookingAmountMinor,
   }) async {
-    try {
-      final res = await _apiClient.post(
-        '/api/wallet/coupons/apply',
-        body: {
-          'code': code.trim().toUpperCase(),
-          'bookingAmountMinor': bookingAmountMinor,
-        },
-        requiresAuth: true,
+    final res = await _apiClient.post(
+      '/api/wallet/coupons/apply',
+      body: {
+        'code': code.trim().toUpperCase(),
+        'bookingAmountMinor': bookingAmountMinor,
+      },
+      requiresAuth: true,
+    );
+
+    if (res is! Map) {
+      throw const ServerException(
+        'Unexpected response while validating the coupon.',
       );
-      if (res is Map<String, dynamic>) {
-        return res;
-      }
-    } catch (_) {
-      // Fallback local coupon evaluation if offline
     }
-
-    // Default authoritative fallback calculations
-    final upper = code.trim().toUpperCase();
-    if (upper == 'WELCOME500' && bookingAmountMinor >= 300000) {
-      return {
-        'success': true,
-        'code': 'WELCOME500',
-        'discountMinor': 50000,
-        'discountInr': 500.0,
-        'description': '₹500 off on your first journey booking',
-      };
-    } else if (upper == 'EXPLORE10' && bookingAmountMinor >= 200000) {
-      final discount = (bookingAmountMinor * 0.1).toInt();
-      final capped = discount > 150000 ? 150000 : discount;
-      return {
-        'success': true,
-        'code': 'EXPLORE10',
-        'discountMinor': capped,
-        'discountInr': capped / 100.0,
-        'description': '10% off up to ₹1,500 on all curated stays & transit',
-      };
-    }
-
-    throw Exception('Invalid or inapplicable coupon code.');
+    return Map<String, dynamic>.from(res);
   }
 
-  /// Request debit for checkout via atomic transaction to prevent double spend
-  Future<void> requestDebit({
-    required String uid,
+  /// Ask the server to debit Naviigo Credit for a booking.
+  ///
+  /// [idempotencyKey] must be stable for a given checkout attempt so that a
+  /// retry (flaky network, double tap) replays the original result instead of
+  /// charging twice. The server performs the balance check and the ledger
+  /// append inside a single transaction.
+  Future<Map<String, dynamic>> requestDebit({
     required int amountMinor,
     required String referenceId,
     required String idempotencyKey,
     String description = 'Booking checkout via Naviigo Credit',
   }) async {
-    final accountRef = _firestore
-        .collection('users')
-        .doc(uid)
-        .collection('wallet')
-        .doc('account');
-    final txCol = _firestore
-        .collection('users')
-        .doc(uid)
-        .collection('wallet_transactions');
-
-    // Run atomic transaction to prevent double spend
-    await _firestore.runTransaction((transaction) async {
-      final snap = await transaction.get(accountRef);
-      final data = snap.data();
-      final currentMinor = (data?['availableMinor'] as num?)?.toInt() ?? 0;
-
-      if (currentMinor < amountMinor) {
-        throw Exception(
-          'Insufficient Naviigo Credit. Available: ₹${currentMinor / 100}, Required: ₹${amountMinor / 100}',
-        );
-      }
-
-      transaction.update(accountRef, {
-        'availableMinor': currentMinor - amountMinor,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-
-      final newTxDoc = txCol.doc(idempotencyKey);
-      transaction.set(newTxDoc, {
-        'transactionId': idempotencyKey,
-        'userId': uid,
-        'type': 'BOOKING_PAYMENT',
-        'direction': 'DEBIT',
+    final res = await _apiClient.post(
+      '/api/wallet/debit',
+      body: {
         'amountMinor': amountMinor,
-        'currency': 'INR',
-        'status': 'SUCCEEDED',
-        'source': 'NAVIIGO_WALLET',
-        'referenceType': 'BOOKING',
         'referenceId': referenceId,
         'idempotencyKey': idempotencyKey,
         'description': description,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-    });
+      },
+      requiresAuth: true,
+    );
+
+    if (res is! Map) {
+      throw const ServerException(
+        'Unexpected response while debiting Naviigo Credit.',
+      );
+    }
+    return Map<String, dynamic>.from(res);
   }
 
-  /// Request refund credit to wallet
-  Future<void> requestRefund({
-    required String uid,
+  /// Ask the server to credit a refund back to Naviigo Credit.
+  ///
+  /// Refunds are server-initiated against a real cancelled reference and are
+  /// idempotent on [idempotencyKey], so a booking can never be refunded twice.
+  Future<Map<String, dynamic>> requestRefund({
     required int amountMinor,
     required String referenceId,
     required String idempotencyKey,
     String reason = 'Booking cancellation refund',
   }) async {
-    final accountRef = _firestore
-        .collection('users')
-        .doc(uid)
-        .collection('wallet')
-        .doc('account');
-    final txCol = _firestore
-        .collection('users')
-        .doc(uid)
-        .collection('wallet_transactions');
-
-    await _firestore.runTransaction((transaction) async {
-      final snap = await transaction.get(accountRef);
-      final data = snap.data();
-      final currentMinor = (data?['availableMinor'] as num?)?.toInt() ?? 0;
-
-      transaction.set(accountRef, {
-        'availableMinor': currentMinor + amountMinor,
-        'currency': 'INR',
-        'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-
-      final newTxDoc = txCol.doc(idempotencyKey);
-      transaction.set(newTxDoc, {
-        'transactionId': idempotencyKey,
-        'userId': uid,
-        'type': 'REFUND',
-        'direction': 'CREDIT',
+    final res = await _apiClient.post(
+      '/api/wallet/refund',
+      body: {
         'amountMinor': amountMinor,
-        'currency': 'INR',
-        'status': 'SUCCEEDED',
-        'source': 'REFUND_SERVICE',
-        'referenceType': 'BOOKING',
         'referenceId': referenceId,
         'idempotencyKey': idempotencyKey,
-        'description': reason,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-    });
+        'reason': reason,
+      },
+      requiresAuth: true,
+    );
+
+    if (res is! Map) {
+      throw const ServerException(
+        'Unexpected response while refunding Naviigo Credit.',
+      );
+    }
+    return Map<String, dynamic>.from(res);
   }
 }

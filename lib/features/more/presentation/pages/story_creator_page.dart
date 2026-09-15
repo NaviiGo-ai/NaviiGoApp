@@ -1,9 +1,16 @@
+import 'dart:io';
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/constants/master_destinations.dart';
+import '../../../../core/widgets/no_journey_state.dart';
 import '../../../trips/presentation/providers/trip_provider.dart';
 import '../../../trips/domain/models/trip_itinerary_model.dart';
 
@@ -20,6 +27,10 @@ class _StoryCreatorPageState extends ConsumerState<StoryCreatorPage> {
   String _selectedFormat = 'JOURNEY RECAP';
   String _caption =
       'Walking the quiet sunrise corridors and ancient red-sandstone walls.';
+
+  /// Wraps the story card so it can be rasterised to a real PNG on export.
+  final GlobalKey _storyKey = GlobalKey();
+  bool _isExporting = false;
 
   final List<Map<String, String>> _storyFormats = [
     {
@@ -340,159 +351,184 @@ class _StoryCreatorPageState extends ConsumerState<StoryCreatorPage> {
     );
   }
 
-  // STEP 2: 9:16 EXPENSIVE STORY CANVAS PREVIEW (PART 37)
+  // STEP 2: 9:16 STORY CANVAS PREVIEW
   Widget _buildStory916Preview(BuildContext context) {
-    final dest = _selectedTrip?.destName ?? 'Rajasthan';
-    final image = _selectedTrip?.heroImage ?? kMasterDestinations[1].image;
-    final days = _selectedTrip?.totalDays ?? 4;
+    final trip = _selectedTrip;
+    if (trip == null) {
+      return const NoJourneyState(
+        title: 'Choose a Journey First',
+        message:
+            'Pick one of your journeys, or a destination, to compose a story card.',
+        icon: Icons.auto_awesome_outlined,
+      );
+    }
+
+    final dest = trip.destName;
+    final days = trip.totalDays;
+    final placeCount = trip.dayPlans.expand((d) => d.activities).length;
 
     return Column(
       children: [
         Expanded(
           child: Center(
-            child: AspectRatio(
-              aspectRatio: 9 / 16,
-              child: Container(
-                margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: AppColors.floatingShadow,
-                  image: DecorationImage(
-                    image: NetworkImage(image),
-                    fit: BoxFit.cover,
-                  ),
-                ),
-                child: Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(24),
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.black.withAlpha((0.55 * 255).round()),
-                        Colors.transparent,
-                        Colors.transparent,
-                        Colors.black.withAlpha((0.92 * 255).round()),
-                      ],
-                      stops: const [0.0, 0.25, 0.6, 1.0],
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+              child: AspectRatio(
+                aspectRatio: 9 / 16,
+                child: RepaintBoundary(
+                  key: _storyKey,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: AppColors.floatingShadow,
+                      image: DecorationImage(
+                        image: _storyImageProvider(trip),
+                        fit: BoxFit.cover,
+                      ),
                     ),
-                  ),
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Header: Small Naviigo Branding & Format
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(24),
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.black.withAlpha((0.55 * 255).round()),
+                            Colors.transparent,
+                            Colors.transparent,
+                            Colors.black.withAlpha((0.92 * 255).round()),
+                          ],
+                          stops: const [0.0, 0.25, 0.6, 1.0],
+                        ),
+                      ),
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          // Header: Small Naviigo Branding & Format
                           Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Image.asset(
-                                'assets/brand/naviigo-mark-knockout.png',
-                                width: 20,
-                                height: 20,
-                                errorBuilder: (_, __, ___) => const Icon(
-                                  Icons.navigation,
-                                  color: Colors.white,
-                                  size: 16,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'NAVIIGO STORIES',
-                                style: AppTypography.micro(color: Colors.white)
-                                    .copyWith(
-                                      letterSpacing: 2.0,
-                                      fontWeight: FontWeight.w800,
+                              Row(
+                                children: [
+                                  Image.asset(
+                                    'assets/brand/naviigo-mark-knockout.png',
+                                    width: 20,
+                                    height: 20,
+                                    errorBuilder: (_, __, ___) => const Icon(
+                                      Icons.navigation,
+                                      color: Colors.white,
+                                      size: 16,
                                     ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'NAVIIGO STORIES',
+                                    style:
+                                        AppTypography.micro(
+                                          color: Colors.white,
+                                        ).copyWith(
+                                          letterSpacing: 2.0,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                  ),
+                                ],
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 3,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white24,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  _selectedFormat,
+                                  style: AppTypography.micro(
+                                    color: Colors.white,
+                                  ).copyWith(fontSize: 8),
+                                ),
                               ),
                             ],
                           ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white24,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              _selectedFormat,
-                              style: AppTypography.micro(
-                                color: Colors.white,
-                              ).copyWith(fontSize: 8),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const Spacer(),
+                          const Spacer(),
 
-                      // Destination & Editorial Title
-                      Text(
-                        dest.toUpperCase(),
-                        style: AppTypography.displayHero(
-                          color: Colors.white,
-                        ).copyWith(fontSize: 34, letterSpacing: 1.0),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        _caption,
-                        style: AppTypography.bodyMedium(
-                          color: AppColors.cream,
-                        ).copyWith(fontSize: 13, height: 1.3),
-                      ),
-                      const SizedBox(height: 18),
-
-                      // Route Graphic / Waypoint Line
-                      Row(
-                        children: [
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: const BoxDecoration(
-                              color: AppColors.primary,
-                              shape: BoxShape.circle,
-                            ),
+                          // Destination & Editorial Title
+                          Text(
+                            dest.toUpperCase(),
+                            style: AppTypography.displayHero(
+                              color: Colors.white,
+                            ).copyWith(fontSize: 34, letterSpacing: 1.0),
                           ),
-                          Expanded(
-                            child: Container(
-                              height: 1.5,
+                          const SizedBox(height: 6),
+                          Text(
+                            _caption,
+                            style: AppTypography.bodyMedium(
                               color: AppColors.cream,
-                              margin: const EdgeInsets.symmetric(horizontal: 6),
-                            ),
+                            ).copyWith(fontSize: 13, height: 1.3),
                           ),
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: const BoxDecoration(
-                              color: AppColors.yellow,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
+                          const SizedBox(height: 18),
 
-                      // Story Metadata Footer (PART 37)
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            '$days DAYS · 8 PLACES',
-                            style: AppTypography.micro(color: AppColors.cream)
-                                .copyWith(
-                                  letterSpacing: 1.2,
-                                  fontWeight: FontWeight.w700,
+                          // Route Graphic / Waypoint Line
+                          Row(
+                            children: [
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: const BoxDecoration(
+                                  color: AppColors.primary,
+                                  shape: BoxShape.circle,
                                 ),
+                              ),
+                              Expanded(
+                                child: Container(
+                                  height: 1.5,
+                                  color: AppColors.cream,
+                                  margin: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                  ),
+                                ),
+                              ),
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: const BoxDecoration(
+                                  color: AppColors.yellow,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            ],
                           ),
-                          Text(
-                            'Travelled with NaviiGo',
-                            style: AppTypography.micro(color: Colors.white70),
+                          const SizedBox(height: 12),
+
+                          // Story Metadata Footer
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                placeCount > 0
+                                    ? '$days DAYS · $placeCount PLACES'
+                                    : '$days DAYS',
+                                style:
+                                    AppTypography.micro(
+                                      color: AppColors.cream,
+                                    ).copyWith(
+                                      letterSpacing: 1.2,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                              ),
+                              Text(
+                                'Travelled with NaviiGo',
+                                style: AppTypography.micro(
+                                  color: Colors.white70,
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -511,29 +547,31 @@ class _StoryCreatorPageState extends ConsumerState<StoryCreatorPage> {
             child: Row(
               children: [
                 OutlinedButton.icon(
-                  onPressed: () => setState(() => _step = 1),
+                  onPressed: _isExporting
+                      ? null
+                      : () => setState(() => _step = 1),
                   icon: const Icon(Icons.edit_outlined, size: 16),
                   label: const Text('EDIT'),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            'Exported 9:16 Story for $dest to System Share Sheet!',
+                    onPressed: _isExporting ? null : () => _shareStory(dest),
+                    icon: _isExporting
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(
+                            Icons.share_outlined,
+                            size: 18,
+                            color: Colors.white,
                           ),
-                          backgroundColor: AppColors.brown,
-                        ),
-                      );
-                    },
-                    icon: const Icon(
-                      Icons.share_outlined,
-                      size: 18,
-                      color: Colors.white,
-                    ),
-                    label: const Text('SHARE STORY'),
+                    label: Text(_isExporting ? 'RENDERING...' : 'SHARE STORY'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       shape: RoundedRectangleBorder(
@@ -550,6 +588,57 @@ class _StoryCreatorPageState extends ConsumerState<StoryCreatorPage> {
     );
   }
 
+  /// Story cards may point at a remote hero URL or a bundled asset, so pick
+  /// the matching ImageProvider instead of assuming network.
+  ImageProvider _storyImageProvider(TripItineraryModel trip) {
+    final hero = trip.heroImage;
+    if (hero.startsWith('http://') || hero.startsWith('https://')) {
+      return NetworkImage(hero);
+    }
+    return AssetImage(hero);
+  }
+
+  /// Rasterises the on-screen card at 3x and hands the PNG to the OS share
+  /// sheet. Success is only reported once a real file exists on disk.
+  Future<void> _shareStory(String dest) async {
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _isExporting = true);
+    try {
+      final boundary =
+          _storyKey.currentContext?.findRenderObject()
+              as RenderRepaintBoundary?;
+      if (boundary == null) {
+        throw StateError('Story canvas is not ready yet.');
+      }
+
+      final ui.Image image = await boundary.toImage(pixelRatio: 3.0);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      image.dispose();
+      if (byteData == null) {
+        throw StateError('Could not encode the story image.');
+      }
+
+      final dir = await getTemporaryDirectory();
+      final safeName = dest.replaceAll(RegExp(r'[^A-Za-z0-9]+'), '_');
+      final file = File('${dir.path}/naviigo_story_$safeName.png');
+      await file.writeAsBytes(byteData.buffer.asUint8List(), flush: true);
+
+      await Share.shareXFiles([
+        XFile(file.path, mimeType: 'image/png'),
+      ], text: 'Travelled with NaviiGo');
+    } catch (e) {
+      debugPrint('[StoryCreator] Export failed: $e');
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Could not export the story image. Please try again.'),
+          backgroundColor: AppColors.brown,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isExporting = false);
+    }
+  }
+
   Widget _buildBottomBar() {
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
@@ -562,22 +651,9 @@ class _StoryCreatorPageState extends ConsumerState<StoryCreatorPage> {
         child: SizedBox(
           height: 50,
           child: ElevatedButton(
-            onPressed: () {
-              if (_selectedTrip == null) {
-                // Default to first destination if none selected
-                setState(() {
-                  final d = kMasterDestinations[1];
-                  _selectedTrip = TripItineraryModel(
-                    id: 'temp_${d.id}',
-                    uuid: 'temp_${d.id}',
-                    destId: d.id,
-                    destName: d.name,
-                    form: {'heroImage': d.image, 'days': 4},
-                  );
-                });
-              }
-              setState(() => _step++);
-            },
+            onPressed: _selectedTrip == null
+                ? null
+                : () => setState(() => _step++),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
               shape: RoundedRectangleBorder(
