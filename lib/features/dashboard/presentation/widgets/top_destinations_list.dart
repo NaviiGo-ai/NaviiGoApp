@@ -84,146 +84,153 @@ class TopDestinationsList extends ConsumerWidget {
 
                   return GestureDetector(
                     onTap: () => context.push('/destination/${dest.id}'),
-                    child: Container(
-                      width: cardWidth,
-                      margin: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(18),
-                        boxShadow: AppColors.cardShadow,
-                        image: DecorationImage(
-                          image: NetworkImage(dest.image),
-                          fit: BoxFit.cover,
+                    // Shared element (§3, signature moment 1) — same tag the
+                    // details page flies into. See explore_discover_page.dart.
+                    child: Hero(
+                      tag: 'destination-${dest.id}',
+                      child: Container(
+                        width: cardWidth,
+                        margin: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 4,
                         ),
-                      ),
-                      child: Stack(
-                        children: [
-                          // Cinematic warm gradient overlay
-                          Container(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(18),
-                              gradient: LinearGradient(
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                                colors: [
-                                  Colors.transparent,
-                                  const Color(
-                                    0xFF24323A,
-                                  ).withAlpha((0.25 * 255).round()),
-                                  const Color(
-                                    0xFF191D20,
-                                  ).withAlpha((0.85 * 255).round()),
-                                ],
-                                stops: const [0.4, 0.7, 1.0],
-                              ),
-                            ),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(18),
+                          boxShadow: AppColors.cardShadow,
+                          image: DecorationImage(
+                            image: NetworkImage(dest.image),
+                            fit: BoxFit.cover,
                           ),
-                          // Category badge top left
-                          Positioned(
-                            top: 12,
-                            left: 12,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
+                        ),
+                        child: Stack(
+                          children: [
+                            // Cinematic warm gradient overlay
+                            Container(
                               decoration: BoxDecoration(
-                                color: Colors.black.withAlpha(
-                                  (0.4 * 255).round(),
+                                borderRadius: BorderRadius.circular(18),
+                                gradient: LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [
+                                    Colors.transparent,
+                                    const Color(
+                                      0xFF24323A,
+                                    ).withAlpha((0.25 * 255).round()),
+                                    const Color(
+                                      0xFF191D20,
+                                    ).withAlpha((0.85 * 255).round()),
+                                  ],
+                                  stops: const [0.4, 0.7, 1.0],
                                 ),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: Colors.white24,
-                                  width: 0.8,
-                                ),
-                              ),
-                              child: Text(
-                                dest.category.toUpperCase(),
-                                style: AppTypography.micro(color: Colors.white)
-                                    .copyWith(
-                                      letterSpacing: 1.0,
-                                      fontWeight: FontWeight.w700,
-                                    ),
                               ),
                             ),
-                          ),
-                          // Rating badge top right
-                          Positioned(
-                            top: 12,
-                            right: 12,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 7,
-                                vertical: 3,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppColors.surface,
-                                borderRadius: BorderRadius.circular(10),
-                                boxShadow: AppColors.cardShadow,
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(
-                                    Icons.star_rounded,
-                                    size: 13,
-                                    color: AppColors.yellow,
+                            // Category badge top left
+                            Positioned(
+                              top: 12,
+                              left: 12,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withAlpha(
+                                    (0.4 * 255).round(),
                                   ),
-                                  const SizedBox(width: 3),
-                                  Text(
-                                    dest.rating.toStringAsFixed(1),
-                                    style: AppTypography.micro(
-                                      color: AppColors.textPrimary,
-                                    ).copyWith(fontWeight: FontWeight.w800),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: Colors.white24,
+                                    width: 0.8,
                                   ),
-                                ],
+                                ),
+                                child: Text(
+                                  dest.category.toUpperCase(),
+                                  style:
+                                      AppTypography.micro(
+                                        color: Colors.white,
+                                      ).copyWith(
+                                        letterSpacing: 1.0,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                ),
                               ),
                             ),
-                          ),
-                          // Bottom Info
-                          Positioned(
-                            bottom: 14,
-                            left: 14,
-                            right: 14,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  dest.title,
-                                  style: AppTypography.tripTitle(
-                                    color: Colors.white,
-                                  ).copyWith(fontSize: 17, height: 1.15),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
+                            // Rating badge top right
+                            Positioned(
+                              top: 12,
+                              right: 12,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 7,
+                                  vertical: 3,
                                 ),
-                                const SizedBox(height: 3),
-                                Row(
+                                decoration: BoxDecoration(
+                                  color: AppColors.surface,
+                                  borderRadius: BorderRadius.circular(10),
+                                  boxShadow: AppColors.cardShadow,
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
                                   children: [
                                     const Icon(
-                                      Icons.location_on_outlined,
-                                      size: 12,
-                                      color: AppColors.cream,
+                                      Icons.star_rounded,
+                                      size: 13,
+                                      color: AppColors.yellow,
                                     ),
                                     const SizedBox(width: 3),
-                                    Expanded(
-                                      child: Text(
-                                        dest.subtitle,
-                                        style: AppTypography.micro(
-                                          color: AppColors.cream,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
+                                    Text(
+                                      dest.rating.toStringAsFixed(1),
+                                      style: AppTypography.micro(
+                                        color: AppColors.textPrimary,
+                                      ).copyWith(fontWeight: FontWeight.w800),
                                     ),
                                   ],
                                 ),
-                              ],
+                              ),
                             ),
-                          ),
-                        ],
+                            // Bottom Info
+                            Positioned(
+                              bottom: 14,
+                              left: 14,
+                              right: 14,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    dest.title,
+                                    style: AppTypography.tripTitle(
+                                      color: Colors.white,
+                                    ).copyWith(fontSize: 17, height: 1.15),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.location_on_outlined,
+                                        size: 12,
+                                        color: AppColors.cream,
+                                      ),
+                                      const SizedBox(width: 3),
+                                      Expanded(
+                                        child: Text(
+                                          dest.subtitle,
+                                          style: AppTypography.micro(
+                                            color: AppColors.cream,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   );

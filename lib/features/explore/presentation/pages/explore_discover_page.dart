@@ -175,20 +175,27 @@ class _ExploreDiscoverPageState extends State<ExploreDiscoverPage> {
           clipBehavior: Clip.antiAlias,
           child: Row(
             children: [
-              Container(
-                width: 110,
-                height: 100,
-                decoration: BoxDecoration(
-                  image: DecorationImage(
-                    image: dest.image.startsWith('assets/')
-                        ? AssetImage(dest.image)
-                        : (dest.image.startsWith('http')
-                                  ? NetworkImage(dest.image)
-                                  : const AssetImage(
-                                      'assets/brand/varanasi-dawn-hero.jpg',
-                                    ))
-                              as ImageProvider,
-                    fit: BoxFit.cover,
+              // Shared element (§3, signature moment 1). The details page
+              // declares Hero(tag: 'destination-<id>') around its hero image;
+              // without a matching tag on the card the flight has no source and
+              // the "shared" route kind silently degrades to a plain push.
+              Hero(
+                tag: 'destination-${dest.id}',
+                child: Container(
+                  width: 110,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    image: DecorationImage(
+                      image: dest.image.startsWith('assets/')
+                          ? AssetImage(dest.image)
+                          : (dest.image.startsWith('http')
+                                    ? NetworkImage(dest.image)
+                                    : const AssetImage(
+                                        'assets/brand/varanasi-dawn-hero.jpg',
+                                      ))
+                                as ImageProvider,
+                      fit: BoxFit.cover,
+                    ),
                   ),
                 ),
               ),
