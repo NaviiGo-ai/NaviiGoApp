@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -8,7 +7,12 @@ import '../../../trips/presentation/providers/trip_provider.dart';
 import '../../../trips/domain/models/trip_itinerary_model.dart';
 import '../../../bookings/presentation/providers/passport_provider.dart';
 import '../../../bookings/domain/models/passport_model.dart';
+import '../../../places/presentation/providers/places_provider.dart';
 import '../../../../core/auth/auth_provider.dart';
+import '../../../../core/constants/master_destinations.dart';
+import '../../../../core/motion/nav_haptics.dart';
+import '../../../../core/motion/nav_motion.dart';
+import '../../../../core/widgets/journey_line.dart';
 import '../../../../core/widgets/no_journey_state.dart';
 import '../../../navigation/presentation/nav_hub_page.dart';
 
@@ -21,18 +25,37 @@ class OngoingTripsPage extends ConsumerStatefulWidget {
 
 class _OngoingTripsPageState extends ConsumerState<OngoingTripsPage>
     with SingleTickerProviderStateMixin {
-  bool _isBuddySharing = true;
-  final String _buddyName = 'Rohan';
+  /// How many stops the traveller has checked into today. Local to this
+  /// screen: live progress is not persisted, and nothing here is presented as
+  /// saved until the backend confirms it.
+  ///
+  /// There is deliberately no buddy state. Naviigo has no buddy backend, and
+  /// this screen used to assert `LIVE WITH <name> · Coordinates & ETA synced`
+  /// from a hard-coded flag — a safety claim backed by nothing. The strip is
+  /// gone rather than disabled, because a paused false claim is still a claim.
   int _completedStopsCount = 0;
   late AnimationController _pulseController;
 
   @override
   void initState() {
     super.initState();
+    // §1: the pulse rides the motion ladder rather than inventing a 2s beat.
     _pulseController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 2),
+      duration: NavMotion.atmospheric,
     )..repeat(reverse: true);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // §65: the pulse is decorative, so under reduced motion it stops rather
+    // than shortening. A slower pulse would still be a pulse.
+    if (NavReduce.of(context)) {
+      _pulseController.stop();
+    } else if (!_pulseController.isAnimating) {
+      _pulseController.repeat(reverse: true);
+    }
   }
 
   @override
@@ -82,19 +105,18 @@ class _OngoingTripsPageState extends ConsumerState<OngoingTripsPage>
             AnimatedBuilder(
               animation: _pulseController,
               builder: (context, child) {
+                // Held at midpoint under reduced motion: the dot still reads
+                // as live, it just stops breathing.
+                final t = NavReduce.of(context) ? 0.5 : _pulseController.value;
                 return Container(
                   width: 8,
                   height: 8,
                   decoration: BoxDecoration(
-                    color: AppColors.teal.withAlpha(
-                      (180 + 75 * _pulseController.value).round(),
-                    ),
+                    color: AppColors.teal.withAlpha((180 + 75 * t).round()),
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.teal.withAlpha(
-                          (100 * _pulseController.value).round(),
-                        ),
+                        color: AppColors.teal.withAlpha((100 * t).round()),
                         blurRadius: 6,
                         spreadRadius: 2,
                       ),
@@ -135,13 +157,64 @@ class _OngoingTripsPageState extends ConsumerState<OngoingTripsPage>
   ) {
     final firstDay = trip.dayPlans.isNotEmpty ? trip.dayPlans.first : null;
     final activities = firstDay?.activities ?? [];
-    final currentActivity = activities.isNotEmpty ? activities.first : null;
-    final nextActivity = activities.length > 1 ? activities[1] : null;
-
     final totalStops = activities.length;
-    final progressPercent = totalStops > 0
-        ? (_completedStopsCount / totalStops).clamp(0.0, 1.0)
-        : 0.33;
+
+    // The active stop follows the check-ins. It used to be pinned to
+    // activities.first, so the "WHAT NOW?" card kept showing stop 1 while the
+    // waypoint checklist further down advanced past it — the screen
+    // contradicted itself, and "WHAT NEXT?" previewed the wrong stop.
+    final int currentIndex = totalStops == 0
+        ? 0
+        : _completedStopsCount.clamp(0, totalStops - 1);
+    final currentActivity = activities.isEmpty
+        ? null
+        : activities[currentIndex];
+    final nextActivity = currentIndex + 1 < activities.length
+        ? activities[currentIndex + 1]
+        : null;
+
+    // Only the fields the itinerary actually carries. The card used to print
+    // "09:00 AM · Heritage Walk · ~1.5 HRS" from hard-coded defaults whenever
+    // the activity had no time or category, and the duration was invented
+    // regardless of what the planner returned.
+    final currentActivityMeta = [
+      currentActivity?.time,
+      currentActivity?.category,
+      currentActivity?.duration,
+    ].whereType<String>().where((v) => v.trim().isNotEmpty).join(' · ');
+
+    // The same rule for the stop after this one. "WHAT NEXT?" used to print a
+    // fixed "15 MIN · 3.2 KM TRANSIT ESTIMATED · AUTO / CAB" — an invented
+    // distance, travel time and transport mode, shown before the traveller had
+    // even looked at the route.
+    final nextActivityMeta = [
+      nextActivity?.location,
+      nextActivity?.duration,
+      nextActivity?.category,
+    ].whereType<String>().where((v) => v.trim().isNotEmpty).join(' · ');
+
+    // Real weather for this destination, or nothing at all. This banner used
+    // to print a hard-coded "28°C · CLEAR". The backend returns
+    // {"current": null} when Open-Meteo is unreachable, and that is rendered
+    // as absence rather than a guess (§14).
+    final masterDest = findDestinationById(trip.destName);
+    final weather = masterDest == null
+        ? null
+        : ref
+              .watch(
+                destinationWeatherProvider((
+                  lat: masterDest.lat,
+                  lng: masterDest.lng,
+                )),
+              )
+              .valueOrNull;
+    final current = (weather?['current'] as Map?)?.cast<String, dynamic>();
+    final temp = current?['temp'];
+    final condition = current?['condition'];
+    final String? weatherLabel = (temp is num && condition is String)
+        ? '${temp.round()}°C · ${condition.toUpperCase()}'
+        : null;
+    final String weatherEmoji = current?['emoji'] as String? ?? '';
 
     final now = DateTime.now();
     final timeString =
@@ -198,30 +271,37 @@ class _OngoingTripsPageState extends ConsumerState<OngoingTripsPage>
                           ).copyWith(fontWeight: FontWeight.w800, fontSize: 16),
                         ),
                         const SizedBox(height: 2),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.wb_sunny_outlined,
-                              size: 12,
-                              color: AppColors.yellow,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              '28°C · CLEAR',
-                              style: AppTypography.micro(
-                                color: AppColors.textTertiary,
-                              ).copyWith(fontSize: 10),
-                            ),
-                          ],
-                        ),
+                        // Shown only when the backend actually returned a
+                        // reading for these coordinates.
+                        if (weatherLabel != null)
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (weatherEmoji.isNotEmpty) ...[
+                                Text(
+                                  weatherEmoji,
+                                  style: const TextStyle(fontSize: 11),
+                                ),
+                                const SizedBox(width: 4),
+                              ],
+                              Text(
+                                weatherLabel,
+                                style: AppTypography.micro(
+                                  color: AppColors.textTertiary,
+                                ).copyWith(fontSize: 10),
+                              ),
+                            ],
+                          ),
                       ],
                     ),
                   ],
                 ),
                 const SizedBox(height: 14),
 
-                // Live Progress Track
+                // THE JOURNEY LINE (§6) — the same device the planner and the
+                // itinerary use, now in live mode. It reports where the day
+                // actually is, so the count is a real checked-in count rather
+                // than a percentage.
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -232,310 +312,281 @@ class _OngoingTripsPageState extends ConsumerState<OngoingTripsPage>
                       ).copyWith(fontWeight: FontWeight.w700, fontSize: 9),
                     ),
                     Text(
-                      '${(progressPercent * 100).toInt()}% COMPLETED',
+                      totalStops == 0
+                          ? 'NO WAYPOINTS PLANNED'
+                          : '$_completedStopsCount OF $totalStops COMPLETED',
                       style: AppTypography.micro(
                         color: AppColors.teal,
                       ).copyWith(fontWeight: FontWeight.w800, fontSize: 10),
                     ),
                   ],
                 ),
-                const SizedBox(height: 6),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: progressPercent,
-                    backgroundColor: AppColors.cream.withAlpha(100),
-                    valueColor: const AlwaysStoppedAnimation<Color>(
-                      AppColors.teal,
-                    ),
-                    minHeight: 6,
+                const SizedBox(height: 8),
+                if (totalStops > 1)
+                  JourneyLine(
+                    totalSteps: totalStops,
+                    currentStep: _completedStopsCount.toDouble(),
+                    mode: JourneyLineMode.live,
                   ),
-                ),
               ],
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
 
-          // 2. Buddy Live Sharing Strip
-          if (_isBuddySharing)
+          // 2. THE CORE COMPANION MOMENT: "WHAT NOW?"
+          //
+          // Rendered only when the itinerary actually carries a waypoint. It
+          // used to fall back to invented copy — "<Destination> Historic
+          // Quarter Walk" and a made-up start time — so a journey with no plan
+          // still read as scheduled. `dart format` owns the indentation here.
+          if (currentActivity != null)
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: AppColors.teal.withAlpha(20),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppColors.teal.withAlpha(80)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.people_alt_outlined,
-                    color: AppColors.teal,
-                    size: 18,
+                color: AppColors.brown,
+                borderRadius: BorderRadius.circular(22),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.brown.withAlpha(80),
+                    blurRadius: 18,
+                    offset: const Offset(0, 6),
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      '● LIVE WITH $_buddyName · Coordinates & ETA synced',
-                      style: AppTypography.micro(color: AppColors.teal)
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 9,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          'WHAT NOW?',
+                          style: AppTypography.micro(color: Colors.white)
+                              .copyWith(
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 1.0,
+                              ),
+                        ),
+                      ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.pin_drop_rounded,
+                            size: 14,
+                            color: AppColors.yellow,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'ACTIVE WAYPOINT',
+                            style: AppTypography.micro(
+                              color: AppColors.yellow,
+                            ).copyWith(fontWeight: FontWeight.w800),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+
+                  Text(
+                    currentActivity.title,
+                    style: AppTypography.tripTitle(
+                      color: Colors.white,
+                    ).copyWith(fontSize: 22, height: 1.2),
+                  ),
+                  if (currentActivityMeta.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      currentActivityMeta,
+                      style: AppTypography.caption(color: Colors.white70),
+                    ),
+                  ],
+                  if (currentActivity.description != null) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      currentActivity.description!,
+                      style: AppTypography.bodyMedium(
+                        color: Colors.white.withAlpha(220),
+                      ).copyWith(fontSize: 13, height: 1.4),
+                    ),
+                  ],
+                  const SizedBox(height: 18),
+
+                  // Navigation & Check-in Actions
+                  Row(
+                    children: [
+                      Expanded(
+                        flex: 3,
+                        child: ElevatedButton.icon(
+                          onPressed: () async {
+                            NavHaptics.fire(NavHaptic.light);
+                            final target =
+                                '${currentActivity.title}, ${trip.destName}';
+                            final uri = Uri.parse(
+                              'https://www.google.com/maps/dir/?api=1&destination=${Uri.encodeComponent(target)}&travelmode=walking',
+                            );
+                            await launchUrl(
+                              uri,
+                              mode: LaunchMode.externalApplication,
+                            );
+                          },
+                          icon: const Icon(
+                            Icons.directions_outlined,
+                            size: 16,
+                            color: Colors.white,
+                          ),
+                          label: const Text('NAVIGATE NOW'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            elevation: 0,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        flex: 2,
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            NavHaptics.fire(NavHaptic.medium);
+                            setState(() {
+                              if (_completedStopsCount < totalStops) {
+                                _completedStopsCount++;
+                              }
+                            });
+                            // Local to this screen. Nothing has been written to
+                            // the Passport, so the toast must not claim it was —
+                            // the traveller stamps a moment deliberately, through
+                            // "Capture a Moment", which does persist.
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Stop marked complete.'),
+                                backgroundColor: AppColors.teal,
+                              ),
+                            );
+                          },
+                          icon: const Icon(
+                            Icons.check_circle_outline_rounded,
+                            size: 16,
+                            color: Colors.white,
+                          ),
+                          label: Text(
+                            'CHECK IN',
+                            style: AppTypography.button(color: Colors.white),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(
+                              color: Colors.white38,
+                              width: 1.5,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          const SizedBox(height: 18),
+
+          // 4. THE COMPANION SECONDARY MOMENT: "WHAT NEXT?"
+          //
+          // Only a real next waypoint gets a card. `dart format` owns the
+          // indentation of this block.
+          if (nextActivity != null)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: AppColors.border),
+                boxShadow: AppColors.cardShadow,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.cream,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          'WHAT NEXT?',
+                          style: AppTypography.micro(color: AppColors.brown)
+                              .copyWith(
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.8,
+                              ),
+                        ),
+                      ),
+                      if (nextActivity.time != null)
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.schedule_rounded,
+                              size: 12,
+                              color: AppColors.primary,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              nextActivity.time!,
+                              style: AppTypography.micro(
+                                color: AppColors.primary,
+                              ).copyWith(fontWeight: FontWeight.w800),
+                            ),
+                          ],
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+
+                  Text(
+                    nextActivity.title,
+                    style: AppTypography.tripTitle(
+                      color: AppColors.textPrimary,
+                    ).copyWith(fontSize: 18),
+                  ),
+                  if (nextActivityMeta.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      nextActivityMeta,
+                      style: AppTypography.micro(color: AppColors.textSecondary)
                           .copyWith(
                             fontWeight: FontWeight.w700,
                             letterSpacing: 0.4,
                           ),
                     ),
-                  ),
-                  GestureDetector(
-                    onTap: () {
-                      HapticFeedback.lightImpact();
-                      setState(() => _isBuddySharing = false);
-                    },
-                    child: Text(
-                      'PAUSE',
-                      style: AppTypography.micro(
-                        color: AppColors.primary,
-                      ).copyWith(fontWeight: FontWeight.w800),
-                    ),
-                  ),
+                  ],
                 ],
               ),
             ),
-          const SizedBox(height: 16),
-
-          // 3. THE CORE COMPANION MOMENT: "WHAT NOW?"
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: AppColors.brown,
-              borderRadius: BorderRadius.circular(22),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.brown.withAlpha(80),
-                  blurRadius: 18,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 9,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        'WHAT NOW?',
-                        style: AppTypography.micro(color: Colors.white)
-                            .copyWith(
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 1.0,
-                            ),
-                      ),
-                    ),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.pin_drop_rounded,
-                          size: 14,
-                          color: AppColors.yellow,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'ACTIVE WAYPOINT',
-                          style: AppTypography.micro(
-                            color: AppColors.yellow,
-                          ).copyWith(fontWeight: FontWeight.w800),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-
-                Text(
-                  currentActivity?.title ??
-                      '${trip.destName} Historic Quarter Walk',
-                  style: AppTypography.tripTitle(
-                    color: Colors.white,
-                  ).copyWith(fontSize: 22, height: 1.2),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${currentActivity?.time ?? "09:00 AM"} · ${currentActivity?.category ?? "Heritage Walk"} · ~1.5 HRS',
-                  style: AppTypography.caption(color: Colors.white70),
-                ),
-                if (currentActivity?.description != null) ...[
-                  const SizedBox(height: 10),
-                  Text(
-                    currentActivity!.description!,
-                    style: AppTypography.bodyMedium(
-                      color: Colors.white.withAlpha(220),
-                    ).copyWith(fontSize: 13, height: 1.4),
-                  ),
-                ],
-                const SizedBox(height: 18),
-
-                // Navigation & Check-in Actions
-                Row(
-                  children: [
-                    Expanded(
-                      flex: 3,
-                      child: ElevatedButton.icon(
-                        onPressed: () async {
-                          HapticFeedback.lightImpact();
-                          final target =
-                              '${currentActivity?.title ?? trip.destName}, ${trip.destName}';
-                          final uri = Uri.parse(
-                            'https://www.google.com/maps/dir/?api=1&destination=${Uri.encodeComponent(target)}&travelmode=walking',
-                          );
-                          await launchUrl(
-                            uri,
-                            mode: LaunchMode.externalApplication,
-                          );
-                        },
-                        icon: const Icon(
-                          Icons.directions_outlined,
-                          size: 16,
-                          color: Colors.white,
-                        ),
-                        label: const Text('NAVIGATE NOW'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          elevation: 0,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      flex: 2,
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          HapticFeedback.mediumImpact();
-                          setState(() {
-                            if (_completedStopsCount < totalStops) {
-                              _completedStopsCount++;
-                            }
-                          });
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Waypoint stamped into your Passport!',
-                              ),
-                              backgroundColor: AppColors.teal,
-                            ),
-                          );
-                        },
-                        icon: const Icon(
-                          Icons.check_circle_outline_rounded,
-                          size: 16,
-                          color: Colors.white,
-                        ),
-                        label: Text(
-                          'CHECK IN',
-                          style: AppTypography.button(color: Colors.white),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(
-                            color: Colors.white38,
-                            width: 1.5,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 18),
-
-          // 4. THE COMPANION SECONDARY MOMENT: "WHAT NEXT?"
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AppColors.border),
-              boxShadow: AppColors.cardShadow,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.cream,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        'WHAT NEXT?',
-                        style: AppTypography.micro(color: AppColors.brown)
-                            .copyWith(
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.8,
-                            ),
-                      ),
-                    ),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.schedule_rounded,
-                          size: 12,
-                          color: AppColors.primary,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          nextActivity?.time ?? '02:30 PM',
-                          style: AppTypography.micro(
-                            color: AppColors.primary,
-                          ).copyWith(fontWeight: FontWeight.w800),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-
-                Text(
-                  nextActivity?.title ?? 'Central Landmark Exploration',
-                  style: AppTypography.tripTitle(
-                    color: AppColors.textPrimary,
-                  ).copyWith(fontSize: 18),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '15 MIN · 3.2 KM TRANSIT ESTIMATED · AUTO / CAB',
-                  style: AppTypography.micro(
-                    color: AppColors.textSecondary,
-                  ).copyWith(fontWeight: FontWeight.w700, letterSpacing: 0.4),
-                ),
-              ],
-            ),
-          ),
           const SizedBox(height: 18),
 
           // 5. ADD JOURNEY MOMENT ACTION RIBBON
@@ -691,6 +742,10 @@ class _OngoingTripsPageState extends ConsumerState<OngoingTripsPage>
           const SizedBox(height: 24),
 
           // 7. LOCAL ESSENTIALS (HOSPITAL, PHARMACY, POLICE, 112)
+          //
+          // Each tile opens a live Maps search around the destination. They
+          // used to advertise a hard-coded "1.2 km" / "300m" / "2.0 km" as if
+          // Naviigo had measured the distance to the nearest hospital.
           Text(
             'LOCAL ESSENTIALS',
             style: AppTypography.eyebrow(color: AppColors.textTertiary),
@@ -701,28 +756,24 @@ class _OngoingTripsPageState extends ConsumerState<OngoingTripsPage>
               _buildEssentialButton(
                 Icons.local_hospital_outlined,
                 'Hospital',
-                '1.2 km',
                 trip.destName,
               ),
               const SizedBox(width: 8),
               _buildEssentialButton(
                 Icons.local_pharmacy_outlined,
                 'Pharmacy',
-                '300m',
                 trip.destName,
               ),
               const SizedBox(width: 8),
               _buildEssentialButton(
                 Icons.local_police_outlined,
                 'Police',
-                '2.0 km',
                 trip.destName,
               ),
               const SizedBox(width: 8),
               _buildEssentialButton(
                 Icons.call_outlined,
                 'Help 112',
-                'Direct',
                 trip.destName,
               ),
             ],
@@ -733,7 +784,7 @@ class _OngoingTripsPageState extends ConsumerState<OngoingTripsPage>
           Center(
             child: GestureDetector(
               onLongPress: () {
-                HapticFeedback.heavyImpact();
+                NavHaptics.fire(NavHaptic.strong);
                 _triggerSosFlow(context);
               },
               child: Container(
@@ -775,17 +826,12 @@ class _OngoingTripsPageState extends ConsumerState<OngoingTripsPage>
     );
   }
 
-  Widget _buildEssentialButton(
-    IconData icon,
-    String label,
-    String distance,
-    String destName,
-  ) {
+  Widget _buildEssentialButton(IconData icon, String label, String destName) {
     return Expanded(
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () async {
-          HapticFeedback.lightImpact();
+          NavHaptics.fire(NavHaptic.light);
           if (label == 'Help 112') {
             final uri = Uri.parse('tel:112');
             if (await canLaunchUrl(uri)) await launchUrl(uri);
@@ -822,13 +868,7 @@ class _OngoingTripsPageState extends ConsumerState<OngoingTripsPage>
                 label,
                 style: AppTypography.micro(
                   color: AppColors.textPrimary,
-                ).copyWith(fontWeight: FontWeight.w700),
-              ),
-              Text(
-                distance,
-                style: AppTypography.micro(
-                  color: AppColors.textTertiary,
-                ).copyWith(fontSize: 9),
+                ).copyWith(fontWeight: FontWeight.w700, fontSize: 9),
               ),
             ],
           ),
@@ -946,14 +986,17 @@ class _OngoingTripsPageState extends ConsumerState<OngoingTripsPage>
                 ),
                 const SizedBox(width: 10),
                 Text(
-                  'EMERGENCY MODE ACTIVE',
+                  'EMERGENCY CALL',
                   style: AppTypography.sectionTitle(color: AppColors.error),
                 ),
               ],
             ),
             const SizedBox(height: 12),
+            // No dispatch, no coordinate sharing, no notification to anyone.
+            // Naviigo has no emergency integration, so this does exactly one
+            // thing and says exactly that: it opens the dialer on 112.
             Text(
-              'Sharing temporary live coordinates with emergency contacts and Indian National Tourist Helpline.',
+              'This opens your phone\'s dialer on 112, the national emergency number. Naviigo does not place the call, dispatch help, or share your location with anyone.',
               style: AppTypography.bodyMedium(color: AppColors.textPrimary),
             ),
             const SizedBox(height: 18),
@@ -966,7 +1009,7 @@ class _OngoingTripsPageState extends ConsumerState<OngoingTripsPage>
                 }
               },
               icon: const Icon(Icons.phone_rounded, color: Colors.white),
-              label: const Text('CALL EMERGENCY SERVICES (112)'),
+              label: const Text('DIAL 112'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.error,
                 minimumSize: const Size(double.infinity, 48),
@@ -984,7 +1027,7 @@ class _OngoingTripsPageState extends ConsumerState<OngoingTripsPage>
                   borderRadius: BorderRadius.circular(16),
                 ),
               ),
-              child: const Text('DISMISS EMERGENCY MODE'),
+              child: const Text('CLOSE'),
             ),
           ],
         ),
@@ -1007,33 +1050,28 @@ class _OngoingTripsPageState extends ConsumerState<OngoingTripsPage>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Safety & Buddy Center',
+              'Safety',
               style: AppTypography.tripTitle(color: AppColors.brown),
+            ),
+            const SizedBox(height: 6),
+            // No buddy backend and no stored emergency contacts exist, so the
+            // sheet says so. It previously offered a "Buddy Mode" switch that
+            // toggled a local bool and claimed "2 contacts registered".
+            Text(
+              'Naviigo does not share your location, and has no emergency contacts on file for you.',
+              style: AppTypography.caption(),
             ),
             const SizedBox(height: 14),
             ListTile(
-              leading: const Icon(Icons.group_outlined, color: AppColors.teal),
-              title: const Text('Buddy Mode Status'),
-              subtitle: Text(
-                _isBuddySharing ? 'Active with $_buddyName' : 'Disabled',
-              ),
-              trailing: Switch(
-                value: _isBuddySharing,
-                activeColor: AppColors.teal,
-                onChanged: (val) {
-                  setState(() => _isBuddySharing = val);
-                  Navigator.pop(ctx);
-                },
-              ),
-            ),
-            ListTile(
-              leading: const Icon(
-                Icons.contact_phone_outlined,
-                color: AppColors.brown,
-              ),
-              title: const Text('Emergency Contacts'),
-              subtitle: const Text('2 contacts registered'),
-              onTap: () => Navigator.pop(ctx),
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.call_outlined, color: AppColors.error),
+              title: const Text('Dial 112'),
+              subtitle: const Text('National emergency number'),
+              onTap: () async {
+                Navigator.pop(ctx);
+                final uri = Uri.parse('tel:112');
+                if (await canLaunchUrl(uri)) await launchUrl(uri);
+              },
             ),
           ],
         ),
