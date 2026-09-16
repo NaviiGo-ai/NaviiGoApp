@@ -34,16 +34,20 @@ class TripRepository {
             return timeB.compareTo(timeA);
           });
 
-          // Cache trips locally in Hive for offline access
+          // Cache trips locally in Hive for offline access. `status` travels
+          // with them: a restart with no network must still resolve the active
+          // journey from its lifecycle, never from today's date.
           for (final trip in trips) {
             HiveService.cacheItinerary(trip.id, {
               'id': trip.id,
               'uuid': trip.uuid,
               'destId': trip.destId,
               'destName': trip.destName,
+              'userId': trip.userId,
               'form': trip.form,
               'generatedData': trip.generatedData,
               'isActive': trip.isActive,
+              if (trip.status != null) 'status': trip.status!.wireName,
               'updatedAt': trip.updatedAt?.toIso8601String(),
             });
           }
@@ -115,11 +119,13 @@ class TripRepository {
       'uuid': trip.uuid,
       'destId': trip.destId,
       'destName': trip.destName,
+      'userId': uid,
       'form': trip.form,
       'dayPlans': dayPlansData,
       'generatedData': genData,
       'isActive': trip.isActive,
       'isPublic': trip.isPublic,
+      if (trip.status != null) 'status': trip.status!.wireName,
       'updatedAt': now,
     };
 
@@ -174,17 +180,25 @@ class TripRepository {
       'uuid': trip.uuid,
       'destId': trip.destId,
       'destName': trip.destName,
+      'userId': uid,
       'form': trip.form,
       'dayPlans': dayPlansData,
       'generatedData': genData,
       'isActive': trip.isActive,
+      if (trip.status != null) 'status': trip.status!.wireName,
       'updatedAt': DateTime.now().toIso8601String(),
     });
 
     return trip.id;
   }
 
-  /// Mark an itinerary as the active trip
+  /// Mark an itinerary as the active trip.
+  ///
+  /// Two journeys must never read as ACTIVE at once, so any other trip that
+  /// currently claims `isActive` also has its stale `status` cleared — it then
+  /// derives its lifecycle from its own dates rather than lying. Callers that
+  /// deliberately intend to end another journey do that explicitly first, via
+  /// [endTrip].
   Future<void> setActiveTrip(String uid, String activeTripId) async {
     final userItinCol = _firestore
         .collection('users')
@@ -197,17 +211,33 @@ class TripRepository {
       if (doc.id == activeTripId) {
         batch.update(doc.reference, {
           'isActive': true,
-          'status': 'active',
+          'status': TripStatus.active.wireName,
           'updatedAt': FieldValue.serverTimestamp(),
         });
       } else if (doc.data()['isActive'] == true) {
         batch.update(doc.reference, {
           'isActive': false,
+          'status': FieldValue.delete(),
           'updatedAt': FieldValue.serverTimestamp(),
         });
       }
     }
     await batch.commit();
+  }
+
+  /// End a journey the traveller chose to leave. Terminal, so it can never
+  /// reappear as the active trip whatever its dates say.
+  Future<void> endTrip(String uid, String tripId) async {
+    await _firestore
+        .collection('users')
+        .doc(uid)
+        .collection('itineraries')
+        .doc(tripId)
+        .set({
+          'isActive': false,
+          'status': TripStatus.cancelled.wireName,
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
   }
 
   /// Delete itinerary from user subcollection and root collection
@@ -266,11 +296,17 @@ class TripRepository {
           (itinData['id'] ?? 'trip_${DateTime.now().millisecondsSinceEpoch}')
               .toString();
 
+      // The owner is stamped at creation. Start-trip validation treats an
+      // owner-less journey as unverifiable and refuses to begin it, so a trip
+      // that never carried one would be unstartable.
+      final uid = FirebaseClient.auth.currentUser?.uid;
+
       final tripModel = TripItineraryModel.fromMap(tripId, {
         'id': tripId,
         'uuid': tripId,
         'destId': payload['destination'],
         'destName': destName,
+        if (uid != null) 'userId': uid,
         'form': payload,
         'generatedData': itinData,
         'isActive': false,
@@ -279,7 +315,6 @@ class TripRepository {
       });
 
       // Save to Firebase & local cache
-      final uid = FirebaseClient.auth.currentUser?.uid;
       if (uid != null) {
         await saveTrip(uid, tripModel);
       }

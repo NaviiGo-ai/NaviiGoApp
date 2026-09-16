@@ -14,9 +14,10 @@
   - `NavMotion` & `NavEnvironment`: standardized durations/curves, reduced-motion compliance (`reducedMotion`), and environmental lighting/palette adjustments.
   - Compaction: Shell bottom bar auto-collapses on scroll down and restores on scroll up / route transition (`navChromeCollapseProvider`).
 - **No Mock/Fake Fallback Policy**: No fake data generation, no Unsplash URLs in place data, no client-side coupon/debit evaluations. Server owns validation and transactions.
-- **Trip Lifecycle (single vocabulary)**: `TripStatus` — `draft`, `planned`, `upcoming`, `eligibleToStart`, `active`, `completed`, `cancelled` — lives in `trip_itinerary_model.dart` with a tolerant `fromString` that absorbs the strings already in Firestore (`active` / `past` / `in_progress`). `TripItineraryModel.tripStatus` returns the server-written `status` when present, otherwise derives it. **Derived `active` comes only from the explicit `isActive` flag — arriving on the calendar makes a trip `eligibleToStart`, never silently `active`.**
-- **Start-trip gating**: `TripValidationService` (`domain/services/`) is pure Dart — Haversine proximity, no geo plugin. It fails closed through seven named gates in order: authenticated → owner → location permission → coordinates present → GPS accuracy (< 500 m) → proximity to the start region (< 25 km) → destination-local date. Each failure is a distinct `StartTripStatus`, and wrong-city carries distance + destination so the UI can render recovery without re-deriving.
-- **Live journey state**: `LiveTripState` derives everything the live screen renders from three honest sources — the itinerary, the traveller's own check-ins, and the latest real fix — with no simulated telemetry, no progress percentage, and no buddy data. Check-ins (`arrived` / `completed` / `skipped`) persist through Hive and work offline. `LiveTripController` takes position from a `LocationAdapter` rather than owning GPS; the default adapter reports the gap instead of inventing a coordinate.
+- **Trip Lifecycle (single vocabulary)**: `TripStatus` — `draft`, `planned`, `upcoming`, `eligibleToStart`, `active`, `completed`, `cancelled` — lives in `trip_itinerary_model.dart` with a tolerant `fromString` that absorbs the strings already in Firestore (`active` / `past` / `in_progress`). `TripItineraryModel.tripStatus` returns the server-written `status` when present, otherwise derives it. **Derived `active` comes only from the explicit `isActive` flag — arriving on the calendar makes a trip `eligibleToStart`, never silently `active`. `activeTripProvider` strictly filters on `tripStatus == TripStatus.active` as the single canonical source of truth.**
+- **Start-trip gating**: `TripValidationService` (`domain/services/`) is pure Dart — Haversine proximity, no geo plugin. It fails closed through eleven named gates in order: authenticated → owner (fail-closed if unowned) → no active-trip conflict → location permission → location services enabled → location timeout → coordinates present → fix freshness (≤ 5 min) → GPS accuracy (≤ 500 m) → proximity to the start region (≤ 25 km) → destination-local date. Each failure is a distinct `StartTripStatus`, and wrong-city carries distance + destination so the UI can render recovery without re-deriving.
+- **Location Architecture**: Decoupled platform adapter pattern (`LocationAdapter` / `GeolocatorLocationAdapter` / `LiveFix` / `LocationResult`). Foreground-only location reads with bounded accuracy retry (< 500m, max 3 attempts, 2s delay), freshness validation (≤ 5 min), granular failure mappings, and explicit OS settings navigation.
+- **Live journey state**: `LiveTripState` derives everything the live screen renders from three honest sources — the itinerary, the traveller's own check-ins, and the latest real fix — with no simulated telemetry, no progress percentage, and no buddy data. Check-ins (`arrived` / `completed` / `skipped`) persist through Hive and work offline. `LiveTripController` takes position from `LocationAdapter` (wired to `GeolocatorLocationAdapter` in production).
 
 ---
 
@@ -106,19 +107,20 @@ premium_itineraries/{itinId}      (Signature multi-day expert routes)
 
 ## 4. Test Suite & Health
 
-- **Total Test Files**: 11
-- **Total Unit & Widget Tests**: 102
-- **Passing Status**: 102 / 102 (100%)
+- **Total Test Files**: 12
+- **Total Unit & Widget Tests**: 119
+- **Passing Status**: 119 / 119 (100%)
 - **Analyzer Status**: 0 errors, 0 warnings, 0 lints (`flutter analyze` clean)
 - **Test Files**:
   - `test/api_client_and_resilience_test.dart`
   - `test/live_tracking_page_test.dart` — start gate, wrong-city recovery, live sections, closed journeys
   - `test/live_trip_controller_test.dart` — check-in rail, confidence, gating, deviation, sync honesty
+  - `test/location_and_active_trip_test.dart` — platform adapter behaviors, fail-closed accuracy/freshness, active trip canonical truth, multiple active trip conflict prevention
   - `test/motion_contract_test.dart`
   - `test/navigation_shell_test.dart`
   - `test/network_and_api_client_test.dart`
   - `test/trip_itinerary_model_test.dart`
-  - `test/trip_validation_test.dart` — lifecycle enum, `copyWith`, Haversine, all seven start gates
+  - `test/trip_validation_test.dart` — lifecycle enum, `copyWith`, Haversine, all eleven start gates
   - `test/user_profile_and_passport_test.dart`
   - `test/wallet_and_places_test.dart`
   - `test/widget_test.dart`
@@ -146,9 +148,15 @@ premium_itineraries/{itinId}      (Signature multi-day expert routes)
    - De-duplicated a repeated test name in `user_profile_and_passport_test.dart`.
 6. **Trip Lifecycle & Start Validation (vertical slice)**:
    - Added the `TripStatus` enum, `copyWith` on all three trip models, and the `userId` / `startLat` / `startLng` / `status` fields the start gate needs. Start coordinates fall back to the curated destination registry, which also supplies `startRegionName` for user-facing copy.
-   - Added `TripValidationService` with the seven fail-closed gates and a typed `StartTripValidationResult`.
-   - Tightened lifecycle derivation: a trip whose start date is today now derives as `eligible_to_start` rather than `active`.
-7. **Live Journey screen**:
+   - Added `TripValidationService` with the eleven fail-closed gates and a typed `StartTripValidationResult`.
+   - Gate 2 hardened to fail closed on missing or empty owner IDs (`StartTripStatus.notOwner`), and `userId` stamped on itinerary creation in `TripRepository` and `TripPlannerPage`.
+   - Removed unvalidated direct trip activation bypass in `generated_itinerary_page.dart` (now routes directly to `/live-tracking` start gate).
+7. **Platform Location Adapter & Canonical Active Trip**:
+   - Implemented `GeolocatorLocationAdapter` using `geolocator: ^14.0.2` with foreground-only reads, bounded accuracy retry loop (< 500m, max 3 attempts, 2s delay), freshness validation (≤ 5 min), granular failure mappings, and explicit OS settings navigation (`openAppSettings`, `openLocationSettings`).
+   - Declared Android permissions (`ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION`) and iOS privacy strings (`NSLocationWhenInUseUsageDescription`).
+   - Replaced date-matching heuristic `isCurrentlyActive` with `activeTripProvider` / `activeTripsProvider` strictly selecting trips where `t.tripStatus == TripStatus.active`.
+   - Handled multiple active trip conflicts with UI warning/recovery cards and atomic Firestore batch cleanup in `TripRepository.setActiveTrip`.
+8. **Live Journey Screen**:
    - Rebuilt `LiveTrackingPage` around NOW / NEXT / ROUTE / BOOKINGS / BUDDY / LOCAL / SAFETY.
    - Wrong-city state names the destination and distance and offers all four recovery actions (Get Directions, View Trip, Try Location Again, Pre-Trip Mode).
    - Manual check-in (`I'M HERE` / `COMPLETE` / `SKIP`) with undo; `SKIP` is recorded as skipped, never as completed. Arrival confidence is labelled "Confirmed by you" or "Inferred from location".
@@ -159,8 +167,6 @@ premium_itineraries/{itinId}      (Signature multi-day expert routes)
 
 ## 6. Known Blockers & External Dependencies
 
-- **Live Device Location — the one real gap in the live slice**: the app ships no location plugin, so `locationAdapterProvider` returns `UnavailableLocationAdapter`, which reports the gap rather than a coordinate. The start gate therefore fails closed on a real device. Wiring a platform implementation behind `LocationAdapter` (plus Android/iOS permission declarations) is the remaining step; nothing else in the start gate or live screen needs to change.
-- **Toast/desync of `activeTripProvider`**: `activeTripProvider` still selects on the date-window getter `isCurrentlyActive`, so a trip that merely *starts today* can be surfaced as the active trip. `tripStatus` / `LiveTripState.phase` are correct; the provider selector should move to `tripStatus == TripStatus.active`.
 - **Render FastAPI Cold Start**: Free/low tier Render instances take 30–50s on initial cold request. `AppConfig.connectTimeout` and `aiGenerationTimeout` (60s) accommodate this.
 - **Firebase Auth on Native Emulators**: Requires configured `google-services.json` (Android) and `GoogleService-Info.plist` (iOS) with valid SHA-1 for Google Sign-In.
 
@@ -168,9 +174,7 @@ premium_itineraries/{itinId}      (Signature multi-day expert routes)
 
 ## 7. Next Recommended Tasks
 
-1. **Wire the real location adapter**: implement `LocationAdapter` behind `locationAdapterProvider` and declare platform permissions. This is the only thing standing between the live slice and a working start gate on device.
-2. **Move `activeTripProvider` onto the lifecycle**: select on `tripStatus == TripStatus.active` so a not-yet-started trip is never presented as the active journey.
-3. **Sync check-ins to Firestore**: `LiveTripController.logCheckIn` is local-first via Hive today. Add a repository write and a conflict rule so a second device sees the same rail.
-4. **Story Creator & Export Hardening**: Audit `lib/features/more/presentation/pages/story_creator_page.dart` for canvas export, permissions, and Instagram Stories sharing contracts.
-5. **Booking Flow & Wallet Checkout End-to-End**: Test end-to-end integration between `BookingsPage`, `WalletRepository.requestDebit`, and itinerary reservation hooks.
-6. **Offline Sync & Reconnection Flow**: Enhance `HiveService` cache invalidation when internet reconnects after offline itinerary viewing.
+1. **Sync check-ins to Firestore**: `LiveTripController.logCheckIn` is local-first via Hive today. Add a repository write and a conflict rule so a second device sees the same rail.
+2. **Story Creator & Export Hardening**: Audit `lib/features/more/presentation/pages/story_creator_page.dart` for canvas export, permissions, and Instagram Stories sharing contracts.
+3. **Booking Flow & Wallet Checkout End-to-End**: Test end-to-end integration between `BookingsPage`, `WalletRepository.requestDebit`, and itinerary reservation hooks.
+4. **Offline Sync & Reconnection Flow**: Enhance `HiveService` cache invalidation when internet reconnects after offline itinerary viewing.

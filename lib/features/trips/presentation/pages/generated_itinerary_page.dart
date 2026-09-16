@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
-import '../../../../core/network/firebase_client.dart';
 import '../providers/trip_provider.dart';
 import '../../domain/models/trip_itinerary_model.dart';
 import '../widgets/itinerary_overview_widgets.dart';
@@ -449,17 +448,14 @@ class _GeneratedItineraryPageState
               Expanded(
                 flex: 3,
                 child: ElevatedButton.icon(
-                  onPressed: () async {
+                  onPressed: () {
                     NavHaptics.fire(NavHaptic.strong);
-                    final uid = FirebaseClient.auth.currentUser?.uid;
-                    if (uid != null) {
-                      await ref
-                          .read(tripRepositoryProvider)
-                          .setActiveTrip(uid, trip.id);
-                    }
-                    if (context.mounted) {
-                      context.push('/ongoing-trips');
-                    }
+                    // Beginning a journey has exactly one gate, and it lives on
+                    // the live screen: permission, fix freshness, accuracy,
+                    // proximity, ownership and the one-journey-at-a-time rule.
+                    // This button only walks the traveller to that gate — it
+                    // never marks a trip active on its own.
+                    context.push('/live-tracking', extra: trip);
                   },
                   icon: const Icon(
                     Icons.navigation_rounded,

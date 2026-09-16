@@ -139,6 +139,31 @@ void main() {
       expect(result.isValid, isFalse);
     });
 
+    test('fails closed when the trip carries no owner at all', () {
+      // An absent owner is unverifiable, not implicitly the caller's. Otherwise
+      // any journey without a userId — including one read from another
+      // traveller's public document — would be startable by anyone.
+      final unownedTrip = TripItineraryModel.fromMap('trip_unowned', {
+        'destId': 'jaipur',
+        'destName': 'Jaipur Royal Tour',
+        'form': {'startDate': '2026-10-15', 'days': 4},
+      });
+      expect(unownedTrip.userId, isNull);
+
+      final result = service.validateStartTrip(
+        trip: unownedTrip,
+        currentUserId: 'pilot_user_1',
+        userLat: 26.9124,
+        userLng: 75.7873,
+        gpsAccuracyMeters: 10,
+        hasLocationPermission: true,
+        referenceDate: DateTime(2026, 10, 15),
+      );
+
+      expect(result.status, StartTripStatus.notOwner);
+      expect(result.isValid, isFalse);
+    });
+
     test('fails validation when location permission is denied', () {
       final result = service.validateStartTrip(
         trip: jaipurTrip,

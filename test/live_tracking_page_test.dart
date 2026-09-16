@@ -48,12 +48,14 @@ Widget _harness({
   bool hasPermission = true,
   bool isOffline = false,
   List<BookingModel> bookings = const [],
+  List<TripItineraryModel>? trips,
+  TripItineraryModel? initialTrip,
 }) {
   return ProviderScope(
     overrides: [
       activeTripProvider.overrideWithValue(trip),
       userTripsStreamProvider.overrideWith((ref) => Stream.value(
-            trip == null ? <TripItineraryModel>[] : [trip],
+            trips ?? (trip == null ? <TripItineraryModel>[] : [trip]),
           )),
       bookingsStreamProvider.overrideWith((ref) => Stream.value(bookings)),
       checkInStoreProvider.overrideWithValue(InMemoryCheckInStore()),
@@ -62,7 +64,7 @@ Widget _harness({
       liveTripFixProvider.overrideWith((ref) => fix),
       liveTripOfflineProvider.overrideWith((ref) => isOffline),
     ],
-    child: const MaterialApp(home: LiveTrackingPage()),
+    child: MaterialApp(home: LiveTrackingPage(initialTrip: initialTrip)),
   );
 }
 
@@ -74,6 +76,41 @@ void main() {
 
       expect(find.text('Tracking Idle'), findsOneWidget);
       expect(find.text('LIVE JOURNEY'), findsOneWidget);
+    });
+
+    testWidgets('judges the journey it was opened for, not the list head',
+        (tester) async {
+      // Another, unrelated journey the traveller is not about to start. It comes
+      // first in the stream, which is exactly the trip a positional fallback
+      // would have wrongly judged.
+      final unrelated = TripItineraryModel.fromMap('trip_other', {
+        'destId': 'udaipur',
+        'destName': 'Udaipur Lakes',
+        'userId': 'pilot_1',
+        'isActive': false,
+        'form': {'startDate': _todayIso(), 'days': 1},
+        'dayPlans': [
+          {
+            'day': 1,
+            'activities': [
+              {'title': 'Lake Pichola'},
+            ],
+          },
+        ],
+      });
+      final tapped = _trip();
+
+      await tester.pumpWidget(_harness(
+        trip: null,
+        trips: [unrelated, tapped],
+        initialTrip: tapped,
+        fix: _jaipur(),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('START JOURNEY'), findsOneWidget);
+      expect(find.textContaining('Jaipur'), findsWidgets);
+      expect(find.textContaining('Udaipur'), findsNothing);
     });
   });
 
@@ -109,9 +146,11 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('NOT AT THE START YET'), findsOneWidget);
+      expect(find.text('LOCATION NOT VERIFIED'), findsOneWidget);
+      expect(find.text('VERIFY YOUR START'), findsOneWidget);
+      // Naviigo's own words, not a permission constant.
       expect(
-        find.textContaining('Location permission is needed'),
+        find.textContaining('Naviigo uses your location'),
         findsOneWidget,
       );
     });

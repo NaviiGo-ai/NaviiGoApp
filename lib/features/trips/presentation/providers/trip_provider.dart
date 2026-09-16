@@ -19,21 +19,21 @@ final userTripsStreamProvider = StreamProvider<List<TripItineraryModel>>((ref) {
   return repo.getUserTripsStream(user.uid);
 });
 
+/// Journeys whose canonical lifecycle says they are under way.
+///
+/// Lifecycle is the only authority here. Dates may make a journey UPCOMING or
+/// ELIGIBLE_TO_START, but merely arriving on the calendar must never make one
+/// ACTIVE — that requires an explicit, validated transition.
+final activeTripsProvider = Provider<List<TripItineraryModel>>((ref) {
+  final trips = ref.watch(userTripsStreamProvider).value;
+  if (trips == null) return const [];
+  return trips.where((t) => t.tripStatus == TripStatus.active).toList();
+});
+
 /// Currently active ongoing trip (if any)
 final activeTripProvider = Provider<TripItineraryModel?>((ref) {
-  final tripsAsync = ref.watch(userTripsStreamProvider);
-  return tripsAsync.when(
-    data: (trips) {
-      // Prioritize explicitly active trip, then date-based ongoing trip
-      try {
-        return trips.firstWhere((t) => t.isCurrentlyActive);
-      } catch (_) {
-        return null;
-      }
-    },
-    loading: () => null,
-    error: (_, __) => null,
-  );
+  final active = ref.watch(activeTripsProvider);
+  return active.isEmpty ? null : active.first;
 });
 
 /// Upcoming trips scheduled for future dates

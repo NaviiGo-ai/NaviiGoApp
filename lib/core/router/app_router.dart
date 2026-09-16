@@ -192,8 +192,14 @@ final GoRouter appRouter = GoRouter(
         ),
         GoRoute(
           path: '/live-tracking',
-          pageBuilder: (context, state) =>
-              _page(state, const LiveTrackingPage()),
+          pageBuilder: (context, state) => _page(
+            state,
+            LiveTrackingPage(
+              initialTrip: state.extra is TripItineraryModel
+                  ? state.extra as TripItineraryModel
+                  : null,
+            ),
+          ),
         ),
         GoRoute(
           path: '/past-trips',

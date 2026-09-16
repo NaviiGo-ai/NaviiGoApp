@@ -1,62 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/auth/auth_provider.dart';
 import '../../../../core/cache/hive_service.dart';
+import '../../../../core/location/geolocator_location_adapter.dart';
+import '../../../../core/location/location_adapter.dart';
 import '../../domain/models/live_trip_state.dart';
 import '../../domain/models/trip_itinerary_model.dart';
 import '../../domain/services/trip_validation_service.dart';
 import 'trip_provider.dart';
-
-/// ─────────────────────────────────────────────────────────────────────────────
-/// LOCATION
-/// The app ships no GPS plugin, so position is always supplied to the live
-/// layer by an adapter. Swapping in a platform implementation is the only
-/// change required — nothing here invents a fix when the adapter cannot
-/// provide one.
-/// ─────────────────────────────────────────────────────────────────────────────
-enum LocationFailure { permissionDenied, servicesDisabled, unavailable }
-
-class LocationResult {
-  final LiveFix? fix;
-  final LocationFailure? failure;
-  final bool permissionGranted;
-
-  const LocationResult({
-    this.fix,
-    this.failure,
-    this.permissionGranted = false,
-  });
-
-  bool get hasFix => fix != null;
-
-  String get message {
-    switch (failure) {
-      case LocationFailure.permissionDenied:
-        return 'Location permission was declined. Enable it in settings to confirm you are at the start.';
-      case LocationFailure.servicesDisabled:
-        return 'Turn on device location to confirm you are at the start.';
-      case LocationFailure.unavailable:
-        return 'Location is not available on this build yet.';
-      case null:
-        return 'Position updated.';
-    }
-  }
-}
-
-abstract class LocationAdapter {
-  Future<LocationResult> current();
-}
-
-/// Default adapter. Reports the gap honestly instead of returning a made-up
-/// coordinate; the start gate fails closed on it like any other missing input.
-class UnavailableLocationAdapter implements LocationAdapter {
-  const UnavailableLocationAdapter();
-
-  @override
-  Future<LocationResult> current() async => const LocationResult(
-        failure: LocationFailure.unavailable,
-        permissionGranted: false,
-      );
-}
 
 /// ─────────────────────────────────────────────────────────────────────────────
 /// CHECK-IN PERSISTENCE
@@ -130,8 +80,19 @@ final startTripWriterProvider = Provider<StartTripWriter>(
       ref.read(tripRepositoryProvider).setActiveTrip(uid, tripId),
 );
 
+/// Ends a journey the traveller explicitly walked away from. Separate from the
+/// start writer because ending someone's journey is never a side effect of
+/// beginning another — it is always its own confirmed action.
+typedef EndTripWriter = Future<void> Function(String uid, String tripId);
+
+final endTripWriterProvider = Provider<EndTripWriter>(
+  (ref) => (uid, tripId) =>
+      ref.read(tripRepositoryProvider).endTrip(uid, tripId),
+);
+
+/// The platform implementation. Widgets and providers never touch the plugin.
 final locationAdapterProvider = Provider<LocationAdapter>(
-  (ref) => const UnavailableLocationAdapter(),
+  (ref) => const GeolocatorLocationAdapter(),
 );
 
 final liveTripValidationServiceProvider = Provider<TripValidationService>(
@@ -141,6 +102,13 @@ final liveTripValidationServiceProvider = Provider<TripValidationService>(
 final liveTripFixProvider = StateProvider<LiveFix?>((ref) => null);
 
 final liveTripPermissionProvider = StateProvider<bool>((ref) => false);
+
+/// Why the last location read did not produce a fix. Kept separate from
+/// permission because "location is switched off" and "you declined" are fixed
+/// in different places.
+final liveTripLocationFailureProvider = StateProvider<LocationFailure?>(
+  (ref) => null,
+);
 
 /// True when the last read or write failed on connectivity — not a guess about
 /// signal strength.
@@ -209,6 +177,11 @@ class LiveTripController extends StateNotifier<Map<String, TripCheckIn>> {
       logCheckIn(waypointKey, TripCheckIn.pending);
 
   /// Ask the platform adapter for a position. Never fabricates one.
+  ///
+  /// Every caller is an explicit traveller action (VERIFY YOUR START / TRY
+  /// LOCATION AGAIN), so this is the only place that may raise the OS
+  /// permission prompt — permission is never requested at launch or on a
+  /// rebuild.
   Future<void> refreshLocation() async {
     final commands = _ref.read(liveTripCommandProvider.notifier);
     commands.state = commands.state.copyWith(
@@ -216,9 +189,13 @@ class LiveTripController extends StateNotifier<Map<String, TripCheckIn>> {
       clearError: true,
     );
     try {
-      final result = await _ref.read(locationAdapterProvider).current();
+      final result = await _ref
+          .read(locationAdapterProvider)
+          .current(userInitiated: true);
       _ref.read(liveTripPermissionProvider.notifier).state =
           result.permissionGranted;
+      _ref.read(liveTripLocationFailureProvider.notifier).state =
+          result.failure;
       if (result.hasFix) {
         _ref.read(liveTripFixProvider.notifier).state = result.fix;
         _ref.read(liveTripLastSyncProvider.notifier).state = DateTime.now();
@@ -236,6 +213,15 @@ class LiveTripController extends StateNotifier<Map<String, TripCheckIn>> {
     }
   }
 
+  /// Hand off to the OS permission screen. Only ever from an explicit OPEN
+  /// SETTINGS action — the app never navigates there on its own.
+  Future<bool> openAppSettings() =>
+      _ref.read(locationAdapterProvider).openAppSettings();
+
+  /// Hand off to the OS location-services switch.
+  Future<bool> openLocationSettings() =>
+      _ref.read(locationAdapterProvider).openLocationSettings();
+
   /// Begin the journey. Persists `active` through the repository so the server
   /// and every other screen share one lifecycle, then marks it started locally.
   Future<bool> startTrip(TripItineraryModel trip) async {
@@ -243,6 +229,18 @@ class LiveTripController extends StateNotifier<Map<String, TripCheckIn>> {
     if (uid == null) return false;
 
     final commands = _ref.read(liveTripCommandProvider.notifier);
+
+    // One journey at a time. Beginning a second without ending the first is
+    // never a silent side effect — the traveller resolves it explicitly.
+    final conflict = otherActiveTrips(trip.id);
+    if (conflict != null) {
+      commands.state = commands.state.copyWith(
+        isStartingTrip: false,
+        error: 'You already have a journey under way.',
+      );
+      return false;
+    }
+
     commands.state = commands.state.copyWith(
       isStartingTrip: true,
       clearError: true,
@@ -263,6 +261,36 @@ class LiveTripController extends StateNotifier<Map<String, TripCheckIn>> {
       );
       return false;
     }
+  }
+
+  /// End a journey the traveller chose to leave. Only ever called from the
+  /// conflict resolution card, after the traveller picked it.
+  Future<bool> endTrip(TripItineraryModel trip) async {
+    final uid = _ref.read(currentUserIdProvider);
+    if (uid == null) return false;
+
+    final commands = _ref.read(liveTripCommandProvider.notifier);
+    commands.state = commands.state.copyWith(clearError: true);
+    try {
+      await _ref.read(endTripWriterProvider)(uid, trip.id);
+      _ref.read(liveTripLastSyncProvider.notifier).state = DateTime.now();
+      _ref.read(liveTripOfflineProvider.notifier).state = false;
+      return true;
+    } catch (_) {
+      _ref.read(liveTripOfflineProvider.notifier).state = true;
+      commands.state = commands.state.copyWith(
+        error: 'Could not end that journey. Check your connection and retry.',
+      );
+      return false;
+    }
+  }
+
+  /// The journey already under way, if it is not [exceptTripId].
+  TripItineraryModel? otherActiveTrips(String exceptTripId) {
+    for (final t in _ref.read(activeTripsProvider)) {
+      if (t.id != exceptTripId) return t;
+    }
+    return null;
   }
 
   void recordSyncFailure() {
@@ -291,16 +319,31 @@ final liveTripStateProvider =
   final commands = ref.watch(liveTripCommandProvider);
   final fix = ref.watch(liveTripFixProvider);
   final permission = ref.watch(liveTripPermissionProvider);
+  final locationFailure = ref.watch(liveTripLocationFailureProvider);
   final userId = ref.watch(currentUserIdProvider);
 
-  final startCheck = ref.watch(liveTripValidationServiceProvider).validateStartTrip(
-        trip: trip,
-        currentUserId: userId,
-        userLat: fix?.lat,
-        userLng: fix?.lng,
-        gpsAccuracyMeters: fix?.accuracyMeters,
-        hasLocationPermission: permission,
-      );
+  // Another journey already under way. Starting is blocked until the traveller
+  // resolves it — the app never ends someone's journey on its own.
+  TripItineraryModel? conflict;
+  for (final other in ref.watch(activeTripsProvider)) {
+    if (other.id != trip.id) {
+      conflict = other;
+      break;
+    }
+  }
+
+  final startCheck =
+      ref.watch(liveTripValidationServiceProvider).validateStartTrip(
+            trip: trip,
+            currentUserId: userId,
+            userLat: fix?.lat,
+            userLng: fix?.lng,
+            gpsAccuracyMeters: fix?.accuracyMeters,
+            fixTimestamp: fix?.timestamp,
+            hasLocationPermission: permission,
+            locationFailure: locationFailure,
+            hasOtherActiveTrip: conflict != null,
+          );
 
   return LiveTripState(
     trip: trip,
@@ -308,6 +351,8 @@ final liveTripStateProvider =
     fix: fix,
     hasLocationPermission: permission,
     startCheck: startCheck,
+    conflictingTrip: conflict,
+    locationFailure: locationFailure,
     isOffline: ref.watch(liveTripOfflineProvider),
     lastUpdated: ref.watch(liveTripLastSyncProvider),
     isResolvingLocation: commands.isResolvingLocation,

@@ -1,5 +1,11 @@
+import '../../../../core/location/live_fix.dart';
+import '../../../../core/location/location_adapter.dart';
 import 'trip_itinerary_model.dart';
 import '../services/trip_validation_service.dart';
+
+/// A fix and its provenance are part of this model's public surface, so they
+/// travel with it.
+export '../../../../core/location/live_fix.dart';
 
 /// ─────────────────────────────────────────────────────────────────────────────
 /// MANUAL CHECK-IN
@@ -97,26 +103,6 @@ extension ArrivalConfidenceX on ArrivalConfidence {
   }
 }
 
-enum LiveFixSource { device, manual }
-
-/// A single position fix handed to the live layer by a platform adapter.
-/// The app owns no GPS plugin, so this is always an *input* — never invented.
-class LiveFix {
-  final double lat;
-  final double lng;
-  final double? accuracyMeters;
-  final DateTime timestamp;
-  final LiveFixSource source;
-
-  const LiveFix({
-    required this.lat,
-    required this.lng,
-    required this.timestamp,
-    this.accuracyMeters,
-    this.source = LiveFixSource.device,
-  });
-}
-
 /// Which face of the live screen the traveller should see.
 enum LiveTripPhase {
   /// No journey to act on.
@@ -167,6 +153,14 @@ class LiveTripState {
   final LiveFix? fix;
   final bool hasLocationPermission;
   final StartTripValidationResult? startCheck;
+
+  /// Another journey of this traveller's already under way, when there is one.
+  /// Its presence blocks starting [trip] until the traveller resolves it.
+  final TripItineraryModel? conflictingTrip;
+
+  /// Why the last location read produced no fix, when it didn't.
+  final LocationFailure? locationFailure;
+
   final bool isOffline;
   final DateTime? lastUpdated;
   final bool isResolvingLocation;
@@ -179,6 +173,8 @@ class LiveTripState {
     this.fix,
     this.hasLocationPermission = false,
     this.startCheck,
+    this.conflictingTrip,
+    this.locationFailure,
     this.isOffline = false,
     this.lastUpdated,
     this.isResolvingLocation = false,
@@ -198,6 +194,8 @@ class LiveTripState {
     LiveFix? fix,
     bool? hasLocationPermission,
     StartTripValidationResult? startCheck,
+    TripItineraryModel? conflictingTrip,
+    LocationFailure? locationFailure,
     bool? isOffline,
     DateTime? lastUpdated,
     bool? isResolvingLocation,
@@ -211,6 +209,8 @@ class LiveTripState {
       fix: fix ?? this.fix,
       hasLocationPermission: hasLocationPermission ?? this.hasLocationPermission,
       startCheck: startCheck ?? this.startCheck,
+      conflictingTrip: conflictingTrip ?? this.conflictingTrip,
+      locationFailure: locationFailure ?? this.locationFailure,
       isOffline: isOffline ?? this.isOffline,
       lastUpdated: lastUpdated ?? this.lastUpdated,
       isResolvingLocation: isResolvingLocation ?? this.isResolvingLocation,

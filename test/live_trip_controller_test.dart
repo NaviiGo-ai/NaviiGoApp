@@ -1,9 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:naviigo_app/core/location/location_adapter.dart';
 import 'package:naviigo_app/features/trips/domain/models/live_trip_state.dart';
 import 'package:naviigo_app/features/trips/domain/models/trip_itinerary_model.dart';
 import 'package:naviigo_app/features/trips/domain/services/trip_validation_service.dart';
 import 'package:naviigo_app/features/trips/presentation/providers/live_trip_provider.dart';
+import 'package:naviigo_app/features/trips/presentation/providers/trip_provider.dart';
 
 /// Jaipur start date today, so the trip is inside its start window.
 String _todayIso() {
@@ -48,13 +50,26 @@ class _FakeLocationAdapter implements LocationAdapter {
   _FakeLocationAdapter(this._result);
   LocationResult _result;
   int calls = 0;
+  int settingsOpens = 0;
 
   void respondWith(LocationResult result) => _result = result;
 
   @override
-  Future<LocationResult> current() async {
+  Future<LocationResult> current({bool userInitiated = false}) async {
     calls++;
     return _result;
+  }
+
+  @override
+  Future<bool> openAppSettings() async {
+    settingsOpens++;
+    return true;
+  }
+
+  @override
+  Future<bool> openLocationSettings() async {
+    settingsOpens++;
+    return true;
   }
 }
 
@@ -63,13 +78,19 @@ ProviderContainer _container({
   LocationAdapter? location,
   String? userId = 'pilot_1',
   StartTripWriter? writer,
+  EndTripWriter? endWriter,
+  List<TripItineraryModel> trips = const [],
 }) {
   final container = ProviderContainer(
     overrides: [
       checkInStoreProvider.overrideWithValue(store ?? InMemoryCheckInStore()),
       currentUserIdProvider.overrideWithValue(userId),
+      // The conflict gate reads the trip stream, so it must be supplied rather
+      // than reaching for Firebase.
+      userTripsStreamProvider.overrideWith((ref) => Stream.value(trips)),
       if (location != null) locationAdapterProvider.overrideWithValue(location),
       if (writer != null) startTripWriterProvider.overrideWithValue(writer),
+      if (endWriter != null) endTripWriterProvider.overrideWithValue(endWriter),
     ],
   );
   addTearDown(container.dispose);
@@ -315,8 +336,10 @@ void main() {
 
       final state = container.read(liveTripStateProvider(trip));
       expect(state.startCheck!.status, StartTripStatus.permissionDenied);
+      expect(state.locationFailure, LocationFailure.permissionDenied);
       expect(state.fix, isNull);
-      expect(state.lastActionError, contains('permission'));
+      expect(state.lastActionError, contains('Naviigo needs your location'));
+      expect(state.lastActionError, isNot(contains('permission')));
       expect(state.isResolvingLocation, isFalse);
     });
 

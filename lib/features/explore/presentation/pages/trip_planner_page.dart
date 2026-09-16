@@ -218,6 +218,9 @@ class _TripPlannerPageState extends ConsumerState<TripPlannerPage>
           uuid: tripId,
           destId: _selectedDestination.id,
           destName: _selectedDestination.name,
+          // Stamped here so the journey is always attributable to the
+          // traveller who planned it; the start gate refuses an unowned trip.
+          userId: uid,
           isActive: false,
           createdAt: DateTime.now(),
           updatedAt: DateTime.now(),

@@ -14,6 +14,7 @@ import '../../../trips/presentation/providers/trip_provider.dart';
 import '../../../trips/presentation/providers/live_trip_provider.dart';
 import '../../../trips/domain/models/trip_itinerary_model.dart';
 import '../../../trips/domain/models/live_trip_state.dart';
+import '../../../trips/domain/services/trip_validation_service.dart';
 
 /// ─────────────────────────────────────────────────────────────────────────────
 /// LIVE JOURNEY
@@ -23,7 +24,12 @@ import '../../../trips/domain/models/live_trip_state.dart';
 /// missing the screen says so — it never fills the gap with invented telemetry.
 /// ─────────────────────────────────────────────────────────────────────────────
 class LiveTrackingPage extends ConsumerStatefulWidget {
-  const LiveTrackingPage({super.key});
+  const LiveTrackingPage({super.key, this.initialTrip});
+
+  /// The journey the traveller arrived here to begin or follow. Passed by
+  /// screens that already know which itinerary was tapped, so the start gate
+  /// always judges that journey rather than whichever happens to be first.
+  final TripItineraryModel? initialTrip;
 
   @override
   ConsumerState<LiveTrackingPage> createState() => _LiveTrackingPageState();
@@ -39,6 +45,7 @@ class _LiveTrackingPageState extends ConsumerState<LiveTrackingPage> {
   @override
   Widget build(BuildContext context) {
     TripItineraryModel? trip = ref.watch(activeTripProvider);
+    trip ??= widget.initialTrip;
     if (trip == null) {
       final allTrips = ref.watch(userTripsStreamProvider).value ?? [];
       if (allTrips.isNotEmpty) {
@@ -463,7 +470,35 @@ class _StartGate extends StatelessWidget {
     if (isPreTripMode) return _buildPreTripMode(context);
 
     final check = state.startCheck;
+    final status = check?.status;
+
+    // Another journey is under way. The traveller resolves that first — the app
+    // never ends a journey on its own.
+    if (status == StartTripStatus.conflictWithActiveTrip) {
+      return _buildConflict(context);
+    }
+
     final isAtStart = state.phase == LiveTripPhase.atStart;
+    final isWrongCity = status == StartTripStatus.wrongCity;
+
+    // A location problem is not a wrong-city problem: the headline, the reason
+    // and the recovery all differ. Blurring them would leave the traveller with
+    // no idea what to fix.
+    final headline = switch (status) {
+      StartTripStatus.valid => 'YOU ARE AT THE START',
+      StartTripStatus.wrongCity => 'NOT AT THE START YET',
+      StartTripStatus.permissionDenied => 'LOCATION NOT VERIFIED',
+      StartTripStatus.permissionPermanentlyDenied ||
+      StartTripStatus.locationRestricted =>
+        'LOCATION IS BLOCKED',
+      StartTripStatus.servicesDisabled => 'LOCATION IS TURNED OFF',
+      StartTripStatus.locationTimeout ||
+      StartTripStatus.staleFix ||
+      StartTripStatus.inaccurateGps =>
+        "COULDN'T GET A RELIABLE LOCATION",
+      StartTripStatus.dateMismatch => 'TOO EARLY TO START',
+      _ => 'NOT AT THE START YET',
+    };
 
     return _SectionCard(
       background: isAtStart ? AppColors.teal.withAlpha(14) : AppColors.surface,
@@ -472,7 +507,7 @@ class _StartGate extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _SectionLabel(
-            isAtStart ? 'YOU ARE AT THE START' : 'NOT AT THE START YET',
+            headline,
             color: isAtStart ? AppColors.teal : AppColors.brown,
             icon: isAtStart
                 ? Icons.check_circle_outline_rounded
@@ -487,18 +522,19 @@ class _StartGate extends StatelessWidget {
               style: AppTypography.caption(color: AppColors.textPrimary),
             )
           else ...[
-            Text(
-              check?.expectedDestinationName != null
-                  ? 'This journey begins in ${check!.expectedDestinationName}.'
-                  : 'This journey cannot be started right now.',
-              style: AppTypography.bodyMedium(color: AppColors.textPrimary)
-                  .copyWith(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 6),
+            if (isWrongCity)
+              Text(
+                check?.expectedDestinationName != null
+                    ? 'This journey begins in ${check!.expectedDestinationName}.'
+                    : 'This journey cannot be started right now.',
+                style: AppTypography.bodyMedium(color: AppColors.textPrimary)
+                    .copyWith(fontWeight: FontWeight.bold),
+              ),
+            if (isWrongCity) const SizedBox(height: 6),
             Text(
               // The reason comes straight from the gate that failed — never a
               // generic "cannot start".
-              check?.message ?? 'Waiting for location.',
+              _reasonFor(status, check?.message),
               style: AppTypography.caption(color: AppColors.textSecondary),
             ),
           ],
@@ -515,44 +551,31 @@ class _StartGate extends StatelessWidget {
 
           const SizedBox(height: 18),
 
-          // Primary action.
+          // Primary action — different for every gate.
           SizedBox(
             width: double.infinity,
             child: _PrimaryButton(
-              label: isAtStart
-                  ? (state.isStartingTrip ? 'STARTING…' : 'START JOURNEY')
-                  : 'TRY LOCATION AGAIN',
-              icon: isAtStart
-                  ? Icons.play_arrow_rounded
-                  : Icons.my_location_rounded,
+              label: _primaryLabel(status, isAtStart),
+              icon: _primaryIcon(status, isAtStart),
               color: isAtStart ? AppColors.teal : AppColors.brown,
               isBusy: isAtStart
                   ? state.isStartingTrip
                   : state.isResolvingLocation,
-              onTap: isAtStart
-                  ? (state.isStartingTrip
-                      ? null
-                      : () async {
-                          NavHaptics.fire(NavHaptic.medium);
-                          await controller.startTrip(trip);
-                        })
-                  : (state.isResolvingLocation
-                      ? null
-                      : () {
-                          NavHaptics.fire(NavHaptic.light);
-                          controller.refreshLocation();
-                        }),
+              onTap: state.isStartingTrip || state.isResolvingLocation
+                  ? null
+                  : () => _runPrimary(context, status, isAtStart),
             ),
           ),
 
-          // Recovery options for the wrong-city state.
-          if (!isAtStart) ...[
-            const SizedBox(height: 14),
-            Text(
-              'OTHER OPTIONS',
-              style: AppTypography.micro(color: AppColors.textTertiary),
-            ),
-            const SizedBox(height: 8),
+          const SizedBox(height: 14),
+          Text(
+            'OTHER OPTIONS',
+            style: AppTypography.micro(color: AppColors.textTertiary),
+          ),
+          const SizedBox(height: 8),
+
+          // Only a genuine wrong-city has somewhere to navigate to.
+          if (isWrongCity)
             _RecoveryRow(
               label: 'Get Directions',
               icon: Icons.directions_rounded,
@@ -561,20 +584,162 @@ class _StartGate extends StatelessWidget {
                 _openDirections(context, trip);
               },
             ),
-            _RecoveryRow(
-              label: 'View Trip',
-              icon: Icons.menu_book_rounded,
+          _RecoveryRow(
+            label: 'View Trip',
+            icon: Icons.menu_book_rounded,
+            onTap: () {
+              NavHaptics.fire(NavHaptic.light);
+              context.push('/itinerary', extra: trip);
+            },
+          ),
+          _RecoveryRow(
+            label: 'Pre-Trip Mode',
+            icon: Icons.event_note_rounded,
+            onTap: onEnterPreTripMode,
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// The reason, in Naviigo's voice. Permission gets its own rationale rather
+  /// than a permission constant.
+  static String _reasonFor(StartTripStatus? status, String? gateMessage) {
+    if (status == StartTripStatus.permissionDenied) {
+      return 'Naviigo uses your location to make sure you are near the beginning '
+          'of this journey before Live Trip starts.';
+    }
+    return gateMessage ?? 'Waiting for location.';
+  }
+
+  static String _primaryLabel(StartTripStatus? status, bool isAtStart) {
+    if (isAtStart) return 'START JOURNEY';
+    return switch (status) {
+      StartTripStatus.servicesDisabled => 'OPEN LOCATION SETTINGS',
+      StartTripStatus.permissionPermanentlyDenied ||
+      StartTripStatus.locationRestricted =>
+        'OPEN SETTINGS',
+      StartTripStatus.permissionDenied => 'VERIFY YOUR START',
+      _ => 'TRY LOCATION AGAIN',
+    };
+  }
+
+  static IconData _primaryIcon(StartTripStatus? status, bool isAtStart) {
+    if (isAtStart) return Icons.play_arrow_rounded;
+    return switch (status) {
+      StartTripStatus.servicesDisabled ||
+      StartTripStatus.permissionPermanentlyDenied ||
+      StartTripStatus.locationRestricted =>
+        Icons.settings_outlined,
+      _ => Icons.my_location_rounded,
+    };
+  }
+
+  Future<void> _runPrimary(
+    BuildContext context,
+    StartTripStatus? status,
+    bool isAtStart,
+  ) async {
+    if (isAtStart) {
+      NavHaptics.fire(NavHaptic.medium);
+      await controller.startTrip(trip);
+      return;
+    }
+
+    NavHaptics.fire(NavHaptic.light);
+    switch (status) {
+      case StartTripStatus.servicesDisabled:
+        await _openSettings(context, deviceSettings: true);
+      case StartTripStatus.permissionPermanentlyDenied:
+      case StartTripStatus.locationRestricted:
+        await _openSettings(context, deviceSettings: false);
+      default:
+        await controller.refreshLocation();
+    }
+  }
+
+  /// Hand off to the OS. Only ever reached from an explicit action.
+  Future<void> _openSettings(
+    BuildContext context, {
+    required bool deviceSettings,
+  }) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final opened = deviceSettings
+        ? await controller.openLocationSettings()
+        : await controller.openAppSettings();
+    if (!opened) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Could not open settings on this device.'),
+        ),
+      );
+    }
+  }
+
+  /// Two journeys must not run at once, and the app will not end one behind the
+  /// traveller's back — they pick.
+  Widget _buildConflict(BuildContext context) {
+    final other = state.conflictingTrip;
+
+    return _SectionCard(
+      background: AppColors.surfaceWarm,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _SectionLabel(
+            'A JOURNEY IS ALREADY UNDER WAY',
+            icon: Icons.timelapse_rounded,
+          ),
+          const SizedBox(height: 10),
+          Text(
+            other == null
+                ? 'You already have a journey under way.'
+                : '${other.destName} is in progress. Finish or end it before '
+                    'starting this one.',
+            style: AppTypography.bodyMedium(color: AppColors.textPrimary)
+                .copyWith(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Only one journey can be in motion at a time.',
+            style: AppTypography.caption(color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 18),
+          SizedBox(
+            width: double.infinity,
+            child: _PrimaryButton(
+              label: 'VIEW ACTIVE TRIP',
+              icon: Icons.near_me_rounded,
+              color: AppColors.teal,
               onTap: () {
                 NavHaptics.fire(NavHaptic.light);
-                context.push('/itinerary', extra: trip);
+                context.push('/live-tracking');
               },
             ),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            'OTHER OPTIONS',
+            style: AppTypography.micro(color: AppColors.textTertiary),
+          ),
+          const SizedBox(height: 8),
+          if (other != null)
             _RecoveryRow(
-              label: 'Pre-Trip Mode',
-              icon: Icons.event_note_rounded,
-              onTap: onEnterPreTripMode,
+              label: 'End Current Trip',
+              icon: Icons.stop_circle_outlined,
+              onTap: () {
+                NavHaptics.fire(NavHaptic.medium);
+                controller.endTrip(other);
+              },
             ),
-          ],
+          _RecoveryRow(
+            label: 'Cancel',
+            icon: Icons.close_rounded,
+            onTap: () {
+              NavHaptics.fire(NavHaptic.light);
+              onLeavePreTripMode();
+            },
+          ),
         ],
       ),
     );
