@@ -495,20 +495,26 @@ class TripItineraryModel {
   }
 
   /// Inside the start window: from the day before the scheduled departure
-  /// onwards, and not yet begun, finished, or abandoned. Late starts stay
-  /// eligible — real journeys slip.
+  /// through to the end of the journey, and not yet begun, finished, or
+  /// abandoned. Late starts stay eligible — real journeys slip.
+  ///
+  /// Deliberately ignores [isCurrentlyActive]: arriving on the calendar is not
+  /// the same as having begun, and only [isActive] (or a server-written status)
+  /// may claim a journey is under way.
   bool get isEligibleToStart {
     if (status == TripStatus.eligibleToStart) return true;
     if (status != null && (status!.isTerminal || status == TripStatus.active)) {
       return false;
     }
-    if (isCurrentlyActive) return false;
+    if (isActive) return false;
     final start = parsedStartDate;
     if (start == null) return false;
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final windowOpens = DateTime(start.year, start.month, start.day)
-        .subtract(const Duration(days: 1));
+    final startDay = DateTime(start.year, start.month, start.day);
+    final windowOpens = startDay.subtract(const Duration(days: 1));
+    final journeyEnds = startDay.add(Duration(days: totalDays));
+    if (today.isAfter(journeyEnds)) return false;
     return !today.isBefore(windowOpens);
   }
 
@@ -521,7 +527,6 @@ class TripItineraryModel {
     if (isPast) return TripStatus.completed;
     if (isEligibleToStart) return TripStatus.eligibleToStart;
     if (isUpcoming) return TripStatus.upcoming;
-    if (parsedStartDate != null) return TripStatus.active;
     return TripStatus.planned;
   }
 
