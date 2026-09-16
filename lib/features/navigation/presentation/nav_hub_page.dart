@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/motion/nav_haptics.dart';
@@ -69,10 +70,19 @@ const List<_NavDestination> _destinations = [
   ),
 ];
 
-class NavHubPage extends ConsumerWidget {
+class NavHubPage extends ConsumerStatefulWidget {
   final Widget child;
 
   const NavHubPage({super.key, required this.child});
+
+  @override
+  ConsumerState<NavHubPage> createState() => _NavHubPageState();
+}
+
+class _NavHubPageState extends ConsumerState<NavHubPage> {
+  /// The last location the shell built for, so a route change can be told
+  /// apart from a rebuild for any other reason.
+  String? _lastPath;
 
   /// Which bottom-nav root owns the current location.
   int _calculateSelectedIndex(BuildContext context) {
@@ -111,8 +121,32 @@ class NavHubPage extends ConsumerWidget {
     return 0;
   }
 
+  /// Settles the chrome, skipping the write when it is already there — a
+  /// scroll emits this on every frame and the value only has two states.
+  void _setChrome(double value) {
+    if (ref.read(navChromeCollapseProvider) != value) {
+      ref.read(navChromeCollapseProvider.notifier).state = value;
+    }
+  }
+
+  /// A deliberate move — a tab tap, a drawer tap, any push into the shell —
+  /// brings the chrome back. Without this the bar stays tight into the next
+  /// screen, which has not been scrolled at all.
+  void _restoreChromeOnRouteChange(BuildContext context) {
+    final String path = GoRouterState.of(context).uri.path;
+    if (path == _lastPath) return;
+    _lastPath = path;
+
+    // Post-frame, because build is not allowed to write a provider.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _setChrome(0.0);
+    });
+  }
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
+    _restoreChromeOnRouteChange(context);
+
     final int currentIndex = _calculateSelectedIndex(context);
     final double collapse = ref.watch(navChromeCollapseProvider);
 
@@ -122,7 +156,39 @@ class NavHubPage extends ConsumerWidget {
       // One drawer for every in-shell route. Without this the app had no
       // reachable navigation beyond the five bottom-nav roots.
       drawer: const NavDrawer(),
-      body: child,
+      body: NotificationListener<ScrollNotification>(
+        // ── §4 / §60: scroll-driven chrome coordination ──────────────────────
+        // Scrolling into the page tightens the bar so the content gets the
+        // room; coming back up — or landing back at the top — returns it.
+        // Only the vertical axis counts: swiping the destination carousel or
+        // panning the map is not a reason to hide the navigation.
+        onNotification: (notification) {
+          if (notification.metrics.axis != Axis.vertical) return false;
+
+          if (notification is UserScrollNotification) {
+            // Intent, not position. This fires once per direction change and
+            // routinely *before* the first pixel has moved — so it has to be
+            // read on its own. Reordering it behind a position check is how
+            // the bar ends up never collapsing on the first drag.
+            switch (notification.direction) {
+              case ScrollDirection.reverse:
+                _setChrome(1.0);
+              case ScrollDirection.forward:
+                _setChrome(0.0);
+              case ScrollDirection.idle:
+                break; // Says nothing about intent.
+            }
+          } else if (notification is ScrollUpdateNotification &&
+              notification.metrics.pixels <=
+                  notification.metrics.minScrollExtent) {
+            // Back at the top there is nothing left to recede from.
+            _setChrome(0.0);
+          }
+
+          return false;
+        },
+        child: widget.child,
+      ),
       bottomNavigationBar: _NavBottomBar(
         currentIndex: currentIndex,
         collapse: collapse,

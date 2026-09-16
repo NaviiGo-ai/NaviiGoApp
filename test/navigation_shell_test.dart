@@ -26,6 +26,18 @@ Widget _probePage(String label) {
   );
 }
 
+/// A page long enough to actually scroll, so the shell's chrome coordination
+/// has something to listen to.
+Widget _scrollablePage() {
+  return Scaffold(
+    appBar: AppBar(leading: const NavHubLeading()),
+    body: ListView.builder(
+      itemCount: 60,
+      itemBuilder: (_, i) => SizedBox(height: 48, child: Text('row $i')),
+    ),
+  );
+}
+
 GoRouter _router({String initial = '/home'}) {
   return GoRouter(
     initialLocation: initial,
@@ -34,6 +46,7 @@ GoRouter _router({String initial = '/home'}) {
         builder: (context, state, child) => NavHubPage(child: child),
         routes: [
           GoRoute(path: '/home', builder: (_, __) => _probePage('HOME PAGE')),
+          GoRoute(path: '/scrollable', builder: (_, __) => _scrollablePage()),
           GoRoute(
             path: '/upcoming-trips',
             builder: (_, __) => _probePage('UPCOMING PAGE'),
@@ -129,6 +142,124 @@ void main() {
 
       expect(find.byIcon(Icons.menu_rounded), findsOneWidget);
       expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('NavHubPage chrome coordination (§4)', () {
+    /// A user drag, which is what emits UserScrollNotification.
+    Future<void> drag(WidgetTester tester, double dy) async {
+      await tester.drag(find.byType(ListView), Offset(0, dy));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('scrolling into the page compacts the bar, scrolling back '
+        'restores it', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp.router(
+            routerConfig: _router(initial: '/scrollable'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(NavHubPage)),
+      );
+
+      expect(container.read(navChromeCollapseProvider), 0.0, reason: 'at rest');
+
+      await drag(tester, -400);
+      expect(
+        container.read(navChromeCollapseProvider),
+        1.0,
+        reason: 'scrolling down should tighten the chrome',
+      );
+      // The labels are the visible consequence of that.
+      final label = tester.widget<AnimatedOpacity>(
+        find
+            .ancestor(
+              of: find.text('Home'),
+              matching: find.byType(AnimatedOpacity),
+            )
+            .first,
+      );
+      expect(label.opacity, 0.0);
+
+      await drag(tester, 200);
+      expect(
+        container.read(navChromeCollapseProvider),
+        0.0,
+        reason: 'scrolling up should bring the chrome back',
+      );
+      expect(
+        tester
+            .widget<AnimatedOpacity>(
+              find
+                  .ancestor(
+                    of: find.text('Home'),
+                    matching: find.byType(AnimatedOpacity),
+                  )
+                  .first,
+            )
+            .opacity,
+        1.0,
+      );
+    });
+
+    testWidgets('reaching the top restores the chrome even without a '
+        'scroll-up gesture', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp.router(
+            routerConfig: _router(initial: '/scrollable'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(NavHubPage)),
+      );
+
+      await drag(tester, -400);
+      expect(container.read(navChromeCollapseProvider), 1.0);
+
+      // Fling straight back to the top: the gesture direction on the way is
+      // still 'reverse' for part of the travel.
+      await tester.fling(find.byType(ListView), const Offset(0, 400), 3000);
+      await tester.pumpAndSettle();
+
+      expect(container.read(navChromeCollapseProvider), 0.0);
+    });
+
+    testWidgets('leaving for another route restores the chrome', (
+      tester,
+    ) async {
+      // The next screen has not been scrolled at all, so carrying a compacted
+      // bar into it would be a lie about its position.
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp.router(
+            routerConfig: _router(initial: '/scrollable'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(NavHubPage)),
+      );
+
+      await drag(tester, -400);
+      expect(container.read(navChromeCollapseProvider), 1.0);
+
+      await _openDrawer(tester);
+      await tester.tap(find.text('Upcoming Journeys'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('UPCOMING PAGE'), findsOneWidget);
+      expect(container.read(navChromeCollapseProvider), 0.0);
     });
   });
 }
