@@ -7,6 +7,7 @@ import '../../domain/models/destination_model.dart';
 import '../../domain/models/journal_article_model.dart';
 import '../../../trips/domain/models/trip_itinerary_model.dart';
 import '../../../profile/presentation/providers/user_provider.dart';
+import '../../../navigation/presentation/nav_hub_page.dart';
 
 /// ─────────────────────────────────────────────────────────
 /// 1. MINIMALIST EDITORIAL HEADER
@@ -28,10 +29,11 @@ class HomeJournalHeader extends ConsumerWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Left: Brand mark + Editorial wordmark
+          // Left: Navigation drawer + Brand mark + Editorial wordmark
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              const NavHubLeading(iconColor: AppColors.textPrimary),
               Image.asset(
                 'assets/brand/naviigo-mark-primary.png',
                 width: 26,

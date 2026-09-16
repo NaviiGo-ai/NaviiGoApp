@@ -7,7 +7,6 @@ import '../providers/dashboard_providers.dart';
 import '../widgets/home_journal_widgets.dart';
 import '../../../trips/presentation/providers/trip_provider.dart';
 import '../../../trips/domain/models/trip_itinerary_model.dart';
-import '../../../navigation/presentation/widgets/custom_drawer.dart';
 
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});
@@ -26,10 +25,12 @@ class HomePage extends ConsumerWidget {
     final destinations = destinationsAsync.valueOrNull ?? [];
     final articles = articlesAsync.valueOrNull ?? [];
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      drawer: const CustomDrawer(),
-      body: SafeArea(
+    // No Scaffold here: the shell (NavHubPage) owns the drawer and the bottom
+    // bar. Nesting one locally shadowed both, which is why Home was the only
+    // screen with a drawer and none of them had a way to open it.
+    return ColoredBox(
+      color: AppColors.background,
+      child: SafeArea(
         bottom: false,
         child: CustomScrollView(
           physics: const BouncingScrollPhysics(),

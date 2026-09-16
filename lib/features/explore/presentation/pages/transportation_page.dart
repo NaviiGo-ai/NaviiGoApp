@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/constants/master_destinations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
+import '../../../navigation/presentation/nav_hub_page.dart';
 
 class TransportationPage extends StatefulWidget {
   const TransportationPage({super.key});
@@ -30,16 +30,7 @@ class _TransportationPageState extends State<TransportationPage> {
       appBar: AppBar(
         backgroundColor: AppColors.background,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go('/home');
-            }
-          },
-        ),
+        leading: const NavHubLeading(),
         title: Text(
           'TRANSIT & MOBILITY',
           style: AppTypography.eyebrow(color: AppColors.brown),

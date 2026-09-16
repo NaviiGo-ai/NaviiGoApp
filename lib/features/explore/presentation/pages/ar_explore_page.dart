@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
+import '../../../navigation/presentation/nav_hub_page.dart';
 
 class ARExplorePage extends StatefulWidget {
   const ARExplorePage({super.key});
@@ -102,16 +102,7 @@ class _ARExplorePageState extends State<ARExplorePage> {
       appBar: AppBar(
         backgroundColor: const Color(0xFF141A1F),
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go('/home');
-            }
-          },
-        ),
+        leading: const NavHubLeading(iconColor: Colors.white),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

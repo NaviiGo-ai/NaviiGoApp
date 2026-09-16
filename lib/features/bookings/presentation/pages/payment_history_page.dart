@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../wallet/domain/models/wallet_transaction_model.dart';
 import '../../../wallet/presentation/providers/wallet_provider.dart';
+import '../../../navigation/presentation/nav_hub_page.dart';
 
 class PaymentHistoryPage extends ConsumerWidget {
   const PaymentHistoryPage({super.key});
@@ -20,16 +20,7 @@ class PaymentHistoryPage extends ConsumerWidget {
       appBar: AppBar(
         backgroundColor: AppColors.background,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go('/home');
-            }
-          },
-        ),
+        leading: const NavHubLeading(),
         title: Text(
           'TRAVEL WALLET & LEDGER',
           style: AppTypography.eyebrow(color: AppColors.brown),

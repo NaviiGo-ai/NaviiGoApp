@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../bookings/presentation/providers/passport_provider.dart';
 import '../../../trips/presentation/providers/trip_provider.dart';
 import '../../../trips/domain/models/trip_itinerary_model.dart';
+import '../../../navigation/presentation/nav_hub_page.dart';
 
 class PastTripsPage extends ConsumerWidget {
   const PastTripsPage({super.key});
@@ -20,14 +21,7 @@ class PastTripsPage extends ConsumerWidget {
         backgroundColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
-        leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_ios_new_rounded,
-            color: Colors.black,
-            size: 20,
-          ),
-          onPressed: () => context.go('/home'),
-        ),
+        leading: const NavHubLeading(iconColor: Colors.black),
         title: const Text(
           'Past Trips',
           style: TextStyle(

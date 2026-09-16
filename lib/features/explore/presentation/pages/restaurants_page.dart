@@ -5,6 +5,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../places/domain/models/place_model.dart';
 import '../../../places/presentation/providers/places_provider.dart';
+import '../../../navigation/presentation/nav_hub_page.dart';
 
 class RestaurantsPage extends ConsumerStatefulWidget {
   const RestaurantsPage({super.key});
@@ -63,16 +64,7 @@ class _RestaurantsPageState extends ConsumerState<RestaurantsPage> {
       appBar: AppBar(
         backgroundColor: AppColors.background,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go('/home');
-            }
-          },
-        ),
+        leading: const NavHubLeading(),
         title: Text(
           'CUISINE & DINING',
           style: AppTypography.eyebrow(color: AppColors.brown),

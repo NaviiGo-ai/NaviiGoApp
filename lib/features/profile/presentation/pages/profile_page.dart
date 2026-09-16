@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/auth/auth_provider.dart';
+import '../../../navigation/presentation/nav_hub_page.dart';
 import '../providers/user_provider.dart';
 
 class ProfilePage extends ConsumerWidget {
@@ -30,10 +31,7 @@ class ProfilePage extends ConsumerWidget {
         backgroundColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: textDark, size: 20),
-          onPressed: () => context.go('/home'),
-        ),
+        leading: const NavHubLeading(iconColor: textDark),
         title: const Text(
           'Profile & Account',
           style: TextStyle(

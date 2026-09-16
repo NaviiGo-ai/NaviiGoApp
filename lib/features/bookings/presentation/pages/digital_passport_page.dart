@@ -8,6 +8,7 @@ import '../providers/passport_provider.dart';
 import '../providers/saved_places_provider.dart';
 import '../../../trips/presentation/providers/trip_provider.dart';
 import '../../../trips/domain/models/trip_itinerary_model.dart';
+import '../../../navigation/presentation/nav_hub_page.dart';
 
 class DigitalPassportPage extends ConsumerWidget {
   const DigitalPassportPage({super.key});
@@ -33,20 +34,7 @@ class DigitalPassportPage extends ConsumerWidget {
         backgroundColor: AppColors.background,
         elevation: 0,
         scrolledUnderElevation: 0,
-        leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_ios_new_rounded,
-            color: AppColors.textPrimary,
-            size: 18,
-          ),
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go('/home');
-            }
-          },
-        ),
+        leading: const NavHubLeading(),
         title: Text(
           'Passport',
           style: AppTypography.editorialTitle(

@@ -10,6 +10,7 @@ import '../providers/trip_provider.dart';
 import '../../domain/models/trip_itinerary_model.dart';
 import '../widgets/itinerary_overview_widgets.dart';
 import '../../../../core/widgets/no_journey_state.dart';
+import '../../../navigation/presentation/nav_hub_page.dart';
 
 class GeneratedItineraryPage extends ConsumerStatefulWidget {
   final TripItineraryModel? trip;
@@ -47,20 +48,7 @@ class _GeneratedItineraryPageState
         appBar: AppBar(
           backgroundColor: AppColors.background,
           elevation: 0,
-          leading: IconButton(
-            icon: const Icon(
-              Icons.arrow_back_ios_new_rounded,
-              color: AppColors.textPrimary,
-              size: 18,
-            ),
-            onPressed: () {
-              if (context.canPop()) {
-                context.pop();
-              } else {
-                context.go('/home');
-              }
-            },
-          ),
+          leading: const NavHubLeading(),
         ),
         body: const NoJourneyState(
           title: 'No Itinerary Yet',
@@ -92,26 +80,7 @@ class _GeneratedItineraryPageState
             pinned: true,
             backgroundColor: AppColors.background,
             elevation: 0,
-            leading: Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: CircleAvatar(
-                backgroundColor: Colors.black.withAlpha((0.4 * 255).round()),
-                child: IconButton(
-                  icon: const Icon(
-                    Icons.arrow_back_ios_new_rounded,
-                    color: Colors.white,
-                    size: 18,
-                  ),
-                  onPressed: () {
-                    if (context.canPop()) {
-                      context.pop();
-                    } else {
-                      context.go('/home');
-                    }
-                  },
-                ),
-              ),
-            ),
+            leading: const NavHubLeading(iconColor: Colors.white),
             actions: [
               Padding(
                 padding: const EdgeInsets.all(8.0),

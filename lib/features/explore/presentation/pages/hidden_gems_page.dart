@@ -7,6 +7,7 @@ import '../../../../core/theme/app_typography.dart';
 import '../../../../core/auth/auth_provider.dart';
 import '../../../bookings/presentation/providers/saved_places_provider.dart';
 import '../../../bookings/domain/models/saved_place_model.dart';
+import '../../../navigation/presentation/nav_hub_page.dart';
 
 class HiddenGemItem {
   final String id;
@@ -165,16 +166,7 @@ class _HiddenGemsPageState extends ConsumerState<HiddenGemsPage> {
         backgroundColor: AppColors.surface,
         elevation: 0,
         scrolledUnderElevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: AppColors.brown),
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go('/home');
-            }
-          },
-        ),
+        leading: const NavHubLeading(iconColor: AppColors.brown),
         title: Text(
           'HIDDEN GEMS',
           style: AppTypography.editorialTitle(

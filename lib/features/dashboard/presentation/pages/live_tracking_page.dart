@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/widgets/no_journey_state.dart';
+import '../../../navigation/presentation/nav_hub_page.dart';
 import '../../../trips/presentation/providers/trip_provider.dart';
 import '../../../trips/domain/models/trip_itinerary_model.dart';
 
@@ -34,20 +34,7 @@ class _LiveTrackingPageState extends ConsumerState<LiveTrackingPage> {
         appBar: AppBar(
           backgroundColor: AppColors.background,
           elevation: 0,
-          leading: IconButton(
-            icon: const Icon(
-              Icons.arrow_back_ios_new_rounded,
-              color: AppColors.textPrimary,
-              size: 18,
-            ),
-            onPressed: () {
-              if (context.canPop()) {
-                context.pop();
-              } else {
-                context.go('/home');
-              }
-            },
-          ),
+          leading: const NavHubLeading(),
           title: Text(
             'LIVE TRACKING & BUDDY',
             style: AppTypography.eyebrow(color: AppColors.brown),
@@ -71,16 +58,7 @@ class _LiveTrackingPageState extends ConsumerState<LiveTrackingPage> {
       appBar: AppBar(
         backgroundColor: AppColors.background,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go('/home');
-            }
-          },
-        ),
+        leading: const NavHubLeading(),
         title: Text(
           'LIVE TRACKING & BUDDY',
           style: AppTypography.eyebrow(color: AppColors.brown),

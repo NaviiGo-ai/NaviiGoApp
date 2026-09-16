@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
@@ -11,6 +10,7 @@ import '../../../bookings/presentation/providers/passport_provider.dart';
 import '../../../bookings/domain/models/passport_model.dart';
 import '../../../../core/auth/auth_provider.dart';
 import '../../../../core/widgets/no_journey_state.dart';
+import '../../../navigation/presentation/nav_hub_page.dart';
 
 class OngoingTripsPage extends ConsumerStatefulWidget {
   const OngoingTripsPage({super.key});
@@ -59,20 +59,7 @@ class _OngoingTripsPageState extends ConsumerState<OngoingTripsPage>
         appBar: AppBar(
           backgroundColor: AppColors.background,
           elevation: 0,
-          leading: IconButton(
-            icon: const Icon(
-              Icons.arrow_back_ios_new_rounded,
-              color: AppColors.textPrimary,
-              size: 18,
-            ),
-            onPressed: () {
-              if (context.canPop()) {
-                context.pop();
-              } else {
-                context.go('/home');
-              }
-            },
-          ),
+          leading: const NavHubLeading(),
         ),
         body: const NoJourneyState(
           title: 'No Live Journey',
@@ -88,20 +75,7 @@ class _OngoingTripsPageState extends ConsumerState<OngoingTripsPage>
       appBar: AppBar(
         backgroundColor: AppColors.background,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_ios_new_rounded,
-            color: AppColors.textPrimary,
-            size: 18,
-          ),
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go('/home');
-            }
-          },
-        ),
+        leading: const NavHubLeading(),
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [

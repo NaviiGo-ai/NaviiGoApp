@@ -4,15 +4,16 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
+import '../../../../core/motion/nav_haptics.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/constants/master_destinations.dart';
 import '../../../../core/widgets/no_journey_state.dart';
 import '../../../trips/presentation/providers/trip_provider.dart';
 import '../../../trips/domain/models/trip_itinerary_model.dart';
+import '../../../navigation/presentation/nav_hub_page.dart';
 
 class StoryCreatorPage extends ConsumerStatefulWidget {
   const StoryCreatorPage({super.key});
@@ -69,24 +70,23 @@ class _StoryCreatorPageState extends ConsumerState<StoryCreatorPage> {
       appBar: AppBar(
         backgroundColor: AppColors.background,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_ios_new_rounded,
-            color: AppColors.textPrimary,
-            size: 18,
-          ),
-          onPressed: () {
-            if (_step > 0) {
-              setState(() => _step--);
-            } else {
-              if (context.canPop()) {
-                context.pop();
-              } else {
-                context.go('/home');
-              }
-            }
-          },
-        ),
+        // This leading is the wizard's step control, not a plain back button:
+        // inside the wizard it steps back through the scenes, and only at the
+        // first scene does it fall through to the shell drawer. Replacing it
+        // wholesale with NavHubLeading made step 0 unreachable.
+        leading: _step > 0
+            ? IconButton(
+                icon: const Icon(
+                  Icons.arrow_back_rounded,
+                  color: AppColors.textPrimary,
+                ),
+                tooltip: 'Previous step',
+                onPressed: () {
+                  NavHaptics.fire(NavHaptic.light);
+                  setState(() => _step--);
+                },
+              )
+            : const NavHubLeading(),
         title: Text(
           'Story Creator Beta',
           style: AppTypography.editorialTitle(

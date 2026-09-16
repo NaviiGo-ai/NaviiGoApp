@@ -402,9 +402,8 @@ class _TripPlannerPageState extends ConsumerState<TripPlannerPage>
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: JourneyLine(
                 totalSteps: _totalSteps,
-                currentStep: _currentStep,
+                currentStep: _currentStep.toDouble(),
                 mode: JourneyLineMode.plan,
-                progress: 1.0,
               ),
             ),
 

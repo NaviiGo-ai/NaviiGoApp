@@ -6,6 +6,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/auth/auth_provider.dart';
 import '../../../profile/presentation/providers/user_provider.dart';
+import '../../../navigation/presentation/nav_hub_page.dart';
 
 class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
@@ -40,16 +41,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         backgroundColor: AppColors.surface,
         elevation: 0,
         scrolledUnderElevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: AppColors.brown),
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go('/home');
-            }
-          },
-        ),
+        leading: const NavHubLeading(iconColor: AppColors.brown),
         title: Text(
           'SETTINGS',
           style: AppTypography.editorialTitle(

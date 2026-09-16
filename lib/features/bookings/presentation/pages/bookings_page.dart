@@ -6,6 +6,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../providers/bookings_provider.dart';
 import '../../domain/models/booking_model.dart';
+import '../../../navigation/presentation/nav_hub_page.dart';
 
 class BookingsPage extends ConsumerWidget {
   const BookingsPage({super.key});
@@ -19,16 +20,7 @@ class BookingsPage extends ConsumerWidget {
       appBar: AppBar(
         backgroundColor: AppColors.background,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go('/home');
-            }
-          },
-        ),
+        leading: const NavHubLeading(),
         title: Text(
           'BOOKINGS & VOUCHERS',
           style: AppTypography.eyebrow(color: AppColors.brown),

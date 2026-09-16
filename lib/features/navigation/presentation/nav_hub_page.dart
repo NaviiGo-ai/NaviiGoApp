@@ -1,19 +1,83 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/motion/nav_haptics.dart';
+import '../../../core/motion/nav_motion.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/auth/auth_provider.dart';
+
+/// ─────────────────────────────────────────────────────────────────────────────
+/// Scroll-driven chrome compaction (§4 / §60).
+/// 0.0 = fully expanded, 1.0 = fully compacted. Pages drive this from a scroll
+/// listener; the shell responds by tightening the bottom bar.
+/// ─────────────────────────────────────────────────────────────────────────────
+final navChromeCollapseProvider = StateProvider<double>((ref) => 0.0);
+
+/// The shell's own [ScaffoldState].
+///
+/// The drawer lives on the shell so all 27 in-shell routes share one, but each
+/// page nests its own [Scaffold] for its app bar — so `Scaffold.of(context)`
+/// from inside a page resolves to that inner Scaffold, which has no drawer.
+/// This key is how [NavHubLeading] reaches the real one.
+final GlobalKey<ScaffoldState> navHubScaffoldKey = GlobalKey<ScaffoldState>();
+
+class _NavDestination {
+  final IconData icon;
+  final IconData activeIcon;
+  final String label;
+  final String route;
+
+  const _NavDestination({
+    required this.icon,
+    required this.activeIcon,
+    required this.label,
+    required this.route,
+  });
+}
+
+const List<_NavDestination> _destinations = [
+  _NavDestination(
+    icon: Icons.cottage_outlined,
+    activeIcon: Icons.cottage_rounded,
+    label: 'Home',
+    route: '/home',
+  ),
+  _NavDestination(
+    icon: Icons.explore_outlined,
+    activeIcon: Icons.explore_rounded,
+    label: 'Explore',
+    route: '/explore-discover',
+  ),
+  _NavDestination(
+    icon: Icons.alt_route_outlined,
+    activeIcon: Icons.alt_route_rounded,
+    label: 'Trips',
+    route: '/trips',
+  ),
+  _NavDestination(
+    icon: Icons.card_membership_outlined,
+    activeIcon: Icons.card_membership_rounded,
+    label: 'Passport',
+    route: '/digital-passport',
+  ),
+  _NavDestination(
+    icon: Icons.person_outline_rounded,
+    activeIcon: Icons.person_rounded,
+    label: 'Profile',
+    route: '/profile',
+  ),
+];
 
 class NavHubPage extends ConsumerWidget {
   final Widget child;
 
   const NavHubPage({super.key, required this.child});
 
+  /// Which bottom-nav root owns the current location.
   int _calculateSelectedIndex(BuildContext context) {
     final String location = GoRouterState.of(context).uri.path;
     if (location.startsWith('/explore') ||
-        location.startsWith('/explore-discover') ||
         location.startsWith('/hidden-gems') ||
         location.startsWith('/restaurants') ||
         location.startsWith('/transportation') ||
@@ -44,143 +108,220 @@ class NavHubPage extends ConsumerWidget {
         location.startsWith('/help-support')) {
       return 4;
     }
-    return 0; // Default: Home
-  }
-
-  void _onItemTapped(int index, BuildContext context) {
-    switch (index) {
-      case 0:
-        context.go('/home');
-        break;
-      case 1:
-        context.go('/explore-discover');
-        break;
-      case 2:
-        context.go('/trips');
-        break;
-      case 3:
-        context.go('/digital-passport');
-        break;
-      case 4:
-        context.go('/profile');
-        break;
-    }
+    return 0;
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final int currentIndex = _calculateSelectedIndex(context);
+    final double collapse = ref.watch(navChromeCollapseProvider);
 
     return Scaffold(
+      key: navHubScaffoldKey,
       backgroundColor: AppColors.background,
+      // One drawer for every in-shell route. Without this the app had no
+      // reachable navigation beyond the five bottom-nav roots.
+      drawer: const NavDrawer(),
       body: child,
-      bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          color: AppColors.surface,
-          border: Border(top: BorderSide(color: AppColors.border, width: 1)),
-        ),
-        child: SafeArea(
-          top: false,
-          child: SizedBox(
-            height: 62,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildNavItem(
-                  context,
-                  0,
-                  Icons.cottage_outlined,
-                  Icons.cottage_rounded,
-                  'Home',
-                  currentIndex,
-                ),
-                _buildNavItem(
-                  context,
-                  1,
-                  Icons.explore_outlined,
-                  Icons.explore_rounded,
-                  'Explore',
-                  currentIndex,
-                ),
-                _buildNavItem(
-                  context,
-                  2,
-                  Icons.alt_route_outlined,
-                  Icons.alt_route_rounded,
-                  'Trips',
-                  currentIndex,
-                ),
-                _buildNavItem(
-                  context,
-                  3,
-                  Icons.card_membership_outlined,
-                  Icons.card_membership_rounded,
-                  'Passport',
-                  currentIndex,
-                ),
-                _buildNavItem(
-                  context,
-                  4,
-                  Icons.person_outline_rounded,
-                  Icons.person_rounded,
-                  'Profile',
-                  currentIndex,
-                ),
-              ],
-            ),
-          ),
+      bottomNavigationBar: _NavBottomBar(
+        currentIndex: currentIndex,
+        collapse: collapse,
+      ),
+    );
+  }
+}
+
+/// ─────────────────────────────────────────────────────────────────────────────
+/// BOTTOM NAVIGATION (§4)
+///
+/// The selection indicator travels between tabs rather than blinking on and
+/// off — so switching roots reads as moving along the nav, not as five separate
+/// buttons each toggling. Icons scale 6% (never a giant jump), labels settle,
+/// and each tap gives a light haptic.
+/// ─────────────────────────────────────────────────────────────────────────────
+class _NavBottomBar extends StatelessWidget {
+  final int currentIndex;
+  final double collapse;
+
+  const _NavBottomBar({required this.currentIndex, required this.collapse});
+
+  @override
+  Widget build(BuildContext context) {
+    final double height = lerpDouble(62, 50, collapse);
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppColors.surface,
+        border: Border(top: BorderSide(color: AppColors.border, width: 1)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: TweenAnimationBuilder<double>(
+          tween: Tween<double>(begin: height, end: height),
+          duration: NavMotion.standard,
+          curve: NavMotion.settle,
+          builder: (context, h, _) {
+            return SizedBox(
+              height: h,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final double itemWidth =
+                      constraints.maxWidth / _destinations.length;
+
+                  return Stack(
+                    children: [
+                      // Travelling selection indicator.
+                      AnimatedPositioned(
+                        duration: NavReduce.duration(
+                          context,
+                          NavMotion.standard,
+                        ),
+                        curve: NavMotion.settle,
+                        left: (currentIndex * itemWidth) + (itemWidth - 48) / 2,
+                        top: 6,
+                        child: Container(
+                          width: 48,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            color: AppColors.cream.withAlpha(150),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                      ),
+                      Row(
+                        children: [
+                          for (int i = 0; i < _destinations.length; i++)
+                            _NavItem(
+                              destination: _destinations[i],
+                              isSelected: i == currentIndex,
+                              collapse: collapse,
+                            ),
+                        ],
+                      ),
+                    ],
+                  );
+                },
+              ),
+            );
+          },
         ),
       ),
     );
   }
 
-  Widget _buildNavItem(
-    BuildContext context,
-    int index,
-    IconData inactiveIcon,
-    IconData activeIcon,
-    String label,
-    int currentIndex,
-  ) {
-    final bool isSelected = currentIndex == index;
+  /// Linear interpolation without pulling in `dart:ui` just for `lerpDouble`.
+  static double lerpDouble(double a, double b, double t) => a + ((b - a) * t);
+}
+
+class _NavItem extends StatelessWidget {
+  final _NavDestination destination;
+  final bool isSelected;
+  final double collapse;
+
+  const _NavItem({
+    required this.destination,
+    required this.isSelected,
+    required this.collapse,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     final Color color = isSelected
         ? AppColors.primary
         : AppColors.textSecondary;
 
     return Expanded(
-      child: InkWell(
-        onTap: () => _onItemTapped(index, context),
-        splashColor: Colors.transparent,
-        highlightColor: Colors.transparent,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? AppColors.cream.withAlpha(120)
-                    : Colors.transparent,
-                borderRadius: BorderRadius.circular(16),
+      child: Semantics(
+        selected: isSelected,
+        button: true,
+        label: destination.label,
+        child: InkWell(
+          onTap: () {
+            NavHaptics.fire(NavHaptic.light);
+            // Already here — re-tapping a root should not rebuild the world.
+            if (GoRouterState.of(context).uri.path != destination.route) {
+              context.go(destination.route);
+            }
+          },
+          splashColor: Colors.transparent,
+          highlightColor: Colors.transparent,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              AnimatedScale(
+                scale: isSelected ? NavMotion.navIconScale : 1.0,
+                duration: NavReduce.duration(context, NavMotion.fast),
+                curve: NavMotion.response,
+                child: Icon(
+                  isSelected ? destination.activeIcon : destination.icon,
+                  color: color,
+                  size: 22,
+                ),
               ),
-              child: Icon(
-                isSelected ? activeIcon : inactiveIcon,
-                color: color,
-                size: 22,
+              // Label recedes as chrome compacts and returns on scroll-up.
+              AnimatedOpacity(
+                opacity: (1.0 - collapse).clamp(0.0, 1.0),
+                duration: NavReduce.duration(context, NavMotion.fast),
+                child: AnimatedDefaultTextStyle(
+                  duration: NavReduce.duration(context, NavMotion.fast),
+                  curve: NavMotion.response,
+                  style: AppTypography.micro(color: color).copyWith(
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                    fontSize: 10.5,
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(destination.label),
+                  ),
+                ),
               ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: AppTypography.micro(color: color).copyWith(
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                fontSize: 10.5,
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
+    );
+  }
+}
+
+/// ─────────────────────────────────────────────────────────────────────────────
+/// SHELL APP-BAR LEADING (§4)
+///
+/// Back when there is genuinely somewhere to go back to; otherwise the drawer,
+/// because that is the only way to reach the routes the five roots don't cover.
+/// ─────────────────────────────────────────────────────────────────────────────
+class NavHubLeading extends StatelessWidget {
+  final Color? iconColor;
+
+  const NavHubLeading({super.key, this.iconColor});
+
+  @override
+  Widget build(BuildContext context) {
+    final Color color = iconColor ?? AppColors.textPrimary;
+
+    // `context.canPop()` resolves through GoRouter.of(), which asserts that a
+    // GoRouter ancestor exists. Pages are also built outside the router (widget
+    // tests, embedded previews), so probe for it instead of assuming.
+    final GoRouter? router = GoRouter.maybeOf(context);
+
+    if (router != null && router.canPop()) {
+      return IconButton(
+        icon: Icon(Icons.arrow_back_rounded, color: color),
+        tooltip: 'Back',
+        onPressed: () => router.pop(),
+      );
+    }
+
+    return IconButton(
+      icon: Icon(Icons.menu_rounded, color: color),
+      tooltip: 'Open navigation',
+      onPressed: () {
+        final ScaffoldState? shell = navHubScaffoldKey.currentState;
+        if (shell != null && shell.hasDrawer) {
+          shell.openDrawer();
+        } else {
+          Scaffold.maybeOf(context)?.openDrawer();
+        }
+      },
     );
   }
 }
@@ -259,10 +400,7 @@ class NavDrawer extends ConsumerWidget {
                     currentRoute,
                   ),
 
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    child: Divider(color: AppColors.border, height: 1),
-                  ),
+                  const _DrawerDivider(),
 
                   _buildSectionHeader('DISCOVER'),
                   _buildDrawerItem(
@@ -301,10 +439,7 @@ class NavDrawer extends ConsumerWidget {
                     currentRoute,
                   ),
 
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    child: Divider(color: AppColors.border, height: 1),
-                  ),
+                  const _DrawerDivider(),
 
                   _buildSectionHeader('TRAVEL WALLET'),
                   _buildDrawerItem(
@@ -343,10 +478,7 @@ class NavDrawer extends ConsumerWidget {
                     currentRoute,
                   ),
 
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    child: Divider(color: AppColors.border, height: 1),
-                  ),
+                  const _DrawerDivider(),
 
                   _buildSectionHeader('ACCOUNT'),
                   _buildDrawerItem(
@@ -424,23 +556,46 @@ class NavDrawer extends ConsumerWidget {
     return ListTile(
       dense: true,
       visualDensity: VisualDensity.compact,
-      leading: Icon(icon, color: color, size: 20),
-      title: Text(
-        title,
-        style: AppTypography.bodyMedium(
+      leading: AnimatedSwitcher(
+        duration: NavReduce.duration(context, NavMotion.fast),
+        child: Icon(
+          icon,
+          key: ValueKey('${icon.codePoint}_$isSelected'),
           color: color,
-        ).copyWith(fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500),
+          size: 20,
+        ),
+      ),
+      title: AnimatedDefaultTextStyle(
+        duration: NavReduce.duration(context, NavMotion.fast),
+        curve: NavMotion.response,
+        style: AppTypography.bodyMedium(color: color).copyWith(
+          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+        ),
+        child: Text(title),
       ),
       selected: isSelected,
       selectedTileColor: AppColors.cream.withAlpha(90),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
       onTap: () {
+        NavHaptics.fire(NavHaptic.light);
         Navigator.of(context).pop();
         if (context.mounted) {
           context.go(route);
         }
       },
+    );
+  }
+}
+
+class _DrawerDivider extends StatelessWidget {
+  const _DrawerDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Divider(color: AppColors.border, height: 1),
     );
   }
 }

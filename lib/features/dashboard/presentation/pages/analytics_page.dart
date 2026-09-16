@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../navigation/presentation/nav_hub_page.dart';
 
 class AnalyticsPage extends StatelessWidget {
   const AnalyticsPage({super.key});
@@ -10,6 +11,9 @@ class AnalyticsPage extends StatelessWidget {
         0xFF0F1117,
       ), // Premium dark mode for analytics
       appBar: AppBar(
+        // This page declared no leading at all, so it had no route back to the
+        // rest of the app — the same gap the shell drawer fixes everywhere else.
+        leading: const NavHubLeading(iconColor: Colors.white),
         title: const Text(
           'Travel Analytics',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
