@@ -8,7 +8,9 @@ import '../providers/passport_provider.dart';
 import '../providers/saved_places_provider.dart';
 import '../../../trips/presentation/providers/trip_provider.dart';
 import '../../../trips/domain/models/trip_itinerary_model.dart';
+import '../../../places/domain/models/place_model.dart';
 import '../../../navigation/presentation/nav_hub_page.dart';
+import '../../../../core/constants/master_destinations.dart';
 
 class DigitalPassportPage extends ConsumerWidget {
   const DigitalPassportPage({super.key});
@@ -230,7 +232,31 @@ class DigitalPassportPage extends ConsumerWidget {
                   itemBuilder: (context, idx) {
                     final place = savedPlaces[idx];
                     return GestureDetector(
-                      onTap: () => context.push('/destination/${place.id}'),
+                      onTap: () {
+                        // A saved place is either a top-level curated
+                        // destination (Varanasi, Jaipur, ...) or a specific
+                        // venue (a restaurant, a monument, a ghat). Each has
+                        // its own route; routing a venue into `/destination/:id`
+                        // asks the destination page to render a restaurant as
+                        // a city.
+                        final isCity =
+                            findDestinationById(place.id) != null ||
+                            place.type.toLowerCase() == 'destination';
+                        if (isCity) {
+                          context.push('/destination/${place.id}');
+                        } else {
+                          context.push(
+                            '/place-details',
+                            extra: PlaceModel(
+                              id: place.id,
+                              name: place.name,
+                              photoUrl: place.image,
+                              vicinity: place.location ?? '',
+                              types: [place.type],
+                            ),
+                          );
+                        }
+                      },
                       child: Container(
                         width: 180,
                         margin: const EdgeInsets.only(right: 10),

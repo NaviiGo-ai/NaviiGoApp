@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:naviigo_app/core/constants/master_destinations.dart';
 import 'package:naviigo_app/features/profile/domain/models/user_profile_model.dart';
 import 'package:naviigo_app/features/profile/domain/models/user_preferences_model.dart';
 import 'package:naviigo_app/features/bookings/domain/models/passport_model.dart';
@@ -109,6 +110,56 @@ void main() {
       );
       expect(booking.pnr, '6E-4521');
       expect(booking.totalPrice, 4200.0);
+    });
+
+    test('Saved place routing disambiguates city destinations from venue places', () {
+      expect(findDestinationById('jaipur') != null, isTrue);
+      expect(findDestinationById('place_city_palace') != null, isFalse);
+
+      const cityPlace = SavedPlaceModel(
+        id: 'jaipur',
+        name: 'Jaipur',
+        type: 'destination',
+      );
+      const venuePlace = SavedPlaceModel(
+        id: 'place_city_palace',
+        name: 'City Palace',
+        type: 'Heritage Site',
+      );
+
+      final isCity1 =
+          findDestinationById(cityPlace.id) != null ||
+          cityPlace.type.toLowerCase() == 'destination';
+      final isCity2 =
+          findDestinationById(venuePlace.id) != null ||
+          venuePlace.type.toLowerCase() == 'destination';
+
+      expect(isCity1, isTrue);
+      expect(isCity2, isFalse);
+    });
+
+    test('Saved place routing disambiguates city destinations from venue places', () {
+      expect(findDestinationById('jaipur') != null, isTrue);
+      expect(findDestinationById('place_city_palace') != null, isFalse);
+
+      const cityPlace = SavedPlaceModel(
+        id: 'jaipur',
+        name: 'Jaipur',
+        type: 'destination',
+      );
+      const venuePlace = SavedPlaceModel(
+        id: 'place_city_palace',
+        name: 'City Palace',
+        type: 'Heritage Site',
+      );
+
+      final isCity1 = findDestinationById(cityPlace.id) != null ||
+          cityPlace.type.toLowerCase() == 'destination';
+      final isCity2 = findDestinationById(venuePlace.id) != null ||
+          venuePlace.type.toLowerCase() == 'destination';
+
+      expect(isCity1, isTrue);
+      expect(isCity2, isFalse);
     });
   });
 }

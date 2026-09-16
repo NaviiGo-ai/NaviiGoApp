@@ -1,5 +1,7 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:naviigo_app/features/trips/domain/models/trip_itinerary_model.dart';
+import 'package:naviigo_app/features/trips/presentation/widgets/itinerary_overview_widgets.dart';
 
 void main() {
   group('TripItineraryModel Unit Tests', () {
@@ -158,5 +160,62 @@ void main() {
       });
       expect(shared.isPublic, isTrue);
     });
+
+    testWidgets(
+      'ItineraryStatsRow renders truthful 0 STOPS when itinerary has no activities',
+      (tester) async {
+        final emptyTrip = TripItineraryModel.fromMap('trip-empty-stops', {
+          'destName': 'Varanasi',
+          'uuid': 'trip-empty-stops',
+          'form': {'days': 5, 'budget': 20000},
+        });
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: ItineraryStatsRow(trip: emptyTrip),
+            ),
+          ),
+        );
+
+        expect(find.text('0 STOPS'), findsOneWidget);
+        expect(find.text('15 STOPS'), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'ItineraryStatsRow calculates exact total waypoint count across days',
+      (tester) async {
+        final trip = TripItineraryModel.fromMap('trip-with-stops', {
+          'destName': 'Jaipur',
+          'uuid': 'trip-with-stops',
+          'dayPlans': [
+            {
+              'day': 1,
+              'activities': [
+                {'title': 'Amber Fort'},
+                {'title': 'City Palace'},
+              ],
+            },
+            {
+              'day': 2,
+              'activities': [
+                {'title': 'Hawa Mahal'},
+              ],
+            },
+          ],
+        });
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: ItineraryStatsRow(trip: trip),
+            ),
+          ),
+        );
+
+        expect(find.text('3 STOPS'), findsOneWidget);
+      },
+    );
   });
 }

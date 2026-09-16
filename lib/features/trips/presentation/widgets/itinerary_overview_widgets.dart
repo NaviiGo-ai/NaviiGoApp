@@ -227,7 +227,6 @@ class ItineraryStatsRow extends StatelessWidget {
     for (final dp in trip.dayPlans) {
       totalWaypoints += dp.activities.length;
     }
-    if (totalWaypoints == 0) totalWaypoints = trip.totalDays * 3;
 
     final budget = trip.form['budget'] ?? 18500;
     final budgetFormatted =
