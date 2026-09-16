@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../navigation/presentation/nav_hub_page.dart';
+import '../../../../core/motion/nav_haptics.dart';
 
 class ARExplorePage extends StatefulWidget {
   const ARExplorePage({super.key});
@@ -70,7 +70,7 @@ class _ARExplorePageState extends State<ARExplorePage> {
     final uri = Uri.parse(
       'https://www.google.com/maps/dir/?api=1&destination=$lat,$lng&travelmode=driving',
     );
-    HapticFeedback.lightImpact();
+    NavHaptics.fire(NavHaptic.light);
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     } else if (mounted) {
@@ -87,7 +87,7 @@ class _ARExplorePageState extends State<ARExplorePage> {
     final uri = Uri.parse(
       'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent('$name, Jaipur, Rajasthan')}',
     );
-    HapticFeedback.lightImpact();
+    NavHaptics.fire(NavHaptic.light);
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
@@ -132,11 +132,7 @@ class _ARExplorePageState extends State<ARExplorePage> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(
-                  Icons.map_rounded,
-                  color: AppColors.teal,
-                  size: 14,
-                ),
+                const Icon(Icons.map_rounded, color: AppColors.teal, size: 14),
                 const SizedBox(width: 4),
                 Text(
                   '${_landmarks.length} SITES',
@@ -183,7 +179,7 @@ class _ARExplorePageState extends State<ARExplorePage> {
                     ),
                     selected: isSelected,
                     onSelected: (_) {
-                      HapticFeedback.selectionClick();
+                      NavHaptics.fire(NavHaptic.light);
                       setState(() => _selectedLandmarkIndex = index);
                     },
                     backgroundColor: const Color(0xFF1E262E),
@@ -259,7 +255,8 @@ class _ARExplorePageState extends State<ARExplorePage> {
                                         borderRadius: BorderRadius.circular(6),
                                       ),
                                       child: Text(
-                                        (selected['category'] as String).toUpperCase(),
+                                        (selected['category'] as String)
+                                            .toUpperCase(),
                                         style: AppTypography.micro(
                                           color: AppColors.teal,
                                         ).copyWith(fontWeight: FontWeight.bold),
@@ -364,9 +361,8 @@ class _ARExplorePageState extends State<ARExplorePage> {
                             children: [
                               Expanded(
                                 child: OutlinedButton.icon(
-                                  onPressed: () => _openSearch(
-                                    selected['name'] as String,
-                                  ),
+                                  onPressed: () =>
+                                      _openSearch(selected['name'] as String),
                                   icon: const Icon(
                                     Icons.place_outlined,
                                     size: 18,
@@ -379,7 +375,9 @@ class _ARExplorePageState extends State<ARExplorePage> {
                                     ),
                                   ),
                                   style: OutlinedButton.styleFrom(
-                                    side: const BorderSide(color: Colors.white24),
+                                    side: const BorderSide(
+                                      color: Colors.white24,
+                                    ),
                                     padding: const EdgeInsets.symmetric(
                                       vertical: 14,
                                     ),

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/auth/auth_provider.dart';
@@ -8,6 +7,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../profile/domain/models/user_preferences_model.dart';
 import '../../../profile/presentation/providers/user_provider.dart';
+import '../../../../core/motion/nav_haptics.dart';
 
 class VibeMatchPage extends ConsumerStatefulWidget {
   const VibeMatchPage({super.key});
@@ -64,7 +64,7 @@ class _VibeMatchPageState extends ConsumerState<VibeMatchPage> {
       return;
     }
 
-    HapticFeedback.lightImpact();
+    NavHaptics.fire(NavHaptic.light);
     if (liked) {
       _likedIds.add(_vibes[_currentIndex].id);
     }

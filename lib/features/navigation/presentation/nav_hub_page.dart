@@ -568,9 +568,9 @@ class NavDrawer extends ConsumerWidget {
       title: AnimatedDefaultTextStyle(
         duration: NavReduce.duration(context, NavMotion.fast),
         curve: NavMotion.response,
-        style: AppTypography.bodyMedium(color: color).copyWith(
-          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-        ),
+        style: AppTypography.bodyMedium(
+          color: color,
+        ).copyWith(fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500),
         child: Text(title),
       ),
       selected: isSelected,

@@ -170,10 +170,7 @@ class _JourneyLineState extends State<JourneyLine>
       // On the first build begin == end, so nothing moves. When currentStep
       // changes, the line animates from wherever it currently is to the new
       // waypoint — progress, rather than a cut.
-      tween: Tween<double>(
-        begin: widget.currentStep,
-        end: widget.currentStep,
-      ),
+      tween: Tween<double>(begin: widget.currentStep, end: widget.currentStep),
       duration: NavReduce.geometry(context, NavMotion.editorial),
       curve: NavMotion.settle,
       builder: (context, animatedStep, _) {
@@ -284,8 +281,7 @@ class _JourneyLinePainter extends CustomPainter {
 
       // A finished journey is entirely behind you: nothing is "upcoming".
       final bool settled = palette.historical || i < targetStep;
-      final bool isActive =
-          !palette.historical && (i - targetStep).abs() < 0.5;
+      final bool isActive = !palette.historical && (i - targetStep).abs() < 0.5;
 
       if (isActive) {
         // Halo — pulses only while actually travelling.
@@ -301,11 +297,7 @@ class _JourneyLinePainter extends CustomPainter {
         canvas.drawCircle(centre, _radius, Paint()..color = palette.completed);
         canvas.drawCircle(centre, 2.5, Paint()..color = Colors.white);
       } else {
-        canvas.drawCircle(
-          centre,
-          _radius - 1,
-          Paint()..color = palette.future,
-        );
+        canvas.drawCircle(centre, _radius - 1, Paint()..color = palette.future);
         canvas.drawCircle(
           centre,
           _radius - 1,

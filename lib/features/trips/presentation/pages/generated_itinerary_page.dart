@@ -11,6 +11,7 @@ import '../../domain/models/trip_itinerary_model.dart';
 import '../widgets/itinerary_overview_widgets.dart';
 import '../../../../core/widgets/no_journey_state.dart';
 import '../../../navigation/presentation/nav_hub_page.dart';
+import '../../../../core/motion/nav_haptics.dart';
 
 class GeneratedItineraryPage extends ConsumerStatefulWidget {
   final TripItineraryModel? trip;
@@ -98,7 +99,7 @@ class _GeneratedItineraryPageState
                           text: 'https://naviigo.com/itinerary/${trip.uuid}',
                         ),
                       );
-                      HapticFeedback.lightImpact();
+                      NavHaptics.fire(NavHaptic.light);
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text(
@@ -245,7 +246,7 @@ class _GeneratedItineraryPageState
                       totalCount: dayPlans.length,
                       dayPlan: dp,
                       onExploreDay: () {
-                        HapticFeedback.mediumImpact();
+                        NavHaptics.fire(NavHaptic.medium);
                         setState(() {
                           _selectedDayIndex = idx;
                           _viewMode = 1; // Switch into Day in Motion
@@ -449,7 +450,7 @@ class _GeneratedItineraryPageState
                 flex: 3,
                 child: ElevatedButton.icon(
                   onPressed: () async {
-                    HapticFeedback.heavyImpact();
+                    NavHaptics.fire(NavHaptic.strong);
                     final uid = FirebaseClient.auth.currentUser?.uid;
                     if (uid != null) {
                       await ref
@@ -481,7 +482,7 @@ class _GeneratedItineraryPageState
                 flex: 2,
                 child: OutlinedButton.icon(
                   onPressed: () {
-                    HapticFeedback.lightImpact();
+                    NavHaptics.fire(NavHaptic.light);
                     context.push('/transportation');
                   },
                   icon: const Icon(
@@ -892,7 +893,7 @@ class _GeneratedItineraryPageState
                   width: double.infinity,
                   child: ElevatedButton.icon(
                     onPressed: () {
-                      HapticFeedback.lightImpact();
+                      NavHaptics.fire(NavHaptic.light);
                       Navigator.pop(context);
                       final firstStop = acts.first.title;
                       final target = '$firstStop, ${trip.destName}';

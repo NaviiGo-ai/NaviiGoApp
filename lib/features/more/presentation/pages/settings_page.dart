@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -7,6 +6,7 @@ import '../../../../core/theme/app_typography.dart';
 import '../../../../core/auth/auth_provider.dart';
 import '../../../profile/presentation/providers/user_provider.dart';
 import '../../../navigation/presentation/nav_hub_page.dart';
+import '../../../../core/motion/nav_haptics.dart';
 
 class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
@@ -56,7 +56,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           // Profile quick link card
           GestureDetector(
             onTap: () {
-              HapticFeedback.selectionClick();
+              NavHaptics.fire(NavHaptic.light);
               context.push('/profile');
             },
             child: Container(
@@ -136,7 +136,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               Icons.notifications_outlined,
               _notifications,
               (val) {
-                HapticFeedback.selectionClick();
+                NavHaptics.fire(NavHaptic.light);
                 setState(() => _notifications = val);
               },
             ),
@@ -146,7 +146,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               Icons.location_on_outlined,
               _location,
               (val) {
-                HapticFeedback.selectionClick();
+                NavHaptics.fire(NavHaptic.light);
                 setState(() => _location = val);
               },
             ),
@@ -211,7 +211,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           Center(
             child: TextButton.icon(
               onPressed: () async {
-                HapticFeedback.lightImpact();
+                NavHaptics.fire(NavHaptic.light);
                 final confirm = await showDialog<bool>(
                   context: context,
                   builder: (ctx) => AlertDialog(
@@ -339,7 +339,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   Widget _buildLinkRow(String title, IconData icon, VoidCallback onTap) {
     return InkWell(
       onTap: () {
-        HapticFeedback.selectionClick();
+        NavHaptics.fire(NavHaptic.light);
         onTap();
       },
       borderRadius: BorderRadius.circular(16),

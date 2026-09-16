@@ -45,28 +45,35 @@ abstract final class NavRouteTransition {
       reverseTransitionDuration: _reverseDurationFor(kind),
       transitionsBuilder: (context, animation, secondaryAnimation, child) {
         final reduced = NavReduce.of(context);
-        return _build(context, animation, secondaryAnimation, child, kind, reduced);
+        return _build(
+          context,
+          animation,
+          secondaryAnimation,
+          child,
+          kind,
+          reduced,
+        );
       },
     );
   }
 
   static Duration _durationFor(NavRouteKind kind) => switch (kind) {
-        // Long enough for the shared image to actually travel.
-        NavRouteKind.shared => NavMotion.editorial,
-        NavRouteKind.push => NavMotion.standard,
-        NavRouteKind.tab => NavMotion.fast,
-        NavRouteKind.expand => NavMotion.editorial,
-        NavRouteKind.memory => NavMotion.immersive,
-      };
+    // Long enough for the shared image to actually travel.
+    NavRouteKind.shared => NavMotion.editorial,
+    NavRouteKind.push => NavMotion.standard,
+    NavRouteKind.tab => NavMotion.fast,
+    NavRouteKind.expand => NavMotion.editorial,
+    NavRouteKind.memory => NavMotion.immersive,
+  };
 
   static Duration _reverseDurationFor(NavRouteKind kind) => switch (kind) {
-        // Returns are always allowed to be quicker than arrivals.
-        NavRouteKind.shared => NavMotion.standard,
-        NavRouteKind.push => NavMotion.fast,
-        NavRouteKind.tab => NavMotion.fast,
-        NavRouteKind.expand => NavMotion.standard,
-        NavRouteKind.memory => NavMotion.editorial,
-      };
+    // Returns are always allowed to be quicker than arrivals.
+    NavRouteKind.shared => NavMotion.standard,
+    NavRouteKind.push => NavMotion.fast,
+    NavRouteKind.tab => NavMotion.fast,
+    NavRouteKind.expand => NavMotion.standard,
+    NavRouteKind.memory => NavMotion.editorial,
+  };
 
   static Widget _build(
     BuildContext context,
@@ -79,10 +86,7 @@ abstract final class NavRouteTransition {
     // ── Reduced motion (§65): state changes stay legible, travel stops. ──
     if (reduced) {
       return FadeTransition(
-        opacity: CurvedAnimation(
-          parent: animation,
-          curve: NavMotion.response,
-        ),
+        opacity: CurvedAnimation(parent: animation, curve: NavMotion.response),
         child: child,
       );
     }
@@ -107,7 +111,10 @@ abstract final class NavRouteTransition {
           reverseCurve: NavMotion.response,
         );
         return FadeTransition(
-          opacity: CurvedAnimation(parent: animation, curve: NavMotion.response),
+          opacity: CurvedAnimation(
+            parent: animation,
+            curve: NavMotion.response,
+          ),
           child: SlideTransition(
             position: Tween<Offset>(
               // Shallow: this is depth, not a deck of cards.
@@ -133,7 +140,10 @@ abstract final class NavRouteTransition {
           opacity: incoming,
           child: ScaleTransition(
             scale: Tween<double>(begin: 0.985, end: 1.0).animate(incoming),
-            child: FadeTransition(opacity: Tween<double>(begin: 1.0, end: 0.0).animate(outgoing), child: child),
+            child: FadeTransition(
+              opacity: Tween<double>(begin: 1.0, end: 0.0).animate(outgoing),
+              child: child,
+            ),
           ),
         );
 
@@ -144,7 +154,10 @@ abstract final class NavRouteTransition {
           reverseCurve: NavMotion.response,
         );
         return FadeTransition(
-          opacity: CurvedAnimation(parent: animation, curve: NavMotion.response),
+          opacity: CurvedAnimation(
+            parent: animation,
+            curve: NavMotion.response,
+          ),
           child: ScaleTransition(
             scale: Tween<double>(begin: 0.94, end: 1.0).animate(curved),
             child: child,

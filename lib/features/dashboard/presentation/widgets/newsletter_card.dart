@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import '../../../../core/motion/nav_haptics.dart';
 
 class NewsletterCard extends StatefulWidget {
   const NewsletterCard({super.key});
@@ -30,7 +30,7 @@ class _NewsletterCardState extends State<NewsletterCard> {
       return;
     }
 
-    HapticFeedback.mediumImpact();
+    NavHaptics.fire(NavHaptic.medium);
     FocusScope.of(context).unfocus();
     setState(() {
       _isSubscribed = true;

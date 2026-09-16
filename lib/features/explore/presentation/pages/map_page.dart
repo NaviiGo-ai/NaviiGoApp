@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/constants/master_destinations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
+import '../../../../core/motion/nav_haptics.dart';
 
 class MapPage extends StatefulWidget {
   const MapPage({super.key});
@@ -206,7 +206,7 @@ class _MapPageState extends State<MapPage> {
                             label: Text(_filters[index]),
                             selected: isSelected,
                             onSelected: (_) {
-                              HapticFeedback.selectionClick();
+                              NavHaptics.fire(NavHaptic.light);
                               setState(() => _selectedFilter = index);
                             },
                             backgroundColor: AppColors.surface,
@@ -246,17 +246,25 @@ class _MapPageState extends State<MapPage> {
                   onTap: () async {
                     if (destinations.isEmpty) return;
                     final activeDest =
-                        destinations[_activeCardIndex.clamp(0, destinations.length - 1)];
+                        destinations[_activeCardIndex.clamp(
+                          0,
+                          destinations.length - 1,
+                        )];
                     final uri = Uri.parse(
                       'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent('${activeDest.name}, ${activeDest.state}, India')}',
                     );
-                    HapticFeedback.lightImpact();
+                    NavHaptics.fire(NavHaptic.light);
                     if (await canLaunchUrl(uri)) {
-                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                      await launchUrl(
+                        uri,
+                        mode: LaunchMode.externalApplication,
+                      );
                     } else if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text('Coordinates: ${activeDest.lat}, ${activeDest.lng}'),
+                          content: Text(
+                            'Coordinates: ${activeDest.lat}, ${activeDest.lng}',
+                          ),
                           duration: const Duration(seconds: 2),
                         ),
                       );
@@ -270,17 +278,25 @@ class _MapPageState extends State<MapPage> {
                   onTap: () async {
                     if (destinations.isEmpty) return;
                     final activeDest =
-                        destinations[_activeCardIndex.clamp(0, destinations.length - 1)];
+                        destinations[_activeCardIndex.clamp(
+                          0,
+                          destinations.length - 1,
+                        )];
                     final uri = Uri.parse(
                       'https://www.google.com/maps/dir/?api=1&destination=${activeDest.lat},${activeDest.lng}&travelmode=driving',
                     );
-                    HapticFeedback.lightImpact();
+                    NavHaptics.fire(NavHaptic.light);
                     if (await canLaunchUrl(uri)) {
-                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                      await launchUrl(
+                        uri,
+                        mode: LaunchMode.externalApplication,
+                      );
                     } else if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text('Route to ${activeDest.name}: ${activeDest.lat}, ${activeDest.lng}'),
+                          content: Text(
+                            'Route to ${activeDest.name}: ${activeDest.lat}, ${activeDest.lng}',
+                          ),
                           duration: const Duration(seconds: 2),
                         ),
                       );
@@ -307,7 +323,7 @@ class _MapPageState extends State<MapPage> {
                       final dest = destinations[index];
                       return GestureDetector(
                         onTap: () {
-                          HapticFeedback.selectionClick();
+                          NavHaptics.fire(NavHaptic.light);
                           context.push('/destination/${dest.id}');
                         },
                         child: Container(
@@ -344,14 +360,16 @@ class _MapPageState extends State<MapPage> {
                                         width: 120,
                                         height: double.infinity,
                                         fit: BoxFit.cover,
-                                        errorBuilder: (_, __, ___) => _buildImagePlaceholder(),
+                                        errorBuilder: (_, __, ___) =>
+                                            _buildImagePlaceholder(),
                                       )
                                     : Image.network(
                                         dest.image,
                                         width: 120,
                                         height: double.infinity,
                                         fit: BoxFit.cover,
-                                        errorBuilder: (_, __, ___) => _buildImagePlaceholder(),
+                                        errorBuilder: (_, __, ___) =>
+                                            _buildImagePlaceholder(),
                                       ),
                               ),
                               Expanded(
@@ -447,7 +465,7 @@ class _MapPageState extends State<MapPage> {
   ) {
     return GestureDetector(
       onTap: () {
-        HapticFeedback.lightImpact();
+        NavHaptics.fire(NavHaptic.light);
         if (_pageController.hasClients &&
             index < _filteredDestinations.length) {
           _pageController.animateToPage(

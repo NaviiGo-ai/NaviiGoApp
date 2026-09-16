@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -8,6 +7,7 @@ import '../../../../core/auth/auth_provider.dart';
 import '../../../bookings/presentation/providers/saved_places_provider.dart';
 import '../../../bookings/domain/models/saved_place_model.dart';
 import '../../../navigation/presentation/nav_hub_page.dart';
+import '../../../../core/motion/nav_haptics.dart';
 
 class HiddenGemItem {
   final String id;
@@ -177,7 +177,7 @@ class _HiddenGemsPageState extends ConsumerState<HiddenGemsPage> {
           IconButton(
             icon: const Icon(Icons.tune_rounded, color: AppColors.brown),
             onPressed: () {
-              HapticFeedback.lightImpact();
+              NavHaptics.fire(NavHaptic.light);
               _showFilterSheet(context);
             },
           ),
@@ -222,7 +222,7 @@ class _HiddenGemsPageState extends ConsumerState<HiddenGemsPage> {
                             label: Text(cat),
                             selected: isSelected,
                             onSelected: (_) {
-                              HapticFeedback.selectionClick();
+                              NavHaptics.fire(NavHaptic.light);
                               setState(() => _selectedCategory = cat);
                             },
                             backgroundColor: AppColors.surface,
@@ -286,7 +286,7 @@ class _HiddenGemsPageState extends ConsumerState<HiddenGemsPage> {
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
           onTap: () {
-            HapticFeedback.selectionClick();
+            NavHaptics.fire(NavHaptic.light);
             context.push('/trip-planner', extra: {'destination': gem.name});
           },
           child: Padding(
@@ -380,7 +380,7 @@ class _HiddenGemsPageState extends ConsumerState<HiddenGemsPage> {
                     const Spacer(),
                     ElevatedButton.icon(
                       onPressed: () async {
-                        HapticFeedback.lightImpact();
+                        NavHaptics.fire(NavHaptic.light);
                         final user = ref.read(currentUserProvider);
                         if (user == null) {
                           ScaffoldMessenger.of(context).showSnackBar(

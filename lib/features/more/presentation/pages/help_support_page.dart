@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../navigation/presentation/nav_hub_page.dart';
+import '../../../../core/motion/nav_haptics.dart';
 
 class HelpSupportPage extends StatelessWidget {
   const HelpSupportPage({super.key});
@@ -68,7 +68,7 @@ class HelpSupportPage extends StatelessWidget {
                 const SizedBox(height: 20),
                 InkWell(
                   onTap: () {
-                    HapticFeedback.lightImpact();
+                    NavHaptics.fire(NavHaptic.light);
                     _openChatSheet(context);
                   },
                   borderRadius: BorderRadius.circular(24),
@@ -145,7 +145,7 @@ class HelpSupportPage extends StatelessWidget {
           Center(
             child: InkWell(
               onTap: () async {
-                HapticFeedback.lightImpact();
+                NavHaptics.fire(NavHaptic.light);
                 final uri = Uri.parse(
                   'mailto:support@naviigo.com?subject=NaviiGo%20Concierge%20Inquiry',
                 );

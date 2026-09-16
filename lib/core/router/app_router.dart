@@ -156,11 +156,8 @@ final GoRouter appRouter = GoRouter(
         ),
         GoRoute(
           path: '/digital-passport',
-          pageBuilder: (context, state) => _page(
-            state,
-            const DigitalPassportPage(),
-            kind: NavRouteKind.tab,
-          ),
+          pageBuilder: (context, state) =>
+              _page(state, const DigitalPassportPage(), kind: NavRouteKind.tab),
         ),
         GoRoute(
           path: '/profile',
@@ -216,7 +213,8 @@ final GoRouter appRouter = GoRouter(
         ),
         GoRoute(
           path: '/restaurants',
-          pageBuilder: (context, state) => _page(state, const RestaurantsPage()),
+          pageBuilder: (context, state) =>
+              _page(state, const RestaurantsPage()),
         ),
         GoRoute(
           path: '/transportation',

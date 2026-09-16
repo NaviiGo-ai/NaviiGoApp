@@ -332,61 +332,61 @@ class PaymentHistoryPage extends ConsumerWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: AppColors.border,
-                    borderRadius: BorderRadius.circular(2),
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppColors.border,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 20),
-              Text(
-                'TRANSACTION DETAILS',
-                style: AppTypography.eyebrow(color: AppColors.primary),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                tx.formattedAmount,
-                style: AppTypography.displayHero(
-                  color: tx.direction == TransactionDirection.credit
-                      ? AppColors.teal
-                      : AppColors.textPrimary,
+                const SizedBox(height: 20),
+                Text(
+                  'TRANSACTION DETAILS',
+                  style: AppTypography.eyebrow(color: AppColors.primary),
                 ),
-              ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceWarm,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.border),
+                const SizedBox(height: 8),
+                Text(
+                  tx.formattedAmount,
+                  style: AppTypography.displayHero(
+                    color: tx.direction == TransactionDirection.credit
+                        ? AppColors.teal
+                        : AppColors.textPrimary,
+                  ),
                 ),
-                child: Column(
-                  children: [
-                    _buildRow('Status', tx.status),
-                    const Divider(color: AppColors.border, height: 16),
-                    _buildRow('Type', tx.type.replaceAll('_', ' ')),
-                    const Divider(color: AppColors.border, height: 16),
-                    _buildRow('Source', tx.source),
-                    if (tx.referenceId != null) ...[
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceWarm,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Column(
+                    children: [
+                      _buildRow('Status', tx.status),
                       const Divider(color: AppColors.border, height: 16),
-                      _buildRow('Reference ID', tx.referenceId!),
-                    ],
-                    if (tx.createdAt != null) ...[
+                      _buildRow('Type', tx.type.replaceAll('_', ' ')),
                       const Divider(color: AppColors.border, height: 16),
-                      _buildRow('Timestamp', tx.createdAt!.toIso8601String()),
+                      _buildRow('Source', tx.source),
+                      if (tx.referenceId != null) ...[
+                        const Divider(color: AppColors.border, height: 16),
+                        _buildRow('Reference ID', tx.referenceId!),
+                      ],
+                      if (tx.createdAt != null) ...[
+                        const Divider(color: AppColors.border, height: 16),
+                        _buildRow('Timestamp', tx.createdAt!.toIso8601String()),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 20),
-            ],
+                const SizedBox(height: 20),
+              ],
+            ),
           ),
-        ),
-      );
+        );
       },
     );
   }

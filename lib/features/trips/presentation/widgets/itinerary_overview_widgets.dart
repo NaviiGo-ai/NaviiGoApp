@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../domain/models/trip_itinerary_model.dart';
+import '../../../../core/motion/nav_haptics.dart';
 
 /// ─────────────────────────────────────────────────────────────────────────────
 /// SAFE IMAGE HELPER (Asset & Network with graceful fallback)
@@ -141,7 +141,7 @@ class ItineraryViewSwitcher extends StatelessWidget {
               icon: Icons.menu_book_rounded,
               isSelected: selectedIndex == 0,
               onTap: () {
-                HapticFeedback.lightImpact();
+                NavHaptics.fire(NavHaptic.light);
                 onSelect(0);
               },
             ),
@@ -153,7 +153,7 @@ class ItineraryViewSwitcher extends StatelessWidget {
               icon: Icons.alt_route_rounded,
               isSelected: selectedIndex == 1,
               onTap: () {
-                HapticFeedback.lightImpact();
+                NavHaptics.fire(NavHaptic.light);
                 onSelect(1);
               },
             ),
@@ -707,7 +707,7 @@ class DaySelectorRail extends StatelessWidget {
           final isSelected = idx == selectedIndex;
           return GestureDetector(
             onTap: () {
-              HapticFeedback.lightImpact();
+              NavHaptics.fire(NavHaptic.light);
               onSelectDay(idx);
             },
             child: AnimatedContainer(

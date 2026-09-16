@@ -7,6 +7,7 @@ import '../../../../core/theme/app_typography.dart';
 import '../providers/bookings_provider.dart';
 import '../../domain/models/booking_model.dart';
 import '../../../navigation/presentation/nav_hub_page.dart';
+import '../../../../core/motion/nav_haptics.dart';
 
 class BookingsPage extends ConsumerWidget {
   const BookingsPage({super.key});
@@ -322,7 +323,7 @@ class BookingsPage extends ConsumerWidget {
                     final text =
                         'NaviiGo Voucher: ${booking.providerName}\nLeg: ${booking.from} to ${booking.to}\nDate: ${booking.date}\nPNR: ${booking.pnr ?? "Confirmed"}\nAmount: ₹${booking.totalPrice.toStringAsFixed(0)}';
                     await Clipboard.setData(ClipboardData(text: text));
-                    HapticFeedback.lightImpact();
+                    NavHaptics.fire(NavHaptic.light);
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
