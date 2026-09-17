@@ -57,6 +57,7 @@ final GoRouter appRouter = GoRouter(
   navigatorKey: _rootNavigatorKey,
   initialLocation: '/',
   routes: <RouteBase>[
+    // ── AUTH & ONBOARDING (modal / entry flows outside shell) ────────────
     GoRoute(path: '/', builder: (context, state) => const SplashPage()),
     GoRoute(
       path: '/login',
@@ -70,49 +71,6 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/vibe-match',
       pageBuilder: (context, state) => _page(state, const VibeMatchPage()),
-    ),
-
-    // ── SHARED-ELEMENT ARRIVALS (§3, §10, §15) ──────────────────────────────
-    // The tapped image becomes the destination hero. The route only fades so
-    // the Hero flight is the single, legible motion on screen.
-    GoRoute(
-      path: '/destination/:id',
-      pageBuilder: (context, state) {
-        final id = state.pathParameters['id'] ?? 'george_everest';
-        return _page(
-          state,
-          DestinationDetailsPage(id: id),
-          kind: NavRouteKind.shared,
-        );
-      },
-    ),
-    GoRoute(
-      path: '/place-details',
-      pageBuilder: (context, state) {
-        final place = state.extra is PlaceModel
-            ? state.extra as PlaceModel
-            : const PlaceModel(id: 'place_default', name: 'Curated Place');
-        return _page(
-          state,
-          PlaceDetailsPage(place: place),
-          kind: NavRouteKind.shared,
-        );
-      },
-    ),
-    GoRoute(
-      path: '/restaurant/:id',
-      pageBuilder: (context, state) {
-        final id = state.pathParameters['id'] ?? '1';
-        return _page(
-          state,
-          RestaurantDetailsPage(id: id),
-          kind: NavRouteKind.shared,
-        );
-      },
-    ),
-    GoRoute(
-      path: '/trip-planner',
-      pageBuilder: (context, state) => _page(state, const TripPlannerPage()),
     ),
 
     ShellRoute(
@@ -166,6 +124,11 @@ final GoRouter appRouter = GoRouter(
         ),
 
         // ── JOURNEYS ───────────────────────────────────────────────────────
+        GoRoute(
+          path: '/trip-planner',
+          pageBuilder: (context, state) =>
+              _page(state, const TripPlannerPage()),
+        ),
         // Plan → Itinerary: shares the Journey Line, so it arrives rather than
         // sliding (§3, §20).
         GoRoute(
@@ -213,6 +176,40 @@ final GoRouter appRouter = GoRouter(
         ),
 
         // ── DISCOVER ───────────────────────────────────────────────────────
+        GoRoute(
+          path: '/destination/:id',
+          pageBuilder: (context, state) {
+            final id = state.pathParameters['id'] ?? '';
+            return _page(
+              state,
+              DestinationDetailsPage(id: id),
+              kind: NavRouteKind.shared,
+            );
+          },
+        ),
+        GoRoute(
+          path: '/place-details',
+          pageBuilder: (context, state) => _page(
+            state,
+            PlaceDetailsPage(
+              place: state.extra is PlaceModel
+                  ? state.extra as PlaceModel
+                  : const PlaceModel(id: '', name: 'Place Details'),
+            ),
+            kind: NavRouteKind.shared,
+          ),
+        ),
+        GoRoute(
+          path: '/restaurant/:id',
+          pageBuilder: (context, state) {
+            final id = state.pathParameters['id'] ?? '';
+            return _page(
+              state,
+              RestaurantDetailsPage(id: id),
+              kind: NavRouteKind.shared,
+            );
+          },
+        ),
         GoRoute(
           path: '/hidden-gems',
           pageBuilder: (context, state) => _page(state, const HiddenGemsPage()),

@@ -90,10 +90,14 @@ class _NavHubPageState extends ConsumerState<NavHubPage> {
     if (location.startsWith('/explore') ||
         location.startsWith('/hidden-gems') ||
         location.startsWith('/restaurants') ||
+        location.startsWith('/restaurant') ||
         location.startsWith('/transportation') ||
         location.startsWith('/local-guides') ||
         location.startsWith('/map') ||
-        location.startsWith('/ar-explore')) {
+        location.startsWith('/ar-explore') ||
+        location.startsWith('/destination') ||
+        location.startsWith('/place-details') ||
+        location.startsWith('/places')) {
       return 1;
     }
     if (location.startsWith('/trips') ||

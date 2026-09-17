@@ -51,6 +51,15 @@ GoRouter _router({String initial = '/home'}) {
             path: '/upcoming-trips',
             builder: (_, __) => _probePage('UPCOMING PAGE'),
           ),
+          GoRoute(
+            path: '/destination/:id',
+            builder: (_, state) =>
+                _probePage('DESTINATION ${state.pathParameters['id']}'),
+          ),
+          GoRoute(
+            path: '/trip-planner',
+            builder: (_, __) => _probePage('TRIP PLANNER PAGE'),
+          ),
         ],
       ),
     ],
@@ -142,6 +151,42 @@ void main() {
 
       expect(find.byIcon(Icons.menu_rounded), findsOneWidget);
       expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('child routes inside ShellRoute retain bottom nav items', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp.router(
+            routerConfig: _router(initial: '/destination/jaipur'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('DESTINATION jaipur'), findsOneWidget);
+      for (final label in ['Home', 'Explore', 'Trips', 'Passport', 'Profile']) {
+        expect(find.text(label), findsOneWidget);
+      }
+    });
+
+    testWidgets('trip planner route inside ShellRoute retains bottom nav items', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp.router(
+            routerConfig: _router(initial: '/trip-planner'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('TRIP PLANNER PAGE'), findsOneWidget);
+      for (final label in ['Home', 'Explore', 'Trips', 'Passport', 'Profile']) {
+        expect(find.text(label), findsOneWidget);
+      }
     });
   });
 
