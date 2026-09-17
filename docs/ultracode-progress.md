@@ -108,8 +108,8 @@ premium_itineraries/{itinId}      (Signature multi-day expert routes)
 ## 4. Test Suite & Health
 
 - **Total Test Files**: 12
-- **Total Unit & Widget Tests**: 119
-- **Passing Status**: 119 / 119 (100%)
+- **Total Unit & Widget Tests**: 121
+- **Passing Status**: 121 / 121 (100%)
 - **Analyzer Status**: 0 errors, 0 warnings, 0 lints (`flutter analyze` clean)
 - **Test Files**:
   - `test/api_client_and_resilience_test.dart`
@@ -162,6 +162,10 @@ premium_itineraries/{itinId}      (Signature multi-day expert routes)
    - Manual check-in (`I'M HERE` / `COMPLETE` / `SKIP`) with undo; `SKIP` is recorded as skipped, never as completed. Arrival confidence is labelled "Confirmed by you" or "Inferred from location".
    - Route deviation states a measured distance and that nothing is shared automatically. Offline shows a real `Last Updated`, or "Not yet synced".
    - Bookings lists only vouchers whose airport/station code resolves to the destination. Local essentials and directions hand off to the device maps app — no invented nearby places.
+9. **Navigation Chrome Persistence**:
+   - Nested `/destination/:id`, `/place-details`, `/restaurant/:id`, and `/trip-planner` sub-routes inside `ShellRoute` in `app_router.dart` so navigation chrome (bottom bar and drawer) is retained on in-app destinations.
+   - Updated `_calculateSelectedIndex` in `nav_hub_page.dart` to map destination and place routes to the Explore tab and trip planner to the Trips tab.
+   - Added widget regression tests in `navigation_shell_test.dart` verifying chrome retention.
 
 ---
 
