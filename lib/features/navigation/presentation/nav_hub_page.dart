@@ -217,7 +217,12 @@ class _NavBottomBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final double height = lerpDouble(62, 50, collapse);
+    // Clamp before arithmetic so transient out-of-range provider values
+    // (e.g. from rapid route changes) never produce pathological heights.
+    final double safeCollapse = collapse.clamp(0.0, 1.0);
+    // Expanded: 62 px — enough for icon + label.
+    // Collapsed: 54 px — enough for icon only, never squeezes to zero.
+    final double height = lerpDouble(62, 54, safeCollapse);
 
     return Container(
       decoration: const BoxDecoration(
@@ -264,7 +269,9 @@ class _NavBottomBar extends StatelessWidget {
                             _NavItem(
                               destination: _destinations[i],
                               isSelected: i == currentIndex,
-                              collapse: collapse,
+                              // Pass the already-clamped value so _NavItem
+                              // never receives values outside [0, 1].
+                              collapse: safeCollapse,
                             ),
                         ],
                       ),
@@ -296,6 +303,9 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // collapse is already clamped by _NavBottomBar before being passed here,
+    // but guard again in case _NavItem is ever instantiated directly.
+    final double safeCollapse = collapse.clamp(0.0, 1.0);
     final Color color = isSelected
         ? AppColors.primary
         : AppColors.textSecondary;
@@ -315,37 +325,61 @@ class _NavItem extends StatelessWidget {
           },
           splashColor: Colors.transparent,
           highlightColor: Colors.transparent,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              AnimatedScale(
-                scale: isSelected ? NavMotion.navIconScale : 1.0,
-                duration: NavReduce.duration(context, NavMotion.fast),
-                curve: NavMotion.response,
-                child: Icon(
-                  isSelected ? destination.activeIcon : destination.icon,
-                  color: color,
-                  size: 22,
-                ),
-              ),
-              // Label recedes as chrome compacts and returns on scroll-up.
-              AnimatedOpacity(
-                opacity: (1.0 - collapse).clamp(0.0, 1.0),
-                duration: NavReduce.duration(context, NavMotion.fast),
-                child: AnimatedDefaultTextStyle(
-                  duration: NavReduce.duration(context, NavMotion.fast),
-                  curve: NavMotion.response,
-                  style: AppTypography.micro(color: color).copyWith(
-                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                    fontSize: 10.5,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              // Flutter Web can briefly deliver pathologically small constraints
+              // during route/browser-resize transitions. Bail out gracefully
+              // instead of building an unconstrained Column that overflows.
+              if (constraints.maxWidth < 24 || constraints.maxHeight < 24) {
+                return const SizedBox.shrink();
+              }
+
+              return Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AnimatedScale(
+                    scale: isSelected ? NavMotion.navIconScale : 1.0,
+                    duration: NavReduce.duration(context, NavMotion.fast),
+                    curve: NavMotion.response,
+                    child: Icon(
+                      isSelected ? destination.activeIcon : destination.icon,
+                      color: color,
+                      size: 22,
+                    ),
                   ),
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 2),
-                    child: Text(destination.label),
+                  // Label physically relinquishes layout height as nav collapses.
+                  // ClipRect + Align(heightFactor) shrinks the bounding box to
+                  // zero, so the Column stops allocating vertical space for the
+                  // label even before opacity reaches 0. Opacity alone is NOT
+                  // sufficient — it hides pixels but does not release height.
+                  ClipRect(
+                    child: Align(
+                      alignment: Alignment.topCenter,
+                      heightFactor: 1.0 - safeCollapse,
+                      child: AnimatedOpacity(
+                        opacity: 1.0 - safeCollapse,
+                        duration: NavReduce.duration(context, NavMotion.fast),
+                        child: AnimatedDefaultTextStyle(
+                          duration: NavReduce.duration(context, NavMotion.fast),
+                          curve: NavMotion.response,
+                          style: AppTypography.micro(color: color).copyWith(
+                            fontWeight: isSelected
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                            fontSize: 10.5,
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Text(destination.label),
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
-                ),
-              ),
-            ],
+                ],
+              );
+            },
           ),
         ),
       ),
