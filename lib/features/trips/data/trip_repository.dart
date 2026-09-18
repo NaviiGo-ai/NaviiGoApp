@@ -266,6 +266,16 @@ class TripRepository {
     int budget = 15000,
     String? startDate,
     String travelerType = 'comfort',
+    Map<String, dynamic>? preferences,
+    Map<String, dynamic>? browsingSignals,
+    String? arrivalTime,
+    String? arrivalMode,
+    String? departureTime,
+    String? departureMode,
+    String? hotelArea,
+    String? originCity,
+    List<Map<String, dynamic>>? mustDo,
+    List<Map<String, dynamic>>? routeStops,
   }) async {
     final payload = {
       'destName': destName,
@@ -281,6 +291,16 @@ class TripRepository {
               .toIso8601String()
               .split('T')[0],
       'travelerType': travelerType,
+      if (preferences != null) 'preferences': preferences,
+      if (browsingSignals != null) 'browsingSignals': browsingSignals,
+      if (arrivalTime != null) 'arrivalTime': arrivalTime,
+      if (arrivalMode != null) 'arrivalMode': arrivalMode,
+      if (departureTime != null) 'departureTime': departureTime,
+      if (departureMode != null) 'departureMode': departureMode,
+      if (hotelArea != null) 'hotelArea': hotelArea,
+      if (originCity != null) 'originCity': originCity,
+      if (mustDo != null) 'mustDo': mustDo,
+      if (routeStops != null) 'routeStops': routeStops,
     };
 
     final response = await _apiClient.post(

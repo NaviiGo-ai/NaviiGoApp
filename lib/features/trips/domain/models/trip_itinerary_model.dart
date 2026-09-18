@@ -11,6 +11,20 @@ class TripActivityModel {
   final String? estimatedCost;
   final bool isCompleted;
 
+  // New rich fields from canonical backend
+  final String? whyItFits;
+  final String? placeId;
+  final double? lat;
+  final double? lng;
+  final String? bookingRequirement;
+  final List<String> warnings;
+  final String? mealContext;
+  final bool isGenericDiningFallback;
+  final String? transferOrigin;
+  final String? transferDestination;
+  final String? transferMode;
+  final String? source;
+
   const TripActivityModel({
     required this.title,
     this.time,
@@ -20,9 +34,24 @@ class TripActivityModel {
     this.duration,
     this.estimatedCost,
     this.isCompleted = false,
+    this.whyItFits,
+    this.placeId,
+    this.lat,
+    this.lng,
+    this.bookingRequirement,
+    this.warnings = const [],
+    this.mealContext,
+    this.isGenericDiningFallback = false,
+    this.transferOrigin,
+    this.transferDestination,
+    this.transferMode,
+    this.source,
   });
 
   factory TripActivityModel.fromMap(Map<String, dynamic> map) {
+    final latRaw = map['lat'] ?? map['latitude'] ?? (map['coordinates'] is Map ? (map['coordinates'] as Map)['lat'] : null);
+    final lngRaw = map['lng'] ?? map['longitude'] ?? (map['coordinates'] is Map ? (map['coordinates'] as Map)['lng'] : null);
+
     return TripActivityModel(
       title: (map['title'] ?? map['name'] ?? 'Activity').toString(),
       time: map['time']?.toString(),
@@ -32,6 +61,18 @@ class TripActivityModel {
       duration: map['duration']?.toString(),
       estimatedCost: (map['estimatedCost'] ?? map['cost'])?.toString(),
       isCompleted: map['isCompleted'] == true,
+      whyItFits: map['whyItFits']?.toString(),
+      placeId: (map['placeId'] ?? map['groundedPlaceId'])?.toString(),
+      lat: latRaw is num ? latRaw.toDouble() : (latRaw is String ? double.tryParse(latRaw) : null),
+      lng: lngRaw is num ? lngRaw.toDouble() : (lngRaw is String ? double.tryParse(lngRaw) : null),
+      bookingRequirement: map['bookingRequirement']?.toString(),
+      warnings: (map['warnings'] as List?)?.map((e) => e.toString()).toList() ?? [],
+      mealContext: map['mealContext']?.toString(),
+      isGenericDiningFallback: map['isGenericDiningFallback'] == true,
+      transferOrigin: map['transferOrigin']?.toString(),
+      transferDestination: map['transferDestination']?.toString(),
+      transferMode: map['transferMode']?.toString(),
+      source: map['source']?.toString(),
     );
   }
 
@@ -45,6 +86,18 @@ class TripActivityModel {
       if (duration != null) 'duration': duration,
       if (estimatedCost != null) 'estimatedCost': estimatedCost,
       'isCompleted': isCompleted,
+      if (whyItFits != null) 'whyItFits': whyItFits,
+      if (placeId != null) 'placeId': placeId,
+      if (lat != null) 'lat': lat,
+      if (lng != null) 'lng': lng,
+      if (bookingRequirement != null) 'bookingRequirement': bookingRequirement,
+      if (warnings.isNotEmpty) 'warnings': warnings,
+      if (mealContext != null) 'mealContext': mealContext,
+      'isGenericDiningFallback': isGenericDiningFallback,
+      if (transferOrigin != null) 'transferOrigin': transferOrigin,
+      if (transferDestination != null) 'transferDestination': transferDestination,
+      if (transferMode != null) 'transferMode': transferMode,
+      if (source != null) 'source': source,
     };
   }
 
@@ -57,6 +110,18 @@ class TripActivityModel {
     String? duration,
     String? estimatedCost,
     bool? isCompleted,
+    String? whyItFits,
+    String? placeId,
+    double? lat,
+    double? lng,
+    String? bookingRequirement,
+    List<String>? warnings,
+    String? mealContext,
+    bool? isGenericDiningFallback,
+    String? transferOrigin,
+    String? transferDestination,
+    String? transferMode,
+    String? source,
   }) {
     return TripActivityModel(
       title: title ?? this.title,
@@ -67,6 +132,18 @@ class TripActivityModel {
       duration: duration ?? this.duration,
       estimatedCost: estimatedCost ?? this.estimatedCost,
       isCompleted: isCompleted ?? this.isCompleted,
+      whyItFits: whyItFits ?? this.whyItFits,
+      placeId: placeId ?? this.placeId,
+      lat: lat ?? this.lat,
+      lng: lng ?? this.lng,
+      bookingRequirement: bookingRequirement ?? this.bookingRequirement,
+      warnings: warnings ?? this.warnings,
+      mealContext: mealContext ?? this.mealContext,
+      isGenericDiningFallback: isGenericDiningFallback ?? this.isGenericDiningFallback,
+      transferOrigin: transferOrigin ?? this.transferOrigin,
+      transferDestination: transferDestination ?? this.transferDestination,
+      transferMode: transferMode ?? this.transferMode,
+      source: source ?? this.source,
     );
   }
 }
@@ -74,12 +151,16 @@ class TripActivityModel {
 class TripDayPlanModel {
   final int dayNumber;
   final String? theme;
+  final String? areaFocus;
+  final String? weatherContext;
   final String? dateFormatted;
   final List<TripActivityModel> activities;
 
   const TripDayPlanModel({
     required this.dayNumber,
     this.theme,
+    this.areaFocus,
+    this.weatherContext,
     this.dateFormatted,
     this.activities = const [],
   });
@@ -106,6 +187,8 @@ class TripDayPlanModel {
     return TripDayPlanModel(
       dayNumber: dayNum,
       theme: (map['theme'] ?? map['title'])?.toString(),
+      areaFocus: (map['areaFocus'] ?? map['area'])?.toString(),
+      weatherContext: map['weatherContext']?.toString(),
       dateFormatted: map['date']?.toString(),
       activities: parsedActs,
     );
@@ -114,12 +197,16 @@ class TripDayPlanModel {
   TripDayPlanModel copyWith({
     int? dayNumber,
     String? theme,
+    String? areaFocus,
+    String? weatherContext,
     String? dateFormatted,
     List<TripActivityModel>? activities,
   }) {
     return TripDayPlanModel(
       dayNumber: dayNumber ?? this.dayNumber,
       theme: theme ?? this.theme,
+      areaFocus: areaFocus ?? this.areaFocus,
+      weatherContext: weatherContext ?? this.weatherContext,
       dateFormatted: dateFormatted ?? this.dateFormatted,
       activities: activities ?? this.activities,
     );
@@ -261,6 +348,11 @@ class TripItineraryModel {
   final DateTime? updatedAt;
   final List<TripDayPlanModel> dayPlans;
 
+  // New metadata fields
+  final Map<String, dynamic>? generationMetadata;
+  final List<String> warnings;
+  final Map<String, dynamic>? costSummary;
+
   /// Owner. Null only for legacy documents written before ownership was
   /// stamped — start-trip validation treats an absent owner as unverifiable.
   final String? userId;
@@ -287,6 +379,9 @@ class TripItineraryModel {
     this.createdAt,
     this.updatedAt,
     this.dayPlans = const [],
+    this.generationMetadata,
+    this.warnings = const [],
+    this.costSummary,
     this.userId,
     this.startLat,
     this.startLng,
@@ -355,6 +450,10 @@ class TripItineraryModel {
       }
     }
 
+    final meta = data['generationMetadata'] ?? genData?['generationMetadata'] ?? genData?['metadata'];
+    final warningsRaw = data['warnings'] ?? genData?['warnings'];
+    final costSum = data['costSummary'] ?? genData?['costSummary'];
+
     return TripItineraryModel(
       id: docId,
       uuid: stableId,
@@ -367,6 +466,9 @@ class TripItineraryModel {
       createdAt: _parseDate(data['createdAt']),
       updatedAt: _parseDate(data['updatedAt']),
       dayPlans: plans,
+      generationMetadata: meta is Map ? Map<String, dynamic>.from(meta) : null,
+      warnings: warningsRaw is List ? (warningsRaw as List).map((e) => e.toString()).toList() : const [],
+      costSummary: costSum is Map ? Map<String, dynamic>.from(costSum) : null,
       userId: _parseString(data['userId'] ?? data['uid'] ?? form['userId'] ?? form['uid']),
       startLat: _parseDouble(
             data['startLat'] ??

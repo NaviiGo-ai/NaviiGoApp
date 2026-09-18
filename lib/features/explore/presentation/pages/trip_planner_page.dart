@@ -203,154 +203,16 @@ class _TripPlannerPageState extends ConsumerState<TripPlannerPage>
       }
     } catch (e) {
       if (mounted) {
-        // Robust offline fallback with rich authentic regional chapters
-        final uid = user.uid;
-        final tripId = 'trip_${DateTime.now().millisecondsSinceEpoch}';
-        final List<TripDayPlanModel> fallbackPlans = [];
-        for (int i = 1; i <= _days; i++) {
-          fallbackPlans.add(
-            _generateDayPlan(i, _selectedDestination, _purpose),
-          );
-        }
-
-        final fallbackTrip = TripItineraryModel(
-          id: tripId,
-          uuid: tripId,
-          destId: _selectedDestination.id,
-          destName: _selectedDestination.name,
-          // Stamped here so the journey is always attributable to the
-          // traveller who planned it; the start gate refuses an unowned trip.
-          userId: uid,
-          isActive: false,
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-          form: {
-            'destination': _selectedDestination.name,
-            'days': _days,
-            'startDate': _startDate.toIso8601String(),
-            'group': _groupType,
-            'purpose': _purpose,
-            'pace': _pace,
-            'budget': _budget.toInt(),
-            'heroImage': _selectedDestination.image,
-          },
-          dayPlans: fallbackPlans,
-        );
-
-        final repo = ref.read(tripRepositoryProvider);
-        await repo.saveTrip(uid, fallbackTrip);
-
-        if (!mounted) return;
         setState(() => _isGenerating = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text(
-              'Generated bespoke itinerary saved to your Passport!',
+              'Generation failed. The NaviiGo Intelligence Engine may be unavailable or returned an error.',
             ),
-            backgroundColor: AppColors.primary,
+            backgroundColor: Colors.red,
           ),
         );
-        context.push('/itinerary', extra: fallbackTrip);
       }
-    }
-  }
-
-  TripDayPlanModel _generateDayPlan(
-    int dayNum,
-    MasterDestination dest,
-    String purpose,
-  ) {
-    if (dayNum == 1) {
-      return TripDayPlanModel(
-        dayNumber: 1,
-        theme: 'Arrival & Old City Immersion',
-        dateFormatted: 'Day 01',
-        activities: [
-          TripActivityModel(
-            title: '${dest.name} Historic Quarter Walk',
-            time: '09:00 AM',
-            category: 'Heritage',
-            description:
-                'Check-in and morning orientation walk through local bazaars.',
-            location: dest.name,
-          ),
-          TripActivityModel(
-            title: 'Iconic Landmark Exploration',
-            time: '02:30 PM',
-            category: 'Sightseeing',
-            description:
-                'Explore the central architectural monument and courtyards.',
-            location: dest.name,
-          ),
-          TripActivityModel(
-            title: 'Sunset Tea & Local Tasting',
-            time: '06:00 PM',
-            category: 'Dining',
-            description: 'Traditional spiced chai and regional dishes.',
-            location: dest.name,
-          ),
-        ],
-      );
-    } else if (dayNum == 2) {
-      return TripDayPlanModel(
-        dayNumber: 2,
-        theme: 'Sacred Sanctums & Artisans',
-        dateFormatted: 'Day 02',
-        activities: [
-          TripActivityModel(
-            title: 'Sunrise River / Temple Chants',
-            time: '06:30 AM',
-            category: 'Spiritual',
-            description:
-                'Early morning sacred rituals and tranquil atmosphere.',
-            location: dest.name,
-          ),
-          TripActivityModel(
-            title: 'Heritage Craft Workshop',
-            time: '11:00 AM',
-            category: 'Culture',
-            description: 'Visit generational block printers and brass masters.',
-            location: dest.name,
-          ),
-          TripActivityModel(
-            title: 'Panoramic Viewpoint Hike',
-            time: '05:30 PM',
-            category: 'Nature',
-            description: 'Golden hour view overlooking the entire valley.',
-            location: dest.name,
-          ),
-        ],
-      );
-    } else {
-      return TripDayPlanModel(
-        dayNumber: dayNum,
-        theme: 'Hidden Corners & Countryside',
-        dateFormatted: 'Day 0$dayNum',
-        activities: [
-          TripActivityModel(
-            title: 'Village & Sanctuary Trail',
-            time: '08:30 AM',
-            category: 'Adventure',
-            description: 'Rural lanes, stepwells, and bird sanctuary paths.',
-            location: dest.name,
-          ),
-          TripActivityModel(
-            title: 'Farm-to-Table Traditional Meal',
-            time: '01:30 PM',
-            category: 'Dining',
-            description: 'Clay-oven cooked lunch with seasonal herbs.',
-            location: dest.name,
-          ),
-          TripActivityModel(
-            title: 'Evening Stroll & Keepsakes',
-            time: '06:30 PM',
-            category: 'Leisure',
-            description:
-                'Final night reflections and souvenir textile collection.',
-            location: dest.name,
-          ),
-        ],
-      );
     }
   }
 
