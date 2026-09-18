@@ -7,26 +7,21 @@ import 'package:naviigo_app/core/config/app_config.dart';
 
 void main() {
   group('ApiClient & Network Resilience Unit Tests', () {
-    test(
-      'AppConfig constants are defined for production and local environments',
-      () {
-        expect(AppConfig.apiBaseUrl, isNotEmpty);
-        expect(AppConfig.apiBaseUrl, startsWith('http'));
-        expect(AppConfig.placesApiBaseUrl, isNotEmpty);
-        expect(AppConfig.placesApiBaseUrl, contains('/api/places'));
-        expect(AppConfig.itineraryApiBaseUrl, contains('/api/itinerary'));
-        expect(AppConfig.connectTimeout, equals(const Duration(seconds: 15)));
-        expect(AppConfig.receiveTimeout, equals(const Duration(seconds: 30)));
-      },
-    );
+    test('AppConfig constants are defined for production and local environments', () {
+      expect(AppConfig.apiBaseUrl, isNotEmpty);
+      expect(AppConfig.apiBaseUrl, startsWith('http'));
+      expect(AppConfig.placesApiBaseUrl, isNotEmpty);
+      expect(AppConfig.placesApiBaseUrl, contains('/api/places'));
+      expect(AppConfig.itineraryApiBaseUrl, contains('/api/itinerary'));
+      expect(AppConfig.connectTimeout, equals(const Duration(seconds: 15)));
+      expect(AppConfig.receiveTimeout, equals(const Duration(seconds: 30)));
+    });
 
     test('ApiClient successfully returns decoded JSON on 200 OK', () async {
       final mockClient = MockClient((request) async {
-        return http.Response(
-          '{"status": "ok", "data": [1, 2, 3]}',
-          200,
-          headers: {'content-type': 'application/json'},
-        );
+        return http.Response('{"status": "ok", "data": [1, 2, 3]}', 200, headers: {
+          'content-type': 'application/json',
+        });
       });
 
       final apiClient = ApiClient(
@@ -40,32 +35,23 @@ void main() {
       expect(result['data'], [1, 2, 3]);
     });
 
-    test(
-      'ApiClient successfully sends PUT request and receives response',
-      () async {
-        final mockClient = MockClient((request) async {
-          expect(request.method, 'PUT');
-          return http.Response(
-            '{"status": "updated", "id": "item_123"}',
-            200,
-            headers: {'content-type': 'application/json'},
-          );
+    test('ApiClient successfully sends PUT request and receives response', () async {
+      final mockClient = MockClient((request) async {
+        expect(request.method, 'PUT');
+        return http.Response('{"status": "updated", "id": "item_123"}', 200, headers: {
+          'content-type': 'application/json',
         });
+      });
 
-        final apiClient = ApiClient(
-          httpClient: mockClient,
-          baseUrl: 'https://test.naviigo.com',
-        );
+      final apiClient = ApiClient(
+        httpClient: mockClient,
+        baseUrl: 'https://test.naviigo.com',
+      );
 
-        final result = await apiClient.put(
-          '/items/item_123',
-          body: {'name': 'New Item'},
-          requiresAuth: false,
-        );
-        expect(result['status'], 'updated');
-        expect(result['id'], 'item_123');
-      },
-    );
+      final result = await apiClient.put('/items/item_123', body: {'name': 'New Item'}, requiresAuth: false);
+      expect(result['status'], 'updated');
+      expect(result['id'], 'item_123');
+    });
 
     test('ApiClient throws ValidationException on 400 Bad Request', () async {
       final mockClient = MockClient((request) async {
@@ -86,11 +72,7 @@ void main() {
         throwsA(
           isA<ValidationException>()
               .having((e) => e.statusCode, 'statusCode', 400)
-              .having(
-                (e) => e.message,
-                'message',
-                contains('Invalid coordinates'),
-              ),
+              .having((e) => e.message, 'message', contains('Invalid coordinates')),
         ),
       );
     });
@@ -138,44 +120,33 @@ void main() {
         throwsA(
           isA<RateLimitException>()
               .having((e) => e.statusCode, 'statusCode', 429)
-              .having(
-                (e) => e.message,
-                'message',
-                contains('Rate limit exceeded'),
-              ),
+              .having((e) => e.message, 'message', contains('Rate limit exceeded')),
         ),
       );
     });
 
-    test(
-      'ApiClient throws ServerException on 500/503 (Render cold-start / server error)',
-      () async {
-        final mockClient = MockClient((request) async {
-          return http.Response(
-            '{"detail": "Server waking up from cold start"}',
-            503,
-            headers: {'content-type': 'application/json'},
-          );
-        });
-
-        final apiClient = ApiClient(
-          httpClient: mockClient,
-          baseUrl: 'https://test.naviigo.com',
+    test('ApiClient throws ServerException on 500/503 (Render cold-start / server error)', () async {
+      final mockClient = MockClient((request) async {
+        return http.Response(
+          '{"detail": "Server waking up from cold start"}',
+          503,
+          headers: {'content-type': 'application/json'},
         );
+      });
 
-        expect(
-          () => apiClient.get('/status', requiresAuth: false),
-          throwsA(
-            isA<ServerException>()
-                .having((e) => e.statusCode, 'statusCode', 500)
-                .having(
-                  (e) => e.message,
-                  'message',
-                  contains('Server waking up'),
-                ),
-          ),
-        );
-      },
-    );
+      final apiClient = ApiClient(
+        httpClient: mockClient,
+        baseUrl: 'https://test.naviigo.com',
+      );
+
+      expect(
+        () => apiClient.get('/status', requiresAuth: false),
+        throwsA(
+          isA<ServerException>()
+              .having((e) => e.statusCode, 'statusCode', 500)
+              .having((e) => e.message, 'message', contains('Server waking up')),
+        ),
+      );
+    });
   });
 }

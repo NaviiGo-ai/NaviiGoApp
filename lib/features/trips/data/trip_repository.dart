@@ -6,20 +6,14 @@ import '../../../core/network/api_client.dart';
 import '../../../core/network/api_exceptions.dart';
 import '../../../core/network/firebase_client.dart';
 import '../domain/models/trip_itinerary_model.dart';
-import '../../analytics/data/analytics_repository.dart';
 
 class TripRepository {
   final FirebaseFirestore _firestore;
   final ApiClient _apiClient;
-  final AnalyticsRepository? _analyticsRepo;
 
-  TripRepository({
-    FirebaseFirestore? firestore,
-    ApiClient? apiClient,
-    AnalyticsRepository? analyticsRepo,
-  }) : _firestore = firestore ?? FirebaseClient.firestore,
-       _apiClient = apiClient ?? ApiClient(),
-       _analyticsRepo = analyticsRepo;
+  TripRepository({FirebaseFirestore? firestore, ApiClient? apiClient})
+    : _firestore = firestore ?? FirebaseClient.firestore,
+      _apiClient = apiClient ?? ApiClient();
 
   /// Stream user itineraries directly from users/{uid}/itineraries in naviigo-db
   Stream<List<TripItineraryModel>> getUserTripsStream(String uid) {
@@ -350,164 +344,5 @@ class TripRepository {
     throw const ServerException(
       'Invalid response received from itinerary generation engine.',
     );
-  }
-
-  // ─── ACTION HANDLERS (With Canonical Analytics) ───
-
-  Future<void> checkInActivity(
-    String uid,
-    TripItineraryModel trip,
-    int dayIdx,
-    int activityIdx,
-  ) async {
-    // Analytics
-    final act = trip.dayPlans[dayIdx].activities[activityIdx];
-    _analyticsRepo?.logEvent(
-      eventType: 'ACTIVITY_CHECKED_IN',
-      tripId: trip.id,
-      dayId: trip.dayPlans[dayIdx].dayNumber.toString(),
-      activityId: act.title,
-      placeId: act.placeId,
-      destinationId: trip.destName,
-    );
-  }
-
-  Future<void> completeActivity(
-    String uid,
-    TripItineraryModel trip,
-    int dayIdx,
-    int activityIdx,
-  ) async {
-    // Analytics
-    final act = trip.dayPlans[dayIdx].activities[activityIdx];
-    _analyticsRepo?.logEvent(
-      eventType: 'ACTIVITY_COMPLETED',
-      tripId: trip.id,
-      dayId: trip.dayPlans[dayIdx].dayNumber.toString(),
-      activityId: act.title,
-      placeId: act.placeId,
-      destinationId: trip.destName,
-    );
-  }
-
-  Future<void> skipActivity(
-    String uid,
-    TripItineraryModel trip,
-    int dayIdx,
-    int activityIdx,
-    String reason,
-  ) async {
-    // Analytics
-    final act = trip.dayPlans[dayIdx].activities[activityIdx];
-    _analyticsRepo?.logEvent(
-      eventType: 'ACTIVITY_SKIPPED',
-      tripId: trip.id,
-      dayId: trip.dayPlans[dayIdx].dayNumber.toString(),
-      activityId: act.title,
-      placeId: act.placeId,
-      destinationId: trip.destName,
-      metadata: {'skipReason': reason},
-    );
-  }
-
-  Future<void> endTrip(String uid, TripItineraryModel trip) async {
-    // Analytics
-    _analyticsRepo?.logEvent(
-      eventType: 'TRIP_COMPLETED',
-      tripId: trip.id,
-      destinationId: trip.destName,
-    );
-
-    // Update Firestore to mark trip inactive
-    final docRef = _firestore
-        .collection('users')
-        .doc(uid)
-        .collection('itineraries')
-        .doc(trip.id);
-    await docRef.update({
-      'isActive': false,
-      'status': 'past',
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
-  }
-
-  Future<void> logReplanRequested(
-    String tripId,
-    String destinationId,
-    String reason,
-  ) async {
-    _analyticsRepo?.logEvent(
-      eventType: 'REPLAN_REQUESTED',
-      tripId: tripId,
-      destinationId: destinationId,
-      metadata: {'reason': reason},
-    );
-  }
-
-  Future<void> acceptReplan(
-    String uid,
-    TripItineraryModel trip,
-    Map<String, dynamic> proposal,
-  ) async {
-    // Send accept request to backend API
-    await _apiClient.post(
-      '/api/itinerary/replan/accept',
-      body: {
-        'tripId': trip.id,
-        'proposalId': proposal['proposalId'],
-        'proposalData': proposal,
-      },
-    );
-
-    // Analytics: log REPLAN_ACCEPTED
-    _analyticsRepo?.logEvent(
-      eventType: 'REPLAN_ACCEPTED',
-      tripId: trip.id,
-      destinationId: trip.destName,
-      metadata: {
-        'reason': proposal['reason'],
-        'proposalId': proposal['proposalId'],
-      },
-    );
-
-    // Check if there's any REPLACE action in the new actions array
-    final actions = proposal['actions'] as List? ?? [];
-    for (final action in actions) {
-      if (action['actionType'] == 'REPLACE' &&
-          action['replacementActivity'] != null) {
-        _analyticsRepo?.logEvent(
-          eventType: 'ACTIVITY_REPLACED',
-          tripId: trip.id,
-          destinationId: trip.destName,
-          metadata: {
-            'oldActivityId': action['activityId'],
-            'newActivityId':
-                action['replacementActivity']['id'] ??
-                action['replacementActivity']['placeId'],
-            'newPlaceId': action['replacementActivity']['placeId'],
-            'reason': proposal['reason'],
-            'proposalId': proposal['proposalId'],
-          },
-        );
-      }
-    }
-  }
-
-  /// Mark a trip as reviewed after the post-trip review flow completes.
-  /// Uses a targeted Firestore update rather than a full model rewrite.
-  Future<void> markTripReviewed(String uid, String tripId) async {
-    try {
-      await _firestore
-          .collection('users')
-          .doc(uid)
-          .collection('itineraries')
-          .doc(tripId)
-          .update({
-            'isReviewed': true,
-            'updatedAt': FieldValue.serverTimestamp(),
-          });
-    } catch (e) {
-      debugPrint('[TripRepository] markTripReviewed error: $e');
-    }
   }
 }

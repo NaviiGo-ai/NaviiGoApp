@@ -33,8 +33,10 @@ Widget _buildTestableWidget({
       designSize: const Size(390, 844),
       minTextAdapt: true,
       splitScreenMode: true,
-      builder: (context, _) =>
-          MaterialApp(debugShowCheckedModeBanner: false, home: child),
+      builder: (context, _) => MaterialApp(
+        debugShowCheckedModeBanner: false,
+        home: child,
+      ),
     ),
   );
 }
@@ -79,9 +81,7 @@ void main() {
       ),
     ];
 
-    testWidgets('Renders wallet balance, points, and transaction cards', (
-      tester,
-    ) async {
+    testWidgets('Renders wallet balance, points, and transaction cards', (tester) async {
       await tester.pumpWidget(
         _buildTestableWidget(
           child: const PaymentHistoryPage(),
@@ -111,9 +111,7 @@ void main() {
       expect(find.text('- ₹850.00'), findsOneWidget);
     });
 
-    testWidgets('Filters transactions when tapping filter chips', (
-      tester,
-    ) async {
+    testWidgets('Filters transactions when tapping filter chips', (tester) async {
       await tester.pumpWidget(
         _buildTestableWidget(
           child: const PaymentHistoryPage(),
@@ -151,9 +149,7 @@ void main() {
       expect(find.text('Jaipur Haveli Booking Refund'), findsNothing);
     });
 
-    testWidgets('Opens transaction detail bottom sheet on card tap', (
-      tester,
-    ) async {
+    testWidgets('Opens transaction detail bottom sheet on card tap', (tester) async {
       await tester.pumpWidget(
         _buildTestableWidget(
           child: const PaymentHistoryPage(),
@@ -191,9 +187,7 @@ void main() {
       totalBookings: 2,
     );
 
-    testWidgets('Renders settings toggles, links, and log out dialog', (
-      tester,
-    ) async {
+    testWidgets('Renders settings toggles, links, and log out dialog', (tester) async {
       tester.view.physicalSize = const Size(800, 1600);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() {
@@ -294,9 +288,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.text(
-          'Naviigo is committed to protecting your travel telemetry, location privacy, and booking details. Your active tracking sessions are private, temporary, and shared only with your authorized Buddies.',
-        ),
+        find.text('Naviigo is committed to protecting your travel telemetry, location privacy, and booking details. Your active tracking sessions are private, temporary, and shared only with your authorized Buddies.'),
         findsOneWidget,
       );
 
@@ -309,9 +301,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.text(
-          'All bookings, itinerary generations, and wallet credits are governed by the Naviigo Platform Terms. Prices and external provider reservations are subject to partner confirmation.',
-        ),
+        find.text('All bookings, itinerary generations, and wallet credits are governed by the Naviigo Platform Terms. Prices and external provider reservations are subject to partner confirmation.'),
         findsOneWidget,
       );
 
@@ -321,11 +311,11 @@ void main() {
   });
 
   group('HelpSupportPage Widget Tests', () {
-    testWidgets('Renders FAQ accordions and AI chat modal sheet', (
-      tester,
-    ) async {
+    testWidgets('Renders FAQ accordions and AI chat modal sheet', (tester) async {
       await tester.pumpWidget(
-        _buildTestableWidget(child: const HelpSupportPage()),
+        _buildTestableWidget(
+          child: const HelpSupportPage(),
+        ),
       );
 
       await tester.pumpAndSettle();
@@ -334,15 +324,16 @@ void main() {
       expect(find.text('CONCIERGE & SUPPORT'), findsOneWidget);
       expect(find.text('NaviiGo AI Concierge'), findsOneWidget);
       expect(find.text('FREQUENTLY ASKED QUESTIONS'), findsOneWidget);
-      expect(find.text('How do I cancel my booking or stay?'), findsOneWidget);
+      expect(
+        find.text('How do I cancel my booking or stay?'),
+        findsOneWidget,
+      );
 
       // Expand first FAQ accordion
       await tester.tap(find.text('How do I cancel my booking or stay?'));
       await tester.pumpAndSettle();
       expect(
-        find.text(
-          'You can review and manage your reservations directly from the Bookings tab. Tap any booking card to view cancellation terms or copy your offline voucher.',
-        ),
+        find.text('You can review and manage your reservations directly from the Bookings tab. Tap any booking card to view cancellation terms or copy your offline voucher.'),
         findsOneWidget,
       );
 
@@ -371,9 +362,7 @@ void main() {
   });
 
   group('DigitalPassportPage Widget Tests', () {
-    testWidgets('Renders digital passport statistics and empty state notice', (
-      tester,
-    ) async {
+    testWidgets('Renders digital passport statistics and empty state notice', (tester) async {
       const mockStats = PassportStatsModel(
         totalXP: 1850,
         statesVisited: ['Rajasthan', 'Kerala', 'Goa'],
@@ -396,7 +385,10 @@ void main() {
           'destId': 'jaipur',
           'destName': 'Royal Jaipur Heritage',
           'uuid': 'trip_1',
-          'form': {'startDate': '2026-11-20', 'days': 3},
+          'form': {
+            'startDate': '2026-11-20',
+            'days': 3,
+          },
           'generatedData': {
             'title': 'Royal Jaipur Heritage',
             'dayPlans': [
@@ -408,9 +400,9 @@ void main() {
                     'title': 'Amber Fort',
                     'time': '09:00 AM',
                     'location': 'Amer',
-                  },
+                  }
                 ],
-              },
+              }
             ],
           },
         }),
@@ -464,10 +456,7 @@ void main() {
       // Verify Moments & Stamps
       expect(find.text('MOMENTS & STAMPS'), findsOneWidget);
       expect(find.text('Amber Fort, Rajasthan'), findsOneWidget);
-      expect(
-        find.text('Reached Amer hill checkpoint at sunrise'),
-        findsOneWidget,
-      );
+      expect(find.text('Reached Amer hill checkpoint at sunrise'), findsOneWidget);
     });
   });
 
@@ -503,9 +492,7 @@ void main() {
       ),
     ];
 
-    testWidgets('Renders active bookings and opens voucher details sheet', (
-      tester,
-    ) async {
+    testWidgets('Renders active bookings and opens voucher details sheet', (tester) async {
       await tester.pumpWidget(
         _buildTestableWidget(
           child: const BookingsPage(),
@@ -547,14 +534,14 @@ void main() {
       await tester.pumpAndSettle();
     });
 
-    testWidgets('Renders empty bookings state and navigation CTA', (
-      tester,
-    ) async {
+    testWidgets('Renders empty bookings state and navigation CTA', (tester) async {
       await tester.pumpWidget(
         _buildTestableWidget(
           child: const BookingsPage(),
           overrides: [
-            bookingsStreamProvider.overrideWith((ref) => Stream.value([])),
+            bookingsStreamProvider.overrideWith(
+              (ref) => Stream.value([]),
+            ),
           ],
         ),
       );
@@ -583,41 +570,38 @@ void main() {
       ),
     ];
 
-    testWidgets(
-      'Renders saved places list with image fallback and bookmark details',
-      (tester) async {
-        await tester.pumpWidget(
-          _buildTestableWidget(
-            child: const SavedPlacesPage(),
-            overrides: [
-              savedPlacesStreamProvider.overrideWith(
-                (ref) => Stream.value(mockSavedPlaces),
-              ),
-              currentUserProvider.overrideWithValue(null),
-            ],
-          ),
-        );
-
-        await tester.pumpAndSettle();
-
-        // Verify Title & Place Items
-        expect(find.text('Saved Places'), findsOneWidget);
-        expect(find.text('Amber Fort'), findsOneWidget);
-        expect(find.text('Amer, Jaipur, Rajasthan'), findsOneWidget);
-        expect(find.text('Meenakshi Temple'), findsOneWidget);
-        expect(find.text('Madurai, Tamil Nadu'), findsOneWidget);
-        expect(find.byIcon(Icons.bookmark_remove_rounded), findsNWidgets(2));
-      },
-    );
-
-    testWidgets('Renders empty state with Explore Places button', (
-      tester,
-    ) async {
+    testWidgets('Renders saved places list with image fallback and bookmark details', (tester) async {
       await tester.pumpWidget(
         _buildTestableWidget(
           child: const SavedPlacesPage(),
           overrides: [
-            savedPlacesStreamProvider.overrideWith((ref) => Stream.value([])),
+            savedPlacesStreamProvider.overrideWith(
+              (ref) => Stream.value(mockSavedPlaces),
+            ),
+            currentUserProvider.overrideWithValue(null),
+          ],
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      // Verify Title & Place Items
+      expect(find.text('Saved Places'), findsOneWidget);
+      expect(find.text('Amber Fort'), findsOneWidget);
+      expect(find.text('Amer, Jaipur, Rajasthan'), findsOneWidget);
+      expect(find.text('Meenakshi Temple'), findsOneWidget);
+      expect(find.text('Madurai, Tamil Nadu'), findsOneWidget);
+      expect(find.byIcon(Icons.bookmark_remove_rounded), findsNWidgets(2));
+    });
+
+    testWidgets('Renders empty state with Explore Places button', (tester) async {
+      await tester.pumpWidget(
+        _buildTestableWidget(
+          child: const SavedPlacesPage(),
+          overrides: [
+            savedPlacesStreamProvider.overrideWith(
+              (ref) => Stream.value([]),
+            ),
             currentUserProvider.overrideWithValue(null),
           ],
         ),

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/auth/auth_provider.dart';
-import '../../../../core/network/api_provider.dart';
 import '../../../navigation/presentation/nav_hub_page.dart';
 import '../providers/user_provider.dart';
 
@@ -205,12 +204,6 @@ class ProfilePage extends ConsumerWidget {
               subtitle: 'Offline data, notifications & preferences',
               onTap: () => context.push('/settings'),
             ),
-            _buildOptionTile(
-              icon: Icons.restart_alt_rounded,
-              title: 'Reset AI Personalization',
-              subtitle: 'Clear all AI learned preferences & start fresh',
-              onTap: () => _resetPersonalization(context, ref),
-            ),
             const SizedBox(height: 32),
 
             // Sign Out Button
@@ -246,53 +239,6 @@ class ProfilePage extends ConsumerWidget {
         ),
       ),
     );
-  }
-
-  Future<void> _resetPersonalization(
-    BuildContext context,
-    WidgetRef ref,
-  ) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Reset AI Personalization?'),
-        content: const Text(
-          'This will clear all your learned travel behaviors, liked places, and skip preferences. New itineraries will no longer consider your past habits. Are you sure?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Reset', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true) {
-      try {
-        final client = ref.read(apiClientProvider); // Needs import
-        await client.post('/analytics/reset', body: {});
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Personalization reset successfully. Itineraries are fresh!',
-              ),
-            ),
-          );
-        }
-      } catch (e) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error resetting personalization: $e')),
-          );
-        }
-      }
-    }
   }
 
   Widget _buildMetric(String value, String label) {
