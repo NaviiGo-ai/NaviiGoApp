@@ -8,6 +8,7 @@ import '../../../../core/theme/app_typography.dart';
 import '../providers/trip_provider.dart';
 import '../../domain/models/trip_itinerary_model.dart';
 import '../widgets/itinerary_overview_widgets.dart';
+import '../widgets/post_trip_review.dart';
 import '../../../../core/widgets/no_journey_state.dart';
 import '../../../navigation/presentation/nav_hub_page.dart';
 import '../../../../core/motion/nav_haptics.dart';
@@ -27,6 +28,18 @@ class _GeneratedItineraryPageState
   // 0 = CHAPTERS OVERVIEW (Screen 5), 1 = DAY IN MOTION (Screen 6)
   int _viewMode = 0;
   int _selectedDayIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (widget.trip != null &&
+          widget.trip!.isPast &&
+          !widget.trip!.isReviewed) {
+        PostTripReviewModal.show(context, widget.trip!);
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {

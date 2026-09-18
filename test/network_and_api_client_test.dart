@@ -48,7 +48,9 @@ void main() {
     });
 
     test('ValidationException handles 400 Bad Request with details', () {
-      const exc = ValidationException('Invalid coordinates', {'lat': 'Must be between -90 and 90'});
+      const exc = ValidationException('Invalid coordinates', {
+        'lat': 'Must be between -90 and 90',
+      });
       expect(exc.statusCode, 400);
       expect(exc.message, 'Invalid coordinates');
       expect(exc.details?['lat'], contains('between -90 and 90'));

@@ -9,6 +9,7 @@ class TripActivityModel {
   final String? category;
   final String? duration;
   final String? estimatedCost;
+  final String? placeId;
   final bool isCompleted;
 
   // New rich fields from canonical backend
@@ -33,6 +34,7 @@ class TripActivityModel {
     this.category,
     this.duration,
     this.estimatedCost,
+    this.placeId,
     this.isCompleted = false,
     this.whyItFits,
     this.placeId,
@@ -60,6 +62,7 @@ class TripActivityModel {
       category: map['category']?.toString(),
       duration: map['duration']?.toString(),
       estimatedCost: (map['estimatedCost'] ?? map['cost'])?.toString(),
+      placeId: map['placeId']?.toString(),
       isCompleted: map['isCompleted'] == true,
       whyItFits: map['whyItFits']?.toString(),
       placeId: (map['placeId'] ?? map['groundedPlaceId'])?.toString(),
@@ -85,6 +88,7 @@ class TripActivityModel {
       if (category != null) 'category': category,
       if (duration != null) 'duration': duration,
       if (estimatedCost != null) 'estimatedCost': estimatedCost,
+      if (placeId != null) 'placeId': placeId,
       'isCompleted': isCompleted,
       if (whyItFits != null) 'whyItFits': whyItFits,
       if (placeId != null) 'placeId': placeId,
@@ -340,6 +344,7 @@ class TripItineraryModel {
   final Map<String, dynamic> form;
   final Map<String, dynamic>? generatedData;
   final bool isActive;
+  final bool isReviewed;
 
   /// Whether the traveller has explicitly shared this journey. Private trips
   /// never leave `users/{uid}/itineraries`.
@@ -375,6 +380,7 @@ class TripItineraryModel {
     this.form = const {},
     this.generatedData,
     this.isActive = false,
+    this.isReviewed = false,
     this.isPublic = false,
     this.createdAt,
     this.updatedAt,
@@ -462,6 +468,7 @@ class TripItineraryModel {
       form: form,
       generatedData: genData,
       isActive: data['isActive'] == true || form['isActive'] == true,
+      isReviewed: data['isReviewed'] == true,
       isPublic: data['isPublic'] == true,
       createdAt: _parseDate(data['createdAt']),
       updatedAt: _parseDate(data['updatedAt']),

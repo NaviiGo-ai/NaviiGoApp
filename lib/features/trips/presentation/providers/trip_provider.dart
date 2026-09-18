@@ -4,9 +4,12 @@ import '../../../../core/network/api_provider.dart';
 import '../../data/trip_repository.dart';
 import '../../domain/models/trip_itinerary_model.dart';
 
+import '../../../analytics/data/analytics_repository.dart';
+
 final tripRepositoryProvider = Provider<TripRepository>((ref) {
   final apiClient = ref.watch(apiClientProvider);
-  return TripRepository(apiClient: apiClient);
+  final analyticsRepo = ref.watch(analyticsRepositoryProvider);
+  return TripRepository(apiClient: apiClient, analyticsRepo: analyticsRepo);
 });
 
 /// Stream of all user trips from Firestore

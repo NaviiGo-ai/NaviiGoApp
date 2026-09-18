@@ -2,9 +2,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/auth/auth_provider.dart';
 import '../../data/saved_places_repository.dart';
 import '../../domain/models/saved_place_model.dart';
+import '../../../analytics/data/analytics_repository.dart';
 
 final savedPlacesRepositoryProvider = Provider<SavedPlacesRepository>((ref) {
-  return SavedPlacesRepository();
+  final analyticsRepo = ref.read(analyticsRepositoryProvider);
+  return SavedPlacesRepository(analyticsRepo: analyticsRepo);
 });
 
 final savedPlacesStreamProvider = StreamProvider<List<SavedPlaceModel>>((ref) {
