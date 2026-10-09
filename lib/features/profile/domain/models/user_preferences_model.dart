@@ -7,6 +7,7 @@ class UserPreferencesModel {
   final List<String> dietaryPreferences;
   final List<String> accessibilityNeeds;
   final String? homeCity;
+  final bool adaptiveAppearanceEnabled;
 
   const UserPreferencesModel({
     this.travelStyle,
@@ -15,6 +16,7 @@ class UserPreferencesModel {
     this.dietaryPreferences = const [],
     this.accessibilityNeeds = const [],
     this.homeCity,
+    this.adaptiveAppearanceEnabled = true,
   });
 
   UserPreferencesModel copyWith({
@@ -24,6 +26,7 @@ class UserPreferencesModel {
     List<String>? dietaryPreferences,
     List<String>? accessibilityNeeds,
     String? homeCity,
+    bool? adaptiveAppearanceEnabled,
   }) {
     return UserPreferencesModel(
       travelStyle: travelStyle ?? this.travelStyle,
@@ -32,6 +35,8 @@ class UserPreferencesModel {
       dietaryPreferences: dietaryPreferences ?? this.dietaryPreferences,
       accessibilityNeeds: accessibilityNeeds ?? this.accessibilityNeeds,
       homeCity: homeCity ?? this.homeCity,
+      adaptiveAppearanceEnabled:
+          adaptiveAppearanceEnabled ?? this.adaptiveAppearanceEnabled,
     );
   }
 
@@ -55,6 +60,8 @@ class UserPreferencesModel {
               .toList() ??
           [],
       homeCity: data['homeCity'] as String?,
+      adaptiveAppearanceEnabled:
+          data['adaptiveAppearanceEnabled'] as bool? ?? true,
     );
   }
 
@@ -75,6 +82,9 @@ class UserPreferencesModel {
       if (includeEmptyLists || accessibilityNeeds.isNotEmpty)
         'accessibilityNeeds': accessibilityNeeds,
       if (homeCity != null) 'homeCity': homeCity,
+      // The default is enabled, so omit it to preserve the existing empty
+      // preference document shape. Only the opt-out needs to be persisted.
+      if (!adaptiveAppearanceEnabled) 'adaptiveAppearanceEnabled': false,
     };
   }
 }

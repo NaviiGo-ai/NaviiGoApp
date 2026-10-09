@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../theme/app_colors.dart';
+import '../adaptive/adaptive_theme_extension.dart';
 import '../theme/app_typography.dart';
 
 /// Honest empty state for surfaces that need a journey to render.
@@ -22,6 +22,7 @@ class NoJourneyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = AdaptiveThemeExtension.of(context);
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -31,30 +32,30 @@ class NoJourneyState extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                color: AppColors.cream.withAlpha(120),
+                color: tokens.surfaceWarm.withAlpha(120),
                 shape: BoxShape.circle,
               ),
-              child: Icon(icon, size: 30, color: AppColors.brown),
+              child: Icon(icon, size: 30, color: tokens.editorialBrown),
             ),
             const SizedBox(height: 18),
             Text(
               title,
               textAlign: TextAlign.center,
               style: AppTypography.editorialTitle(
-                color: AppColors.brown,
+                color: tokens.editorialBrown,
               ).copyWith(fontSize: 20),
             ),
             const SizedBox(height: 8),
             Text(
               message,
               textAlign: TextAlign.center,
-              style: AppTypography.caption(color: AppColors.textSecondary),
+              style: AppTypography.caption(color: tokens.textSecondary),
             ),
             const SizedBox(height: 22),
             ElevatedButton(
               onPressed: () => context.push('/trip-planner'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
+                backgroundColor: tokens.primaryAction,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 26,
                   vertical: 14,

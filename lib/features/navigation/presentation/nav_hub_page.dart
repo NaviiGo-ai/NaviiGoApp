@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/adaptive/adaptive_theme_extension.dart';
 import '../../../core/motion/nav_haptics.dart';
 import '../../../core/motion/nav_motion.dart';
 import '../../../core/theme/app_colors.dart';
@@ -149,6 +150,7 @@ class _NavHubPageState extends ConsumerState<NavHubPage> {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = AdaptiveThemeExtension.of(context);
     _restoreChromeOnRouteChange(context);
 
     final int currentIndex = _calculateSelectedIndex(context);
@@ -156,7 +158,7 @@ class _NavHubPageState extends ConsumerState<NavHubPage> {
 
     return Scaffold(
       key: navHubScaffoldKey,
-      backgroundColor: AppColors.background,
+      backgroundColor: tokens.background,
       // One drawer for every in-shell route. Without this the app had no
       // reachable navigation beyond the five bottom-nav roots.
       drawer: const NavDrawer(),
@@ -217,6 +219,7 @@ class _NavBottomBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = AdaptiveThemeExtension.of(context);
     // Clamp before arithmetic so transient out-of-range provider values
     // (e.g. from rapid route changes) never produce pathological heights.
     final double safeCollapse = collapse.clamp(0.0, 1.0);
@@ -225,9 +228,9 @@ class _NavBottomBar extends StatelessWidget {
     final double height = lerpDouble(62, 54, safeCollapse);
 
     return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        border: Border(top: BorderSide(color: AppColors.border, width: 1)),
+      decoration: BoxDecoration(
+        color: tokens.surface,
+        border: Border(top: BorderSide(color: tokens.border, width: 1)),
       ),
       child: SafeArea(
         top: false,
@@ -258,7 +261,7 @@ class _NavBottomBar extends StatelessWidget {
                           width: 48,
                           height: 28,
                           decoration: BoxDecoration(
-                            color: AppColors.cream.withAlpha(150),
+                            color: tokens.surfaceWarm.withAlpha(150),
                             borderRadius: BorderRadius.circular(14),
                           ),
                         ),
@@ -303,12 +306,13 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = AdaptiveThemeExtension.of(context);
     // collapse is already clamped by _NavBottomBar before being passed here,
     // but guard again in case _NavItem is ever instantiated directly.
     final double safeCollapse = collapse.clamp(0.0, 1.0);
     final Color color = isSelected
-        ? AppColors.primary
-        : AppColors.textSecondary;
+        ? tokens.accentEmphasis
+        : tokens.textSecondary;
 
     return Expanded(
       child: Semantics(
