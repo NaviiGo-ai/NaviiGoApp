@@ -2,8 +2,9 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../adaptive/adaptive_motion_profile.dart';
+import '../adaptive/adaptive_theme_extension.dart';
 import '../motion/nav_motion.dart';
-import '../theme/app_colors.dart';
 
 /// What the line is currently representing. The same geometry carries a
 /// different meaning in each stage of a journey, so it must not look the same.
@@ -48,35 +49,38 @@ class _JourneyPalette {
     this.historical = false,
   });
 
-  static _JourneyPalette of(JourneyLineMode mode) => switch (mode) {
-    JourneyLineMode.plan => const _JourneyPalette(
-      completed: AppColors.primary,
-      active: AppColors.primary,
-      future: AppColors.surfaceWarm,
-      futureBorder: AppColors.borderStrong,
-      halo: AppColors.primary,
+  static _JourneyPalette of(
+    JourneyLineMode mode,
+    AdaptiveThemeExtension tokens,
+  ) => switch (mode) {
+    JourneyLineMode.plan => _JourneyPalette(
+      completed: tokens.journeyLineCompleted,
+      active: tokens.journeyLineActive,
+      future: tokens.journeyLineFuture,
+      futureBorder: tokens.journeyLineFutureBorder,
+      halo: tokens.journeyLineHalo,
     ),
-    JourneyLineMode.itinerary => const _JourneyPalette(
-      completed: AppColors.primary,
-      active: AppColors.primary,
-      future: AppColors.surfaceWarm,
-      futureBorder: AppColors.border,
-      halo: AppColors.primary,
+    JourneyLineMode.itinerary => _JourneyPalette(
+      completed: tokens.journeyLineCompleted,
+      active: tokens.journeyLineActive,
+      future: tokens.journeyLineFuture,
+      futureBorder: tokens.border,
+      halo: tokens.journeyLineHalo,
     ),
-    JourneyLineMode.live => const _JourneyPalette(
-      completed: AppColors.teal,
-      active: AppColors.teal,
-      future: AppColors.surfaceWarm,
-      futureBorder: AppColors.border,
-      halo: AppColors.teal,
+    JourneyLineMode.live => _JourneyPalette(
+      completed: tokens.journeyLineCompleted,
+      active: tokens.journeyLineActive,
+      future: tokens.journeyLineFuture,
+      futureBorder: tokens.border,
+      halo: tokens.journeyLineHalo,
       pulse: true,
     ),
-    JourneyLineMode.passport => const _JourneyPalette(
-      completed: AppColors.brown,
-      active: AppColors.yellow,
-      future: AppColors.surfaceMuted,
-      futureBorder: AppColors.border,
-      halo: AppColors.yellow,
+    JourneyLineMode.passport => _JourneyPalette(
+      completed: tokens.editorialBrown,
+      active: tokens.secondaryEmphasis,
+      future: tokens.surfaceMuted,
+      futureBorder: tokens.border,
+      halo: tokens.secondaryEmphasis,
       historical: true,
     ),
   };
@@ -141,7 +145,7 @@ class _JourneyLineState extends State<JourneyLine>
 
   /// Only a live journey breathes, and never when motion is reduced.
   void _syncPulse() {
-    final wanted = _JourneyPalette.of(widget.mode).pulse;
+    final wanted = widget.mode == JourneyLineMode.live;
     if (wanted && _pulse == null) {
       _pulse = AnimationController(
         vsync: this,
@@ -164,14 +168,19 @@ class _JourneyLineState extends State<JourneyLine>
     if (widget.totalSteps <= 1) return const SizedBox.shrink();
 
     final bool reduced = NavReduce.of(context);
-    final palette = _JourneyPalette.of(widget.mode);
+    final tokens = AdaptiveThemeExtension.of(context);
+    final adaptiveMotion = AdaptiveMotionScope.maybeOf(context);
+    final palette = _JourneyPalette.of(widget.mode, tokens);
 
     final Widget painter = TweenAnimationBuilder<double>(
       // On the first build begin == end, so nothing moves. When currentStep
       // changes, the line animates from wherever it currently is to the new
       // waypoint — progress, rather than a cut.
       tween: Tween<double>(begin: widget.currentStep, end: widget.currentStep),
-      duration: NavReduce.geometry(context, NavMotion.editorial),
+      duration: NavReduce.geometry(
+        context,
+        adaptiveMotion?.sectionReveal ?? NavMotion.editorial,
+      ),
       curve: NavMotion.settle,
       builder: (context, animatedStep, _) {
         final Widget canvas = CustomPaint(
@@ -182,7 +191,12 @@ class _JourneyLineState extends State<JourneyLine>
             palette: palette,
             axis: widget.axis,
             thickness: widget.thickness,
-            pulse: (reduced || _pulse == null) ? 0.0 : _pulse!.value,
+            pulse:
+                (reduced ||
+                    adaptiveMotion?.allowDecorativeMotion == false ||
+                    _pulse == null)
+                ? 0.0
+                : _pulse!.value,
           ),
         );
 
