@@ -207,7 +207,8 @@ class LiveTripState {
       trip: trip ?? this.trip,
       checkIns: checkIns ?? this.checkIns,
       fix: fix ?? this.fix,
-      hasLocationPermission: hasLocationPermission ?? this.hasLocationPermission,
+      hasLocationPermission:
+          hasLocationPermission ?? this.hasLocationPermission,
       startCheck: startCheck ?? this.startCheck,
       conflictingTrip: conflictingTrip ?? this.conflictingTrip,
       locationFailure: locationFailure ?? this.locationFailure,
@@ -215,8 +216,9 @@ class LiveTripState {
       lastUpdated: lastUpdated ?? this.lastUpdated,
       isResolvingLocation: isResolvingLocation ?? this.isResolvingLocation,
       isStartingTrip: isStartingTrip ?? this.isStartingTrip,
-      lastActionError:
-          clearActionError ? null : (lastActionError ?? this.lastActionError),
+      lastActionError: clearActionError
+          ? null
+          : (lastActionError ?? this.lastActionError),
     );
   }
 
@@ -238,7 +240,8 @@ class LiveTripState {
             activity: activity,
             // An explicit check-in wins; a server-side `isCompleted` is
             // honoured only when the traveller has not contradicted it.
-            checkIn: checkIns[key] ??
+            checkIn:
+                checkIns[key] ??
                 (activity.isCompleted
                     ? TripCheckIn.completed
                     : TripCheckIn.pending),
@@ -328,7 +331,9 @@ class LiveTripState {
     final check = startCheck;
     if (check == null) return LiveTripPhase.preTrip;
     if (check.status == StartTripStatus.valid) return LiveTripPhase.atStart;
-    if (check.status == StartTripStatus.wrongCity) return LiveTripPhase.wrongCity;
+    if (check.status == StartTripStatus.wrongCity) {
+      return LiveTripPhase.wrongCity;
+    }
     return LiveTripPhase.preTrip;
   }
 

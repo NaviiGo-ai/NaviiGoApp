@@ -54,9 +54,11 @@ Widget _harness({
   return ProviderScope(
     overrides: [
       activeTripProvider.overrideWithValue(trip),
-      userTripsStreamProvider.overrideWith((ref) => Stream.value(
-            trips ?? (trip == null ? <TripItineraryModel>[] : [trip]),
-          )),
+      userTripsStreamProvider.overrideWith(
+        (ref) => Stream.value(
+          trips ?? (trip == null ? <TripItineraryModel>[] : [trip]),
+        ),
+      ),
       bookingsStreamProvider.overrideWith((ref) => Stream.value(bookings)),
       checkInStoreProvider.overrideWithValue(InMemoryCheckInStore()),
       currentUserIdProvider.overrideWithValue('pilot_1'),
@@ -70,7 +72,9 @@ Widget _harness({
 
 void main() {
   group('LiveTrackingPage — no journey', () {
-    testWidgets('idles honestly when there is nothing to track', (tester) async {
+    testWidgets('idles honestly when there is nothing to track', (
+      tester,
+    ) async {
       await tester.pumpWidget(_harness(trip: null));
       await tester.pumpAndSettle();
 
@@ -78,8 +82,9 @@ void main() {
       expect(find.text('LIVE JOURNEY'), findsOneWidget);
     });
 
-    testWidgets('judges the journey it was opened for, not the list head',
-        (tester) async {
+    testWidgets('judges the journey it was opened for, not the list head', (
+      tester,
+    ) async {
       // Another, unrelated journey the traveller is not about to start. It comes
       // first in the stream, which is exactly the trip a positional fallback
       // would have wrongly judged.
@@ -100,12 +105,14 @@ void main() {
       });
       final tapped = _trip();
 
-      await tester.pumpWidget(_harness(
-        trip: null,
-        trips: [unrelated, tapped],
-        initialTrip: tapped,
-        fix: _jaipur(),
-      ));
+      await tester.pumpWidget(
+        _harness(
+          trip: null,
+          trips: [unrelated, tapped],
+          initialTrip: tapped,
+          fix: _jaipur(),
+        ),
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('START JOURNEY'), findsOneWidget);
@@ -123,8 +130,9 @@ void main() {
       expect(find.textContaining('Jaipur'), findsWidgets);
     });
 
-    testWidgets('wrong city renders distance and every recovery action',
-        (tester) async {
+    testWidgets('wrong city renders distance and every recovery action', (
+      tester,
+    ) async {
       await tester.pumpWidget(_harness(trip: _trip(), fix: _delhi()));
       await tester.pumpAndSettle();
 
@@ -139,8 +147,9 @@ void main() {
       expect(find.text('Pre-Trip Mode'), findsOneWidget);
     });
 
-    testWidgets('a denied permission is named, not glossed over',
-        (tester) async {
+    testWidgets('a denied permission is named, not glossed over', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         _harness(trip: _trip(), hasPermission: false, fix: null),
       );
@@ -149,14 +158,12 @@ void main() {
       expect(find.text('LOCATION NOT VERIFIED'), findsOneWidget);
       expect(find.text('VERIFY YOUR START'), findsOneWidget);
       // Naviigo's own words, not a permission constant.
-      expect(
-        find.textContaining('Naviigo uses your location'),
-        findsOneWidget,
-      );
+      expect(find.textContaining('Naviigo uses your location'), findsOneWidget);
     });
 
-    testWidgets('pre-trip mode drops the start offer and shows the plan',
-        (tester) async {
+    testWidgets('pre-trip mode drops the start offer and shows the plan', (
+      tester,
+    ) async {
       await tester.pumpWidget(_harness(trip: _trip(), fix: _delhi()));
       await tester.pumpAndSettle();
 
@@ -172,10 +179,14 @@ void main() {
   });
 
   group('LiveTrackingPage — in motion', () {
-    testWidgets('shows the NOW / NEXT / ROUTE hierarchy from real state',
-        (tester) async {
+    testWidgets('shows the NOW / NEXT / ROUTE hierarchy from real state', (
+      tester,
+    ) async {
       await tester.pumpWidget(
-        _harness(trip: _trip(isActive: true, status: 'active'), fix: _jaipur()),
+        _harness(
+          trip: _trip(isActive: true, status: 'active'),
+          fix: _jaipur(),
+        ),
       );
       await tester.pumpAndSettle();
 
@@ -195,10 +206,14 @@ void main() {
       expect(find.text('SKIP'), findsOneWidget);
     });
 
-    testWidgets('COMPLETE advances the rail and says what is left',
-        (tester) async {
+    testWidgets('COMPLETE advances the rail and says what is left', (
+      tester,
+    ) async {
       await tester.pumpWidget(
-        _harness(trip: _trip(isActive: true, status: 'active'), fix: _jaipur()),
+        _harness(
+          trip: _trip(isActive: true, status: 'active'),
+          fix: _jaipur(),
+        ),
       );
       await tester.pumpAndSettle();
 
@@ -210,10 +225,14 @@ void main() {
       expect(find.text('0 of 2 waypoints logged'), findsNothing);
     });
 
-    testWidgets('SKIP is recorded as skipped, not as completed',
-        (tester) async {
+    testWidgets('SKIP is recorded as skipped, not as completed', (
+      tester,
+    ) async {
       await tester.pumpWidget(
-        _harness(trip: _trip(isActive: true, status: 'active'), fix: _jaipur()),
+        _harness(
+          trip: _trip(isActive: true, status: 'active'),
+          fix: _jaipur(),
+        ),
       );
       await tester.pumpAndSettle();
 
@@ -228,10 +247,14 @@ void main() {
       );
     });
 
-    testWidgets('no fabricated buddy, telemetry or progress is rendered',
-        (tester) async {
+    testWidgets('no fabricated buddy, telemetry or progress is rendered', (
+      tester,
+    ) async {
       await tester.pumpWidget(
-        _harness(trip: _trip(isActive: true, status: 'active'), fix: _jaipur()),
+        _harness(
+          trip: _trip(isActive: true, status: 'active'),
+          fix: _jaipur(),
+        ),
       );
       await tester.pumpAndSettle();
 
@@ -246,8 +269,9 @@ void main() {
       expect(find.textContaining('%'), findsNothing);
     });
 
-    testWidgets('offline is shown only with a real last-updated label',
-        (tester) async {
+    testWidgets('offline is shown only with a real last-updated label', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         _harness(
           trip: _trip(isActive: true, status: 'active'),
@@ -261,10 +285,14 @@ void main() {
       expect(find.text('NOT YET SYNCED'), findsOneWidget);
     });
 
-    testWidgets('route deviation states a measurement, not an alarm',
-        (tester) async {
+    testWidgets('route deviation states a measurement, not an alarm', (
+      tester,
+    ) async {
       await tester.pumpWidget(
-        _harness(trip: _trip(isActive: true, status: 'active'), fix: _delhi()),
+        _harness(
+          trip: _trip(isActive: true, status: 'active'),
+          fix: _delhi(),
+        ),
       );
       await tester.pumpAndSettle();
 
@@ -276,8 +304,9 @@ void main() {
       );
     });
 
-    testWidgets('safety reports a missing fix rather than inventing one',
-        (tester) async {
+    testWidgets('safety reports a missing fix rather than inventing one', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         _harness(trip: _trip(isActive: true, status: 'active'), fix: null),
       );
@@ -287,49 +316,54 @@ void main() {
       expect(find.text('HOLD FOR 112'), findsOneWidget);
     });
 
-    testWidgets('real vouchers for the destination are listed, others are not',
-        (tester) async {
-      await tester.pumpWidget(
-        _harness(
-          trip: _trip(isActive: true, status: 'active'),
-          fix: _jaipur(),
-          bookings: const [
-            BookingModel(
-              id: 'b1',
-              type: 'flight',
-              status: 'confirmed',
-              from: 'DEL',
-              to: 'JAI',
-              date: '2026-11-20',
-              providerName: 'IndiGo',
-              pnr: '6E-4521',
-              totalPrice: 4200,
-            ),
-            BookingModel(
-              id: 'b2',
-              type: 'train',
-              status: 'confirmed',
-              from: 'MAS',
-              to: 'COK',
-              date: '2026-11-22',
-              providerName: 'IRCTC',
-              pnr: '12345',
-              totalPrice: 900,
-            ),
-          ],
-        ),
-      );
-      await tester.pumpAndSettle();
+    testWidgets(
+      'real vouchers for the destination are listed, others are not',
+      (tester) async {
+        await tester.pumpWidget(
+          _harness(
+            trip: _trip(isActive: true, status: 'active'),
+            fix: _jaipur(),
+            bookings: const [
+              BookingModel(
+                id: 'b1',
+                type: 'flight',
+                status: 'confirmed',
+                from: 'DEL',
+                to: 'JAI',
+                date: '2026-11-20',
+                providerName: 'IndiGo',
+                pnr: '6E-4521',
+                totalPrice: 4200,
+              ),
+              BookingModel(
+                id: 'b2',
+                type: 'train',
+                status: 'confirmed',
+                from: 'MAS',
+                to: 'COK',
+                date: '2026-11-22',
+                providerName: 'IRCTC',
+                pnr: '12345',
+                totalPrice: 900,
+              ),
+            ],
+          ),
+        );
+        await tester.pumpAndSettle();
 
-      expect(find.text('DEL → JAI'), findsOneWidget);
-      expect(find.text('MAS → COK'), findsNothing);
-    });
+        expect(find.text('DEL → JAI'), findsOneWidget);
+        expect(find.text('MAS → COK'), findsNothing);
+      },
+    );
   });
 
   group('LiveTrackingPage — closed journeys', () {
     testWidgets('a completed journey stops offering check-ins', (tester) async {
       await tester.pumpWidget(
-        _harness(trip: _trip(status: 'completed'), fix: _jaipur()),
+        _harness(
+          trip: _trip(status: 'completed'),
+          fix: _jaipur(),
+        ),
       );
       await tester.pumpAndSettle();
 
@@ -338,10 +372,14 @@ void main() {
       expect(find.text('START JOURNEY'), findsNothing);
     });
 
-    testWidgets('a cancelled journey claims nothing is being tracked',
-        (tester) async {
+    testWidgets('a cancelled journey claims nothing is being tracked', (
+      tester,
+    ) async {
       await tester.pumpWidget(
-        _harness(trip: _trip(status: 'cancelled'), fix: _jaipur()),
+        _harness(
+          trip: _trip(status: 'cancelled'),
+          fix: _jaipur(),
+        ),
       );
       await tester.pumpAndSettle();
 

@@ -40,7 +40,9 @@ class HiveCheckInStore implements CheckInStore {
     if (raw is Map) {
       return {
         for (final entry in raw.entries)
-          entry.key.toString(): TripCheckInX.fromString(entry.value?.toString()),
+          entry.key.toString(): TripCheckInX.fromString(
+            entry.value?.toString(),
+          ),
       };
     }
     return {};
@@ -76,8 +78,9 @@ final currentUserIdProvider = Provider<String?>(
 typedef StartTripWriter = Future<void> Function(String uid, String tripId);
 
 final startTripWriterProvider = Provider<StartTripWriter>(
-  (ref) => (uid, tripId) =>
-      ref.read(tripRepositoryProvider).setActiveTrip(uid, tripId),
+  (ref) =>
+      (uid, tripId) =>
+          ref.read(tripRepositoryProvider).setActiveTrip(uid, tripId),
 );
 
 /// Ends a journey the traveller explicitly walked away from. Separate from the
@@ -86,8 +89,8 @@ final startTripWriterProvider = Provider<StartTripWriter>(
 typedef EndTripWriter = Future<void> Function(String uid, String tripId);
 
 final endTripWriterProvider = Provider<EndTripWriter>(
-  (ref) => (uid, tripId) =>
-      ref.read(tripRepositoryProvider).endTrip(uid, tripId),
+  (ref) =>
+      (uid, tripId) => ref.read(tripRepositoryProvider).endTrip(uid, tripId),
 );
 
 /// The platform implementation. Widgets and providers never touch the plugin.
@@ -152,7 +155,7 @@ final liveTripCommandProvider = StateProvider<LiveTripCommandState>(
 /// The controller owns the traveller's check-ins for one journey.
 class LiveTripController extends StateNotifier<Map<String, TripCheckIn>> {
   LiveTripController(this._ref, this.tripId, this._store)
-      : super(_store.read(tripId));
+    : super(_store.read(tripId));
 
   final Ref _ref;
   final String tripId;
@@ -304,18 +307,19 @@ class LiveTripController extends StateNotifier<Map<String, TripCheckIn>> {
 }
 
 final liveTripControllerProvider =
-    StateNotifierProvider.family<LiveTripController, Map<String, TripCheckIn>,
-        String>((ref, tripId) {
-  return LiveTripController(
-    ref,
-    tripId,
-    ref.watch(checkInStoreProvider),
-  );
-});
+    StateNotifierProvider.family<
+      LiveTripController,
+      Map<String, TripCheckIn>,
+      String
+    >((ref, tripId) {
+      return LiveTripController(ref, tripId, ref.watch(checkInStoreProvider));
+    });
 
 /// Everything the live screen renders, derived from real inputs only.
-final liveTripStateProvider =
-    Provider.family<LiveTripState, TripItineraryModel>((ref, trip) {
+final liveTripStateProvider = Provider.family<LiveTripState, TripItineraryModel>((
+  ref,
+  trip,
+) {
   final commands = ref.watch(liveTripCommandProvider);
   final fix = ref.watch(liveTripFixProvider);
   final permission = ref.watch(liveTripPermissionProvider);
@@ -332,18 +336,19 @@ final liveTripStateProvider =
     }
   }
 
-  final startCheck =
-      ref.watch(liveTripValidationServiceProvider).validateStartTrip(
-            trip: trip,
-            currentUserId: userId,
-            userLat: fix?.lat,
-            userLng: fix?.lng,
-            gpsAccuracyMeters: fix?.accuracyMeters,
-            fixTimestamp: fix?.timestamp,
-            hasLocationPermission: permission,
-            locationFailure: locationFailure,
-            hasOtherActiveTrip: conflict != null,
-          );
+  final startCheck = ref
+      .watch(liveTripValidationServiceProvider)
+      .validateStartTrip(
+        trip: trip,
+        currentUserId: userId,
+        userLat: fix?.lat,
+        userLng: fix?.lng,
+        gpsAccuracyMeters: fix?.accuracyMeters,
+        fixTimestamp: fix?.timestamp,
+        hasLocationPermission: permission,
+        locationFailure: locationFailure,
+        hasOtherActiveTrip: conflict != null,
+      );
 
   return LiveTripState(
     trip: trip,

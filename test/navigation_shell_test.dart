@@ -171,23 +171,30 @@ void main() {
       }
     });
 
-    testWidgets('trip planner route inside ShellRoute retains bottom nav items', (
-      tester,
-    ) async {
-      await tester.pumpWidget(
-        ProviderScope(
-          child: MaterialApp.router(
-            routerConfig: _router(initial: '/trip-planner'),
+    testWidgets(
+      'trip planner route inside ShellRoute retains bottom nav items',
+      (tester) async {
+        await tester.pumpWidget(
+          ProviderScope(
+            child: MaterialApp.router(
+              routerConfig: _router(initial: '/trip-planner'),
+            ),
           ),
-        ),
-      );
-      await tester.pumpAndSettle();
+        );
+        await tester.pumpAndSettle();
 
-      expect(find.text('TRIP PLANNER PAGE'), findsOneWidget);
-      for (final label in ['Home', 'Explore', 'Trips', 'Passport', 'Profile']) {
-        expect(find.text(label), findsOneWidget);
-      }
-    });
+        expect(find.text('TRIP PLANNER PAGE'), findsOneWidget);
+        for (final label in [
+          'Home',
+          'Explore',
+          'Trips',
+          'Passport',
+          'Profile',
+        ]) {
+          expect(find.text(label), findsOneWidget);
+        }
+      },
+    );
   });
 
   group('NavHubPage chrome coordination (§4)', () {

@@ -33,7 +33,8 @@ void main() {
     expect(
       probe.permissionGranted,
       isTrue,
-      reason: 'Grant the permission before running this test — see the file '
+      reason:
+          'Grant the permission before running this test — see the file '
           'header. Got failure: ${probe.failure}',
     );
   }
@@ -56,7 +57,8 @@ void main() {
       expect(
         result.failure,
         isNull,
-        reason: 'expected location services on and a readable position; '
+        reason:
+            'expected location services on and a readable position; '
             'got ${result.failure}',
       );
       expect(result.permissionGranted, isTrue);

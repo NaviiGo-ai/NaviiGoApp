@@ -97,13 +97,19 @@ void main() {
       await tester.pumpWidget(
         MediaQuery(
           data: const MediaQueryData(),
-          child: Directionality(textDirection: TextDirection.ltr, child: probe()),
+          child: Directionality(
+            textDirection: TextDirection.ltr,
+            child: probe(),
+          ),
         ),
       );
       await tester.pumpWidget(
         MediaQuery(
           data: const MediaQueryData(disableAnimations: true),
-          child: Directionality(textDirection: TextDirection.ltr, child: probe()),
+          child: Directionality(
+            textDirection: TextDirection.ltr,
+            child: probe(),
+          ),
         ),
       );
 

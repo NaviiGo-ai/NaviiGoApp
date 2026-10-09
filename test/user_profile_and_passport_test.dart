@@ -112,30 +112,33 @@ void main() {
       expect(booking.totalPrice, 4200.0);
     });
 
-    test('Saved place routing disambiguates city destinations from venue places', () {
-      expect(findDestinationById('jaipur') != null, isTrue);
-      expect(findDestinationById('place_city_palace') != null, isFalse);
+    test(
+      'Saved place routing disambiguates city destinations from venue places',
+      () {
+        expect(findDestinationById('jaipur') != null, isTrue);
+        expect(findDestinationById('place_city_palace') != null, isFalse);
 
-      const cityPlace = SavedPlaceModel(
-        id: 'jaipur',
-        name: 'Jaipur',
-        type: 'destination',
-      );
-      const venuePlace = SavedPlaceModel(
-        id: 'place_city_palace',
-        name: 'City Palace',
-        type: 'Heritage Site',
-      );
+        const cityPlace = SavedPlaceModel(
+          id: 'jaipur',
+          name: 'Jaipur',
+          type: 'destination',
+        );
+        const venuePlace = SavedPlaceModel(
+          id: 'place_city_palace',
+          name: 'City Palace',
+          type: 'Heritage Site',
+        );
 
-      final isCity1 =
-          findDestinationById(cityPlace.id) != null ||
-          cityPlace.type.toLowerCase() == 'destination';
-      final isCity2 =
-          findDestinationById(venuePlace.id) != null ||
-          venuePlace.type.toLowerCase() == 'destination';
+        final isCity1 =
+            findDestinationById(cityPlace.id) != null ||
+            cityPlace.type.toLowerCase() == 'destination';
+        final isCity2 =
+            findDestinationById(venuePlace.id) != null ||
+            venuePlace.type.toLowerCase() == 'destination';
 
-      expect(isCity1, isTrue);
-      expect(isCity2, isFalse);
-    });
+        expect(isCity1, isTrue);
+        expect(isCity2, isFalse);
+      },
+    );
   });
 }

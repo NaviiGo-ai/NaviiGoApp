@@ -172,9 +172,7 @@ void main() {
 
         await tester.pumpWidget(
           MaterialApp(
-            home: Scaffold(
-              body: ItineraryStatsRow(trip: emptyTrip),
-            ),
+            home: Scaffold(body: ItineraryStatsRow(trip: emptyTrip)),
           ),
         );
 
@@ -208,9 +206,7 @@ void main() {
 
         await tester.pumpWidget(
           MaterialApp(
-            home: Scaffold(
-              body: ItineraryStatsRow(trip: trip),
-            ),
+            home: Scaffold(body: ItineraryStatsRow(trip: trip)),
           ),
         );
 

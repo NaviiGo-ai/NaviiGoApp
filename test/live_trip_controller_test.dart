@@ -102,7 +102,9 @@ void main() {
     test('walks the waypoint rail through manual check-ins', () async {
       final trip = _jaipurTrip(isActive: true, status: 'active');
       final container = _container();
-      final controller = container.read(liveTripControllerProvider(trip.id).notifier);
+      final controller = container.read(
+        liveTripControllerProvider(trip.id).notifier,
+      );
 
       var state = container.read(liveTripStateProvider(trip));
       expect(state.totalWaypoints, 3);
@@ -174,8 +176,9 @@ void main() {
     test('clearing a check-in puts the waypoint back on the rail', () async {
       final trip = _jaipurTrip(isActive: true, status: 'active');
       final container = _container();
-      final controller =
-          container.read(liveTripControllerProvider(trip.id).notifier);
+      final controller = container.read(
+        liveTripControllerProvider(trip.id).notifier,
+      );
 
       await controller.logCheckIn(
         LiveTripState.waypointKey(0, 0),
@@ -219,15 +222,20 @@ void main() {
         container.read(liveTripStateProvider(planned)).phase,
         LiveTripPhase.preTrip,
       );
-      expect(container.read(liveTripStateProvider(planned)).status,
-          TripStatus.eligibleToStart);
+      expect(
+        container.read(liveTripStateProvider(planned)).status,
+        TripStatus.eligibleToStart,
+      );
 
       for (final entry in {
         'active': LiveTripPhase.inMotion,
         'completed': LiveTripPhase.finished,
         'cancelled': LiveTripPhase.cancelled,
       }.entries) {
-        final trip = _jaipurTrip(isActive: entry.key == 'active', status: entry.key);
+        final trip = _jaipurTrip(
+          isActive: entry.key == 'active',
+          status: entry.key,
+        );
         expect(
           _container().read(liveTripStateProvider(trip)).phase,
           entry.value,
@@ -262,31 +270,36 @@ void main() {
       );
     });
 
-    test('reports wrong city with distance and destination for recovery', () async {
-      final trip = _jaipurTrip();
-      final container = _container(
-        location: _FakeLocationAdapter(
-          LocationResult(
-            fix: LiveFix(
-              lat: 28.6139, // Delhi
-              lng: 77.2090,
-              accuracyMeters: 15,
-              timestamp: DateTime.now(),
+    test(
+      'reports wrong city with distance and destination for recovery',
+      () async {
+        final trip = _jaipurTrip();
+        final container = _container(
+          location: _FakeLocationAdapter(
+            LocationResult(
+              fix: LiveFix(
+                lat: 28.6139, // Delhi
+                lng: 77.2090,
+                accuracyMeters: 15,
+                timestamp: DateTime.now(),
+              ),
+              permissionGranted: true,
             ),
-            permissionGranted: true,
           ),
-        ),
-      );
+        );
 
-      await container.read(liveTripControllerProvider(trip.id).notifier).refreshLocation();
+        await container
+            .read(liveTripControllerProvider(trip.id).notifier)
+            .refreshLocation();
 
-      final state = container.read(liveTripStateProvider(trip));
-      expect(state.phase, LiveTripPhase.wrongCity);
-      expect(state.canStartTrip, isFalse);
-      expect(state.startCheck!.expectedDestinationName, 'Jaipur');
-      expect(state.startCheck!.distanceKm, greaterThan(200));
-      expect(state.startCheck!.distanceLabel, endsWith('km'));
-    });
+        final state = container.read(liveTripStateProvider(trip));
+        expect(state.phase, LiveTripPhase.wrongCity);
+        expect(state.canStartTrip, isFalse);
+        expect(state.startCheck!.expectedDestinationName, 'Jaipur');
+        expect(state.startCheck!.distanceKm, greaterThan(200));
+        expect(state.startCheck!.distanceLabel, endsWith('km'));
+      },
+    );
 
     test('at the start region the gate opens and the start succeeds', () async {
       final trip = _jaipurTrip();
@@ -306,8 +319,9 @@ void main() {
         writer: (uid, tripId) async => started.add('$uid/$tripId'),
       );
 
-      final controller =
-          container.read(liveTripControllerProvider(trip.id).notifier);
+      final controller = container.read(
+        liveTripControllerProvider(trip.id).notifier,
+      );
       await controller.refreshLocation();
 
       final state = container.read(liveTripStateProvider(trip));
@@ -332,7 +346,9 @@ void main() {
         ),
       );
 
-      await container.read(liveTripControllerProvider(trip.id).notifier).refreshLocation();
+      await container
+          .read(liveTripControllerProvider(trip.id).notifier)
+          .refreshLocation();
 
       final state = container.read(liveTripStateProvider(trip));
       expect(state.startCheck!.status, StartTripStatus.permissionDenied);
@@ -360,8 +376,9 @@ void main() {
         writer: (uid, tripId) async => throw Exception('offline'),
       );
 
-      final controller =
-          container.read(liveTripControllerProvider(trip.id).notifier);
+      final controller = container.read(
+        liveTripControllerProvider(trip.id).notifier,
+      );
       await controller.refreshLocation();
 
       expect(await controller.startTrip(trip), isFalse);
@@ -390,8 +407,9 @@ void main() {
         ),
       );
 
-      final controller =
-          container.read(liveTripControllerProvider(trip.id).notifier);
+      final controller = container.read(
+        liveTripControllerProvider(trip.id).notifier,
+      );
       await controller.refreshLocation();
 
       expect(
@@ -460,8 +478,8 @@ void main() {
         'Just now',
       );
 
-      container.read(liveTripLastSyncProvider.notifier).state =
-          DateTime.now().subtract(const Duration(minutes: 12));
+      container.read(liveTripLastSyncProvider.notifier).state = DateTime.now()
+          .subtract(const Duration(minutes: 12));
       expect(
         container.read(liveTripStateProvider(trip)).lastUpdatedLabel,
         '12 min ago',

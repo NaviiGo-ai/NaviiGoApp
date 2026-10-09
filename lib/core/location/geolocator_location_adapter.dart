@@ -29,19 +29,14 @@ class GeolocatorLocationAdapter implements LocationAdapter {
         );
       }
 
-      return LocationResult(
-        fix: await _acquireFix(),
-        permissionGranted: true,
-      );
+      return LocationResult(fix: await _acquireFix(), permissionGranted: true);
     } on TimeoutException {
       return const LocationResult(
         permissionGranted: true,
         failure: LocationFailure.timeout,
       );
     } on PermissionDeniedException {
-      return const LocationResult(
-        failure: LocationFailure.permissionDenied,
-      );
+      return const LocationResult(failure: LocationFailure.permissionDenied);
     } on LocationServiceDisabledException {
       return const LocationResult(
         permissionGranted: true,
@@ -90,7 +85,11 @@ class GeolocatorLocationAdapter implements LocationAdapter {
   /// enough".
   Future<LiveFix> _acquireFix() async {
     LiveFix? best;
-    for (var attempt = 0; attempt < LocationPolicy.maxAccuracyAttempts; attempt++) {
+    for (
+      var attempt = 0;
+      attempt < LocationPolicy.maxAccuracyAttempts;
+      attempt++
+    ) {
       final position = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,

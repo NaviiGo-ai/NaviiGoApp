@@ -49,8 +49,14 @@ class TripActivityModel {
   });
 
   factory TripActivityModel.fromMap(Map<String, dynamic> map) {
-    final latRaw = map['lat'] ?? map['latitude'] ?? (map['coordinates'] is Map ? (map['coordinates'] as Map)['lat'] : null);
-    final lngRaw = map['lng'] ?? map['longitude'] ?? (map['coordinates'] is Map ? (map['coordinates'] as Map)['lng'] : null);
+    final latRaw =
+        map['lat'] ??
+        map['latitude'] ??
+        (map['coordinates'] is Map ? (map['coordinates'] as Map)['lat'] : null);
+    final lngRaw =
+        map['lng'] ??
+        map['longitude'] ??
+        (map['coordinates'] is Map ? (map['coordinates'] as Map)['lng'] : null);
 
     return TripActivityModel(
       title: (map['title'] ?? map['name'] ?? 'Activity').toString(),
@@ -63,10 +69,15 @@ class TripActivityModel {
       isCompleted: map['isCompleted'] == true,
       whyItFits: map['whyItFits']?.toString(),
       placeId: (map['placeId'] ?? map['groundedPlaceId'])?.toString(),
-      lat: latRaw is num ? latRaw.toDouble() : (latRaw is String ? double.tryParse(latRaw) : null),
-      lng: lngRaw is num ? lngRaw.toDouble() : (lngRaw is String ? double.tryParse(lngRaw) : null),
+      lat: latRaw is num
+          ? latRaw.toDouble()
+          : (latRaw is String ? double.tryParse(latRaw) : null),
+      lng: lngRaw is num
+          ? lngRaw.toDouble()
+          : (lngRaw is String ? double.tryParse(lngRaw) : null),
       bookingRequirement: map['bookingRequirement']?.toString(),
-      warnings: (map['warnings'] as List?)?.map((e) => e.toString()).toList() ?? [],
+      warnings:
+          (map['warnings'] as List?)?.map((e) => e.toString()).toList() ?? [],
       mealContext: map['mealContext']?.toString(),
       isGenericDiningFallback: map['isGenericDiningFallback'] == true,
       transferOrigin: map['transferOrigin']?.toString(),
@@ -95,7 +106,8 @@ class TripActivityModel {
       if (mealContext != null) 'mealContext': mealContext,
       'isGenericDiningFallback': isGenericDiningFallback,
       if (transferOrigin != null) 'transferOrigin': transferOrigin,
-      if (transferDestination != null) 'transferDestination': transferDestination,
+      if (transferDestination != null)
+        'transferDestination': transferDestination,
       if (transferMode != null) 'transferMode': transferMode,
       if (source != null) 'source': source,
     };
@@ -139,7 +151,8 @@ class TripActivityModel {
       bookingRequirement: bookingRequirement ?? this.bookingRequirement,
       warnings: warnings ?? this.warnings,
       mealContext: mealContext ?? this.mealContext,
-      isGenericDiningFallback: isGenericDiningFallback ?? this.isGenericDiningFallback,
+      isGenericDiningFallback:
+          isGenericDiningFallback ?? this.isGenericDiningFallback,
       transferOrigin: transferOrigin ?? this.transferOrigin,
       transferDestination: transferDestination ?? this.transferDestination,
       transferMode: transferMode ?? this.transferMode,
@@ -450,7 +463,10 @@ class TripItineraryModel {
       }
     }
 
-    final meta = data['generationMetadata'] ?? genData?['generationMetadata'] ?? genData?['metadata'];
+    final meta =
+        data['generationMetadata'] ??
+        genData?['generationMetadata'] ??
+        genData?['metadata'];
     final warningsRaw = data['warnings'] ?? genData?['warnings'];
     final costSum = data['costSummary'] ?? genData?['costSummary'];
 
@@ -467,10 +483,15 @@ class TripItineraryModel {
       updatedAt: _parseDate(data['updatedAt']),
       dayPlans: plans,
       generationMetadata: meta is Map ? Map<String, dynamic>.from(meta) : null,
-      warnings: warningsRaw is List ? (warningsRaw as List).map((e) => e.toString()).toList() : const [],
+      warnings: warningsRaw is List
+          ? warningsRaw.map((e) => e.toString()).toList()
+          : const [],
       costSummary: costSum is Map ? Map<String, dynamic>.from(costSum) : null,
-      userId: _parseString(data['userId'] ?? data['uid'] ?? form['userId'] ?? form['uid']),
-      startLat: _parseDouble(
+      userId: _parseString(
+        data['userId'] ?? data['uid'] ?? form['userId'] ?? form['uid'],
+      ),
+      startLat:
+          _parseDouble(
             data['startLat'] ??
                 data['lat'] ??
                 form['startLat'] ??
@@ -479,7 +500,8 @@ class TripItineraryModel {
                 _coordField(form['startCoords'], 'lat'),
           ) ??
           _masterDestination(destinationId, destinationName)?.lat,
-      startLng: _parseDouble(
+      startLng:
+          _parseDouble(
             data['startLng'] ??
                 data['lng'] ??
                 form['startLng'] ??
@@ -492,7 +514,9 @@ class TripItineraryModel {
       // rather than guessed from a missing field.
       status: (data['status'] ?? form['status']) == null
           ? null
-          : TripStatus.fromString((data['status'] ?? form['status']).toString()),
+          : TripStatus.fromString(
+              (data['status'] ?? form['status']).toString(),
+            ),
     );
   }
 

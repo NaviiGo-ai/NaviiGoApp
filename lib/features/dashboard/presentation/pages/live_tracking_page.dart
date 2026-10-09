@@ -177,7 +177,9 @@ class _LiveTrackingPageState extends ConsumerState<LiveTrackingPage> {
       if (!launched) {
         messenger.showSnackBar(
           const SnackBar(
-            content: Text('Could not open the dialer. Please call 112 directly.'),
+            content: Text(
+              'Could not open the dialer. Please call 112 directly.',
+            ),
             backgroundColor: Colors.red,
           ),
         );
@@ -201,11 +203,7 @@ class _SectionCard extends StatelessWidget {
   final Color? background;
   final Color? borderColor;
 
-  const _SectionCard({
-    required this.child,
-    this.background,
-    this.borderColor,
-  });
+  const _SectionCard({required this.child, this.background, this.borderColor});
 
   @override
   Widget build(BuildContext context) {
@@ -273,8 +271,9 @@ class _FactChip extends StatelessWidget {
           const SizedBox(width: 4),
           Text(
             label,
-            style: AppTypography.micro(color: color)
-                .copyWith(fontWeight: FontWeight.w800, letterSpacing: 0.4),
+            style: AppTypography.micro(
+              color: color,
+            ).copyWith(fontWeight: FontWeight.w800, letterSpacing: 0.4),
           ),
         ],
       ),
@@ -368,7 +367,11 @@ class _ActionNotice extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.info_outline_rounded, size: 18, color: Colors.orange),
+          const Icon(
+            Icons.info_outline_rounded,
+            size: 18,
+            color: Colors.orange,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -405,9 +408,7 @@ class _RouteDeviationNotice extends StatelessWidget {
     final region = state.trip?.startRegionName ?? 'the journey';
     final distance = state.startCheck?.distanceLabel ?? '';
     final measured = state.distanceFromStartRegionKm;
-    final label = measured == null
-        ? distance
-        : '${measured.round()} km';
+    final label = measured == null ? distance : '${measured.round()} km';
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -427,8 +428,9 @@ class _RouteDeviationNotice extends StatelessWidget {
               children: [
                 Text(
                   'OFF THE PLANNED REGION',
-                  style: AppTypography.micro(color: AppColors.brown)
-                      .copyWith(fontWeight: FontWeight.w800),
+                  style: AppTypography.micro(
+                    color: AppColors.brown,
+                  ).copyWith(fontWeight: FontWeight.w800),
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -489,13 +491,11 @@ class _StartGate extends StatelessWidget {
       StartTripStatus.wrongCity => 'NOT AT THE START YET',
       StartTripStatus.permissionDenied => 'LOCATION NOT VERIFIED',
       StartTripStatus.permissionPermanentlyDenied ||
-      StartTripStatus.locationRestricted =>
-        'LOCATION IS BLOCKED',
+      StartTripStatus.locationRestricted => 'LOCATION IS BLOCKED',
       StartTripStatus.servicesDisabled => 'LOCATION IS TURNED OFF',
       StartTripStatus.locationTimeout ||
       StartTripStatus.staleFix ||
-      StartTripStatus.inaccurateGps =>
-        "COULDN'T GET A RELIABLE LOCATION",
+      StartTripStatus.inaccurateGps => "COULDN'T GET A RELIABLE LOCATION",
       StartTripStatus.dateMismatch => 'TOO EARLY TO START',
       _ => 'NOT AT THE START YET',
     };
@@ -527,8 +527,9 @@ class _StartGate extends StatelessWidget {
                 check?.expectedDestinationName != null
                     ? 'This journey begins in ${check!.expectedDestinationName}.'
                     : 'This journey cannot be started right now.',
-                style: AppTypography.bodyMedium(color: AppColors.textPrimary)
-                    .copyWith(fontWeight: FontWeight.bold),
+                style: AppTypography.bodyMedium(
+                  color: AppColors.textPrimary,
+                ).copyWith(fontWeight: FontWeight.bold),
               ),
             if (isWrongCity) const SizedBox(height: 6),
             Text(
@@ -542,7 +543,8 @@ class _StartGate extends StatelessWidget {
           if (check?.hasDistance == true && !isAtStart) ...[
             const SizedBox(height: 12),
             _FactChip(
-              label: '${check!.distanceLabel.toUpperCase()} FROM '
+              label:
+                  '${check!.distanceLabel.toUpperCase()} FROM '
                   '${trip.startRegionName.toUpperCase()}',
               icon: Icons.straighten_rounded,
               color: AppColors.brown,
@@ -617,8 +619,7 @@ class _StartGate extends StatelessWidget {
     return switch (status) {
       StartTripStatus.servicesDisabled => 'OPEN LOCATION SETTINGS',
       StartTripStatus.permissionPermanentlyDenied ||
-      StartTripStatus.locationRestricted =>
-        'OPEN SETTINGS',
+      StartTripStatus.locationRestricted => 'OPEN SETTINGS',
       StartTripStatus.permissionDenied => 'VERIFY YOUR START',
       _ => 'TRY LOCATION AGAIN',
     };
@@ -629,8 +630,7 @@ class _StartGate extends StatelessWidget {
     return switch (status) {
       StartTripStatus.servicesDisabled ||
       StartTripStatus.permissionPermanentlyDenied ||
-      StartTripStatus.locationRestricted =>
-        Icons.settings_outlined,
+      StartTripStatus.locationRestricted => Icons.settings_outlined,
       _ => Icons.my_location_rounded,
     };
   }
@@ -695,9 +695,10 @@ class _StartGate extends StatelessWidget {
             other == null
                 ? 'You already have a journey under way.'
                 : '${other.destName} is in progress. Finish or end it before '
-                    'starting this one.',
-            style: AppTypography.bodyMedium(color: AppColors.textPrimary)
-                .copyWith(fontWeight: FontWeight.bold),
+                      'starting this one.',
+            style: AppTypography.bodyMedium(
+              color: AppColors.textPrimary,
+            ).copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 6),
           Text(
@@ -752,22 +753,21 @@ class _StartGate extends StatelessWidget {
     final daysAway = start == null
         ? null
         : DateTime(start.year, start.month, start.day)
-            .difference(DateTime(
-              DateTime.now().year,
-              DateTime.now().month,
-              DateTime.now().day,
-            ))
-            .inDays;
+              .difference(
+                DateTime(
+                  DateTime.now().year,
+                  DateTime.now().month,
+                  DateTime.now().day,
+                ),
+              )
+              .inDays;
 
     return _SectionCard(
       background: AppColors.surfaceWarm,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _SectionLabel(
-            'PRE-TRIP MODE',
-            icon: Icons.event_note_rounded,
-          ),
+          const _SectionLabel('PRE-TRIP MODE', icon: Icons.event_note_rounded),
           const SizedBox(height: 10),
           Text(
             trip.destName,
@@ -778,9 +778,9 @@ class _StartGate extends StatelessWidget {
             daysAway == null
                 ? 'Departure: ${trip.startDateFormatted}'
                 : daysAway > 0
-                    ? 'Departs in $daysAway ${daysAway == 1 ? 'day' : 'days'} · '
-                        '${trip.startDateFormatted}'
-                    : 'Departure: ${trip.startDateFormatted}',
+                ? 'Departs in $daysAway ${daysAway == 1 ? 'day' : 'days'} · '
+                      '${trip.startDateFormatted}'
+                : 'Departure: ${trip.startDateFormatted}',
             style: AppTypography.caption(color: AppColors.textSecondary),
           ),
           const SizedBox(height: 12),
@@ -807,8 +807,9 @@ class _StartGate extends StatelessWidget {
               onTap: onLeavePreTripMode,
               child: Text(
                 'Back to start checks',
-                style: AppTypography.caption(color: AppColors.primary)
-                    .copyWith(fontWeight: FontWeight.w700),
+                style: AppTypography.caption(
+                  color: AppColors.primary,
+                ).copyWith(fontWeight: FontWeight.w700),
               ),
             ),
           ),
@@ -843,8 +844,9 @@ class _RecoveryRow extends StatelessWidget {
             Expanded(
               child: Text(
                 label,
-                style: AppTypography.bodyMedium(color: AppColors.textPrimary)
-                    .copyWith(fontWeight: FontWeight.w600),
+                style: AppTypography.bodyMedium(
+                  color: AppColors.textPrimary,
+                ).copyWith(fontWeight: FontWeight.w600),
               ),
             ),
             const Icon(
@@ -936,8 +938,9 @@ class _RoutePreviewCard extends StatelessWidget {
                 },
                 child: Text(
                   'EXPAND',
-                  style: AppTypography.micro(color: AppColors.primary)
-                      .copyWith(fontWeight: FontWeight.w800),
+                  style: AppTypography.micro(
+                    color: AppColors.primary,
+                  ).copyWith(fontWeight: FontWeight.w800),
                 ),
               ),
             ],
@@ -956,8 +959,8 @@ class _RoutePreviewCard extends StatelessWidget {
                       color: state.waypoints[i].isLogged
                           ? AppColors.teal
                           : (state.waypoints[i].key == now?.key
-                              ? AppColors.primary
-                              : AppColors.border),
+                                ? AppColors.primary
+                                : AppColors.border),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -974,8 +977,9 @@ class _RoutePreviewCard extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               'Next: ${next.activity.title}',
-              style: AppTypography.caption(color: AppColors.textPrimary)
-                  .copyWith(fontWeight: FontWeight.w600),
+              style: AppTypography.caption(
+                color: AppColors.textPrimary,
+              ).copyWith(fontWeight: FontWeight.w600),
             ),
           ],
           const SizedBox(height: 14),
@@ -1036,8 +1040,8 @@ class _NowCard extends StatelessWidget {
     final confidenceColor = confidence == ArrivalConfidence.confirmed
         ? AppColors.teal
         : confidence == ArrivalConfidence.inferred
-            ? AppColors.primary
-            : AppColors.textTertiary;
+        ? AppColors.primary
+        : AppColors.textTertiary;
 
     return _SectionCard(
       borderColor: AppColors.primary.withAlpha(70),
@@ -1138,8 +1142,9 @@ class _NowCard extends StatelessWidget {
                 },
                 child: Text(
                   'Undo check-in',
-                  style: AppTypography.caption(color: AppColors.textSecondary)
-                      .copyWith(decoration: TextDecoration.underline),
+                  style: AppTypography.caption(
+                    color: AppColors.textSecondary,
+                  ).copyWith(decoration: TextDecoration.underline),
                 ),
               ),
             ),
@@ -1218,8 +1223,9 @@ class _NextCard extends StatelessWidget {
           else ...[
             Text(
               next.activity.title,
-              style: AppTypography.bodyMedium(color: AppColors.textPrimary)
-                  .copyWith(fontWeight: FontWeight.bold),
+              style: AppTypography.bodyMedium(
+                color: AppColors.textPrimary,
+              ).copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 4),
             Text(
@@ -1300,18 +1306,18 @@ class _RailRow extends StatelessWidget {
     final color = checkIn == TripCheckIn.completed
         ? AppColors.teal
         : checkIn == TripCheckIn.skipped
-            ? AppColors.textTertiary
-            : checkIn == TripCheckIn.arrived
-                ? AppColors.primary
-                : AppColors.border;
+        ? AppColors.textTertiary
+        : checkIn == TripCheckIn.arrived
+        ? AppColors.primary
+        : AppColors.border;
 
     final icon = checkIn == TripCheckIn.completed
         ? Icons.check_rounded
         : checkIn == TripCheckIn.skipped
-            ? Icons.remove_rounded
-            : checkIn == TripCheckIn.arrived
-                ? Icons.my_location_rounded
-                : Icons.circle_outlined;
+        ? Icons.remove_rounded
+        : checkIn == TripCheckIn.arrived
+        ? Icons.my_location_rounded
+        : Icons.circle_outlined;
 
     return IntrinsicHeight(
       child: Row(
@@ -1330,9 +1336,7 @@ class _RailRow extends StatelessWidget {
                 child: Icon(icon, size: 11, color: color),
               ),
               if (!isLast)
-                Expanded(
-                  child: Container(width: 1.4, color: AppColors.border),
-                ),
+                Expanded(child: Container(width: 1.4, color: AppColors.border)),
             ],
           ),
           const SizedBox(width: 12),
@@ -1344,16 +1348,17 @@ class _RailRow extends StatelessWidget {
                 children: [
                   Text(
                     waypoint.activity.title,
-                    style: AppTypography.bodyMedium(
-                      color: checkIn == TripCheckIn.skipped
-                          ? AppColors.textTertiary
-                          : AppColors.textPrimary,
-                    ).copyWith(
-                      fontWeight: FontWeight.w600,
-                      decoration: checkIn == TripCheckIn.skipped
-                          ? TextDecoration.lineThrough
-                          : null,
-                    ),
+                    style:
+                        AppTypography.bodyMedium(
+                          color: checkIn == TripCheckIn.skipped
+                              ? AppColors.textTertiary
+                              : AppColors.textPrimary,
+                        ).copyWith(
+                          fontWeight: FontWeight.w600,
+                          decoration: checkIn == TripCheckIn.skipped
+                              ? TextDecoration.lineThrough
+                              : null,
+                        ),
                   ),
                   const SizedBox(height: 2),
                   Text(
@@ -1395,9 +1400,11 @@ class _BookingsCard extends ConsumerWidget {
     };
 
     final relevant = bookings
-        .where((b) =>
-            codes.contains(b.to.toUpperCase()) ||
-            codes.contains(b.from.toUpperCase()))
+        .where(
+          (b) =>
+              codes.contains(b.to.toUpperCase()) ||
+              codes.contains(b.from.toUpperCase()),
+        )
         .toList();
 
     return _SectionCard(
@@ -1477,8 +1484,9 @@ class _BookingsCard extends ConsumerWidget {
             },
             child: Text(
               'ALL BOOKINGS',
-              style: AppTypography.micro(color: AppColors.primary)
-                  .copyWith(fontWeight: FontWeight.w800),
+              style: AppTypography.micro(
+                color: AppColors.primary,
+              ).copyWith(fontWeight: FontWeight.w800),
             ),
           ),
         ],
@@ -1713,7 +1721,7 @@ class _JourneyClosedCard extends StatelessWidget {
             isCancelled
                 ? 'This journey was cancelled. Nothing is being tracked.'
                 : '${state.completedCount} of ${state.totalWaypoints} waypoints '
-                    'logged as completed.',
+                      'logged as completed.',
             style: AppTypography.caption(color: AppColors.textSecondary),
           ),
         ],
@@ -1725,12 +1733,17 @@ class _JourneyClosedCard extends StatelessWidget {
 /// ─────────────────────────────────────────────────────────────────────────────
 /// HAND-OFFS
 /// ─────────────────────────────────────────────────────────────────────────────
-Future<void> _openDirections(BuildContext context, TripItineraryModel trip) async {
+Future<void> _openDirections(
+  BuildContext context,
+  TripItineraryModel trip,
+) async {
   final messenger = ScaffoldMessenger.of(context);
   final lat = trip.startLat;
   final lng = trip.startLng;
   final uri = (lat != null && lng != null)
-      ? Uri.parse('https://www.google.com/maps/dir/?api=1&destination=$lat,$lng')
+      ? Uri.parse(
+          'https://www.google.com/maps/dir/?api=1&destination=$lat,$lng',
+        )
       : Uri.parse(
           'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(trip.startRegionName)}',
         );

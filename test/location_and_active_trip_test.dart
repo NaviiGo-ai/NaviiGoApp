@@ -96,55 +96,66 @@ void main() {
   const delhiLng = 77.2090;
 
   group('Active trip canonical source of truth (§9, §11, §12)', () {
-    test('activeTripProvider ignores a trip that merely matches today’s date', () async {
-      final tripStartingToday = _makeTrip(
-        id: 't_today',
-        destId: 'jaipur',
-        destName: 'Jaipur',
-        isActive: false,
-        // no explicit status: derives as eligibleToStart
-      );
-      final container = await _makeContainer(trips: [tripStartingToday]);
+    test(
+      'activeTripProvider ignores a trip that merely matches today’s date',
+      () async {
+        final tripStartingToday = _makeTrip(
+          id: 't_today',
+          destId: 'jaipur',
+          destName: 'Jaipur',
+          isActive: false,
+          // no explicit status: derives as eligibleToStart
+        );
+        final container = await _makeContainer(trips: [tripStartingToday]);
 
-      expect(tripStartingToday.tripStatus, TripStatus.eligibleToStart);
-      expect(container.read(activeTripProvider), isNull);
-      expect(container.read(activeTripsProvider), isEmpty);
-    });
+        expect(tripStartingToday.tripStatus, TripStatus.eligibleToStart);
+        expect(container.read(activeTripProvider), isNull);
+        expect(container.read(activeTripsProvider), isEmpty);
+      },
+    );
 
-    test('activeTripProvider returns the trip with explicit TripStatus.active', () async {
-      final activeTrip = _makeTrip(
-        id: 't_active',
-        destId: 'jaipur',
-        destName: 'Jaipur',
-        status: 'active',
-        isActive: true,
-      );
-      final eligibleTrip = _makeTrip(
-        id: 't_eligible',
-        destId: 'udaipur',
-        destName: 'Udaipur',
-        isActive: false,
-      );
-      final container = await _makeContainer(trips: [eligibleTrip, activeTrip]);
+    test(
+      'activeTripProvider returns the trip with explicit TripStatus.active',
+      () async {
+        final activeTrip = _makeTrip(
+          id: 't_active',
+          destId: 'jaipur',
+          destName: 'Jaipur',
+          status: 'active',
+          isActive: true,
+        );
+        final eligibleTrip = _makeTrip(
+          id: 't_eligible',
+          destId: 'udaipur',
+          destName: 'Udaipur',
+          isActive: false,
+        );
+        final container = await _makeContainer(
+          trips: [eligibleTrip, activeTrip],
+        );
 
-      expect(container.read(activeTripProvider), isNotNull);
-      expect(container.read(activeTripProvider)!.id, 't_active');
-      expect(container.read(activeTripsProvider).length, 1);
-    });
+        expect(container.read(activeTripProvider), isNotNull);
+        expect(container.read(activeTripProvider)!.id, 't_active');
+        expect(container.read(activeTripsProvider).length, 1);
+      },
+    );
 
-    test('completed journey is no longer returned as active, regardless of date', () async {
-      final completedTrip = _makeTrip(
-        id: 't_done',
-        destId: 'jaipur',
-        destName: 'Jaipur',
-        status: 'completed',
-        isActive: false,
-      );
-      final container = await _makeContainer(trips: [completedTrip]);
+    test(
+      'completed journey is no longer returned as active, regardless of date',
+      () async {
+        final completedTrip = _makeTrip(
+          id: 't_done',
+          destId: 'jaipur',
+          destName: 'Jaipur',
+          status: 'completed',
+          isActive: false,
+        );
+        final container = await _makeContainer(trips: [completedTrip]);
 
-      expect(completedTrip.tripStatus, TripStatus.completed);
-      expect(container.read(activeTripProvider), isNull);
-    });
+        expect(completedTrip.tripStatus, TripStatus.completed);
+        expect(container.read(activeTripProvider), isNull);
+      },
+    );
 
     test('cancelled journey is no longer returned as active', () async {
       final cancelledTrip = _makeTrip(
@@ -160,79 +171,90 @@ void main() {
       expect(container.read(activeTripProvider), isNull);
     });
 
-    test('multiple active-trip conflict blocks starting a second journey', () async {
-      final runningTrip = _makeTrip(
-        id: 't_running',
-        destId: 'jaipur',
-        destName: 'Jaipur Tour',
-        status: 'active',
-        isActive: true,
-      );
-      final secondTrip = _makeTrip(
-        id: 't_second',
-        destId: 'udaipur',
-        destName: 'Udaipur Tour',
-        isActive: false,
-      );
-      final started = <String>[];
-      final adapter = _TargetedFakeLocationAdapter(
-        LocationResult(
-          fix: LiveFix(
-            lat: 24.5854,
-            lng: 73.7125, // Udaipur
-            accuracyMeters: 10,
-            timestamp: DateTime.now(),
+    test(
+      'multiple active-trip conflict blocks starting a second journey',
+      () async {
+        final runningTrip = _makeTrip(
+          id: 't_running',
+          destId: 'jaipur',
+          destName: 'Jaipur Tour',
+          status: 'active',
+          isActive: true,
+        );
+        final secondTrip = _makeTrip(
+          id: 't_second',
+          destId: 'udaipur',
+          destName: 'Udaipur Tour',
+          isActive: false,
+        );
+        final started = <String>[];
+        final adapter = _TargetedFakeLocationAdapter(
+          LocationResult(
+            fix: LiveFix(
+              lat: 24.5854,
+              lng: 73.7125, // Udaipur
+              accuracyMeters: 10,
+              timestamp: DateTime.now(),
+            ),
+            permissionGranted: true,
           ),
-          permissionGranted: true,
-        ),
-      );
-      final container = await _makeContainer(
-        trips: [runningTrip, secondTrip],
-        location: adapter,
-        writer: (uid, tripId) async => started.add('$uid/$tripId'),
-      );
+        );
+        final container = await _makeContainer(
+          trips: [runningTrip, secondTrip],
+          location: adapter,
+          writer: (uid, tripId) async => started.add('$uid/$tripId'),
+        );
 
-      final controller =
-          container.read(liveTripControllerProvider(secondTrip.id).notifier);
-      await controller.refreshLocation();
+        final controller = container.read(
+          liveTripControllerProvider(secondTrip.id).notifier,
+        );
+        await controller.refreshLocation();
 
-      final state = container.read(liveTripStateProvider(secondTrip));
-      expect(state.startCheck!.status, StartTripStatus.conflictWithActiveTrip);
-      expect(state.conflictingTrip!.id, 't_running');
-      expect(state.canStartTrip, isFalse);
+        final state = container.read(liveTripStateProvider(secondTrip));
+        expect(
+          state.startCheck!.status,
+          StartTripStatus.conflictWithActiveTrip,
+        );
+        expect(state.conflictingTrip!.id, 't_running');
+        expect(state.canStartTrip, isFalse);
 
-      final didStart = await controller.startTrip(secondTrip);
-      expect(didStart, isFalse);
-      expect(started, isEmpty);
-    });
+        final didStart = await controller.startTrip(secondTrip);
+        expect(didStart, isFalse);
+        expect(started, isEmpty);
+      },
+    );
 
-    test('endTrip transitions the conflicting journey via the repository writer', () async {
-      final runningTrip = _makeTrip(
-        id: 't_running',
-        destId: 'jaipur',
-        destName: 'Jaipur Tour',
-        status: 'active',
-        isActive: true,
-      );
-      final secondTrip = _makeTrip(
-        id: 't_second',
-        destId: 'udaipur',
-        destName: 'Udaipur Tour',
-        isActive: false,
-      );
-      final ended = <String>[];
-      final container = await _makeContainer(
-        trips: [runningTrip, secondTrip],
-        endWriter: (uid, tripId) async => ended.add('$uid/$tripId'),
-      );
+    test(
+      'endTrip transitions the conflicting journey via the repository writer',
+      () async {
+        final runningTrip = _makeTrip(
+          id: 't_running',
+          destId: 'jaipur',
+          destName: 'Jaipur Tour',
+          status: 'active',
+          isActive: true,
+        );
+        final secondTrip = _makeTrip(
+          id: 't_second',
+          destId: 'udaipur',
+          destName: 'Udaipur Tour',
+          isActive: false,
+        );
+        final ended = <String>[];
+        final container = await _makeContainer(
+          trips: [runningTrip, secondTrip],
+          endWriter: (uid, tripId) async => ended.add('$uid/$tripId'),
+        );
 
-      final controller =
-          container.read(liveTripControllerProvider(secondTrip.id).notifier);
-      final didEnd = await controller.endTrip(runningTrip);
+        final controller = container.read(
+          liveTripControllerProvider(secondTrip.id).notifier,
+        );
+        final didEnd = await controller.endTrip(runningTrip);
 
-      expect(didEnd, isTrue);
-      expect(ended, ['pilot_1/t_running']);
-    });
+        expect(didEnd, isTrue);
+        expect(ended, ['pilot_1/t_running']);
+      },
+    );
   });
 
   group('Location Adapter & Permission behavior (§1, §3, §4, §5, §6, §7)', () {
@@ -245,8 +267,9 @@ void main() {
         ),
       );
       final container = await _makeContainer(trips: [trip], location: adapter);
-      final controller =
-          container.read(liveTripControllerProvider(trip.id).notifier);
+      final controller = container.read(
+        liveTripControllerProvider(trip.id).notifier,
+      );
 
       await controller.refreshLocation();
 
@@ -256,27 +279,37 @@ void main() {
       expect(state.canStartTrip, isFalse);
     });
 
-    test('permanently denied permission maps to permissionPermanentlyDenied', () async {
-      final trip = _makeTrip(id: 't1', destId: 'jaipur', destName: 'Jaipur');
-      final adapter = _TargetedFakeLocationAdapter(
-        const LocationResult(
-          failure: LocationFailure.permissionPermanentlyDenied,
-          permissionGranted: false,
-        ),
-      );
-      final container = await _makeContainer(trips: [trip], location: adapter);
-      final controller =
-          container.read(liveTripControllerProvider(trip.id).notifier);
+    test(
+      'permanently denied permission maps to permissionPermanentlyDenied',
+      () async {
+        final trip = _makeTrip(id: 't1', destId: 'jaipur', destName: 'Jaipur');
+        final adapter = _TargetedFakeLocationAdapter(
+          const LocationResult(
+            failure: LocationFailure.permissionPermanentlyDenied,
+            permissionGranted: false,
+          ),
+        );
+        final container = await _makeContainer(
+          trips: [trip],
+          location: adapter,
+        );
+        final controller = container.read(
+          liveTripControllerProvider(trip.id).notifier,
+        );
 
-      await controller.refreshLocation();
+        await controller.refreshLocation();
 
-      final state = container.read(liveTripStateProvider(trip));
-      expect(
-        state.startCheck!.status,
-        StartTripStatus.permissionPermanentlyDenied,
-      );
-      expect(state.locationFailure, LocationFailure.permissionPermanentlyDenied);
-    });
+        final state = container.read(liveTripStateProvider(trip));
+        expect(
+          state.startCheck!.status,
+          StartTripStatus.permissionPermanentlyDenied,
+        );
+        expect(
+          state.locationFailure,
+          LocationFailure.permissionPermanentlyDenied,
+        );
+      },
+    );
 
     test('restricted location maps to locationRestricted', () async {
       final trip = _makeTrip(id: 't1', destId: 'jaipur', destName: 'Jaipur');
@@ -287,8 +320,9 @@ void main() {
         ),
       );
       final container = await _makeContainer(trips: [trip], location: adapter);
-      final controller =
-          container.read(liveTripControllerProvider(trip.id).notifier);
+      final controller = container.read(
+        liveTripControllerProvider(trip.id).notifier,
+      );
 
       await controller.refreshLocation();
 
@@ -297,46 +331,60 @@ void main() {
       expect(state.locationFailure, LocationFailure.restricted);
     });
 
-    test('location services disabled maps to servicesDisabled independently of permission', () async {
-      final trip = _makeTrip(id: 't1', destId: 'jaipur', destName: 'Jaipur');
-      final adapter = _TargetedFakeLocationAdapter(
-        const LocationResult(
-          failure: LocationFailure.servicesDisabled,
-          permissionGranted: true, // permission IS granted, GPS is OFF
-        ),
-      );
-      final container = await _makeContainer(trips: [trip], location: adapter);
-      final controller =
-          container.read(liveTripControllerProvider(trip.id).notifier);
+    test(
+      'location services disabled maps to servicesDisabled independently of permission',
+      () async {
+        final trip = _makeTrip(id: 't1', destId: 'jaipur', destName: 'Jaipur');
+        final adapter = _TargetedFakeLocationAdapter(
+          const LocationResult(
+            failure: LocationFailure.servicesDisabled,
+            permissionGranted: true, // permission IS granted, GPS is OFF
+          ),
+        );
+        final container = await _makeContainer(
+          trips: [trip],
+          location: adapter,
+        );
+        final controller = container.read(
+          liveTripControllerProvider(trip.id).notifier,
+        );
 
-      await controller.refreshLocation();
+        await controller.refreshLocation();
 
-      final state = container.read(liveTripStateProvider(trip));
-      expect(state.startCheck!.status, StartTripStatus.servicesDisabled);
-      expect(state.locationFailure, LocationFailure.servicesDisabled);
-      expect(state.hasLocationPermission, isTrue);
-      expect(state.canStartTrip, isFalse);
-    });
+        final state = container.read(liveTripStateProvider(trip));
+        expect(state.startCheck!.status, StartTripStatus.servicesDisabled);
+        expect(state.locationFailure, LocationFailure.servicesDisabled);
+        expect(state.hasLocationPermission, isTrue);
+        expect(state.canStartTrip, isFalse);
+      },
+    );
 
-    test('location timeout maps to locationTimeout without infinite wait', () async {
-      final trip = _makeTrip(id: 't1', destId: 'jaipur', destName: 'Jaipur');
-      final adapter = _TargetedFakeLocationAdapter(
-        const LocationResult(
-          failure: LocationFailure.timeout,
-          permissionGranted: true,
-        ),
-      );
-      final container = await _makeContainer(trips: [trip], location: adapter);
-      final controller =
-          container.read(liveTripControllerProvider(trip.id).notifier);
+    test(
+      'location timeout maps to locationTimeout without infinite wait',
+      () async {
+        final trip = _makeTrip(id: 't1', destId: 'jaipur', destName: 'Jaipur');
+        final adapter = _TargetedFakeLocationAdapter(
+          const LocationResult(
+            failure: LocationFailure.timeout,
+            permissionGranted: true,
+          ),
+        );
+        final container = await _makeContainer(
+          trips: [trip],
+          location: adapter,
+        );
+        final controller = container.read(
+          liveTripControllerProvider(trip.id).notifier,
+        );
 
-      await controller.refreshLocation();
+        await controller.refreshLocation();
 
-      final state = container.read(liveTripStateProvider(trip));
-      expect(state.startCheck!.status, StartTripStatus.locationTimeout);
-      expect(state.locationFailure, LocationFailure.timeout);
-      expect(state.isResolvingLocation, isFalse);
-    });
+        final state = container.read(liveTripStateProvider(trip));
+        expect(state.startCheck!.status, StartTripStatus.locationTimeout);
+        expect(state.locationFailure, LocationFailure.timeout);
+        expect(state.isResolvingLocation, isFalse);
+      },
+    );
 
     test('poor accuracy (> 500m) fails closed on inaccurateGps', () async {
       final trip = _makeTrip(id: 't1', destId: 'jaipur', destName: 'Jaipur');
@@ -352,8 +400,9 @@ void main() {
         ),
       );
       final container = await _makeContainer(trips: [trip], location: adapter);
-      final controller =
-          container.read(liveTripControllerProvider(trip.id).notifier);
+      final controller = container.read(
+        liveTripControllerProvider(trip.id).notifier,
+      );
 
       await controller.refreshLocation();
 
@@ -376,8 +425,9 @@ void main() {
         ),
       );
       final container = await _makeContainer(trips: [trip], location: adapter);
-      final controller =
-          container.read(liveTripControllerProvider(trip.id).notifier);
+      final controller = container.read(
+        liveTripControllerProvider(trip.id).notifier,
+      );
 
       await controller.refreshLocation();
 
@@ -402,8 +452,9 @@ void main() {
         ),
       );
       final container = await _makeContainer(trips: [trip], location: adapter);
-      final controller =
-          container.read(liveTripControllerProvider(trip.id).notifier);
+      final controller = container.read(
+        liveTripControllerProvider(trip.id).notifier,
+      );
 
       await controller.refreshLocation();
 
@@ -426,8 +477,9 @@ void main() {
         ),
       );
       final container = await _makeContainer(trips: [trip], location: adapter);
-      final controller =
-          container.read(liveTripControllerProvider(trip.id).notifier);
+      final controller = container.read(
+        liveTripControllerProvider(trip.id).notifier,
+      );
 
       await controller.refreshLocation();
 

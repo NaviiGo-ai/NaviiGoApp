@@ -10,7 +10,10 @@ void main() {
       expect(TripStatus.fromString('planned'), TripStatus.planned);
       expect(TripStatus.fromString('plan'), TripStatus.planned);
       expect(TripStatus.fromString('UPCOMING'), TripStatus.upcoming);
-      expect(TripStatus.fromString('eligible_to_start'), TripStatus.eligibleToStart);
+      expect(
+        TripStatus.fromString('eligible_to_start'),
+        TripStatus.eligibleToStart,
+      );
       expect(TripStatus.fromString('ready'), TripStatus.eligibleToStart);
       expect(TripStatus.fromString('active'), TripStatus.active);
       expect(TripStatus.fromString('in_progress'), TripStatus.active);
@@ -27,10 +30,7 @@ void main() {
         'destId': 'jaipur',
         'destName': 'Jaipur Royalty',
         'userId': 'user_abc',
-        'form': {
-          'startDate': '2026-10-15',
-          'days': 3,
-        },
+        'form': {'startDate': '2026-10-15', 'days': 3},
       });
 
       expect(trip.userId, 'user_abc');
@@ -82,32 +82,32 @@ void main() {
       'destId': 'jaipur',
       'destName': 'Jaipur Royal Tour',
       'userId': 'pilot_user_1',
-      'form': {
-        'startDate': '2026-10-15',
-        'days': 4,
+      'form': {'startDate': '2026-10-15', 'days': 4},
+    });
+
+    test(
+      'calculates accurate Haversine distance in km between coordinates',
+      () {
+        // Delhi (28.6139, 77.2090) to Jaipur (26.9124, 75.7873) is ~235-245 km
+        final dist = service.calculateDistanceKm(
+          lat1: 28.6139,
+          lng1: 77.2090,
+          lat2: 26.9124,
+          lng2: 75.7873,
+        );
+        expect(dist, greaterThan(230));
+        expect(dist, lessThan(250));
+
+        // Same point distance is 0
+        final zeroDist = service.calculateDistanceKm(
+          lat1: 26.9124,
+          lng1: 75.7873,
+          lat2: 26.9124,
+          lng2: 75.7873,
+        );
+        expect(zeroDist, closeTo(0, 0.001));
       },
-    });
-
-    test('calculates accurate Haversine distance in km between coordinates', () {
-      // Delhi (28.6139, 77.2090) to Jaipur (26.9124, 75.7873) is ~235-245 km
-      final dist = service.calculateDistanceKm(
-        lat1: 28.6139,
-        lng1: 77.2090,
-        lat2: 26.9124,
-        lng2: 75.7873,
-      );
-      expect(dist, greaterThan(230));
-      expect(dist, lessThan(250));
-
-      // Same point distance is 0
-      final zeroDist = service.calculateDistanceKm(
-        lat1: 26.9124,
-        lng1: 75.7873,
-        lat2: 26.9124,
-        lng2: 75.7873,
-      );
-      expect(zeroDist, closeTo(0, 0.001));
-    });
+    );
 
     test('fails validation when user is unauthenticated', () {
       final result = service.validateStartTrip(
@@ -194,22 +194,25 @@ void main() {
       expect(result.isValid, isFalse);
     });
 
-    test('fails validation with wrongCity when user is in Delhi but trip is in Jaipur', () {
-      final result = service.validateStartTrip(
-        trip: jaipurTrip,
-        currentUserId: 'pilot_user_1',
-        userLat: 28.6139, // Delhi
-        userLng: 77.2090,
-        gpsAccuracyMeters: 15,
-        hasLocationPermission: true,
-        referenceDate: DateTime(2026, 10, 15),
-      );
+    test(
+      'fails validation with wrongCity when user is in Delhi but trip is in Jaipur',
+      () {
+        final result = service.validateStartTrip(
+          trip: jaipurTrip,
+          currentUserId: 'pilot_user_1',
+          userLat: 28.6139, // Delhi
+          userLng: 77.2090,
+          gpsAccuracyMeters: 15,
+          hasLocationPermission: true,
+          referenceDate: DateTime(2026, 10, 15),
+        );
 
-      expect(result.status, StartTripStatus.wrongCity);
-      expect(result.isValid, isFalse);
-      expect(result.distanceKm, greaterThan(200));
-      expect(result.expectedDestinationName, 'Jaipur');
-    });
+        expect(result.status, StartTripStatus.wrongCity);
+        expect(result.isValid, isFalse);
+        expect(result.distanceKm, greaterThan(200));
+        expect(result.expectedDestinationName, 'Jaipur');
+      },
+    );
 
     test('fails validation when trip start date is in the distant future', () {
       final result = service.validateStartTrip(
@@ -226,20 +229,23 @@ void main() {
       expect(result.isValid, isFalse);
     });
 
-    test('succeeds with valid status when all proximity, auth, date & GPS conditions pass', () {
-      final result = service.validateStartTrip(
-        trip: jaipurTrip,
-        currentUserId: 'pilot_user_1',
-        userLat: 26.9150, // In Jaipur, ~1km from destination center
-        userLng: 75.7900,
-        gpsAccuracyMeters: 12,
-        hasLocationPermission: true,
-        referenceDate: DateTime(2026, 10, 15),
-      );
+    test(
+      'succeeds with valid status when all proximity, auth, date & GPS conditions pass',
+      () {
+        final result = service.validateStartTrip(
+          trip: jaipurTrip,
+          currentUserId: 'pilot_user_1',
+          userLat: 26.9150, // In Jaipur, ~1km from destination center
+          userLng: 75.7900,
+          gpsAccuracyMeters: 12,
+          hasLocationPermission: true,
+          referenceDate: DateTime(2026, 10, 15),
+        );
 
-      expect(result.status, StartTripStatus.valid);
-      expect(result.isValid, isTrue);
-      expect(result.distanceKm, lessThan(5));
-    });
+        expect(result.status, StartTripStatus.valid);
+        expect(result.isValid, isTrue);
+        expect(result.distanceKm, lessThan(5));
+      },
+    );
   });
 }

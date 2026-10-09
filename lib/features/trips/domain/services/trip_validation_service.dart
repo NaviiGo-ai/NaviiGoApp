@@ -140,7 +140,8 @@ class TripValidationService {
   /// being in the destination's zone (so tests stay deterministic); only the
   /// live `DateTime.now()` fallback is converted.
   DateTime destinationLocalDate(DateTime? referenceDate) {
-    final source = referenceDate ?? DateTime.now().toUtc().add(destinationUtcOffset);
+    final source =
+        referenceDate ?? DateTime.now().toUtc().add(destinationUtcOffset);
     return DateTime(source.year, source.month, source.day);
   }
 
@@ -170,7 +171,10 @@ class TripValidationService {
     // Gate 1 — authenticated.
     final uid = currentUserId?.trim();
     if (uid == null || uid.isEmpty) {
-      return fail(StartTripStatus.unauthenticated, 'Sign in to begin this journey.');
+      return fail(
+        StartTripStatus.unauthenticated,
+        'Sign in to begin this journey.',
+      );
     }
 
     // Gate 2 — owner. A journey belonging to someone else is never startable,
@@ -241,7 +245,10 @@ class TripValidationService {
 
     // Gate 7 — a usable fix exists at both ends.
     if (userLat == null || userLng == null) {
-      return fail(StartTripStatus.missingCoordinates, 'Waiting for a location fix.');
+      return fail(
+        StartTripStatus.missingCoordinates,
+        'Waiting for a location fix.',
+      );
     }
     if (trip.startLat == null || trip.startLng == null) {
       return fail(
@@ -252,7 +259,8 @@ class TripValidationService {
 
     // Gate 8 — the fix is fresh. A coordinate from hours ago says where someone
     // *was*, which is not evidence they are at the start now.
-    if (fixTimestamp != null && DateTime.now().difference(fixTimestamp) > maxFixAge) {
+    if (fixTimestamp != null &&
+        DateTime.now().difference(fixTimestamp) > maxFixAge) {
       return fail(
         StartTripStatus.staleFix,
         'That location is out of date. Get a fresh reading to continue.',

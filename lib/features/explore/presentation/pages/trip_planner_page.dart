@@ -7,7 +7,6 @@ import '../../../../core/constants/master_destinations.dart';
 import '../../../../core/network/firebase_client.dart';
 import '../../../../core/widgets/journey_line.dart';
 import '../../../trips/presentation/providers/trip_provider.dart';
-import '../../../trips/domain/models/trip_itinerary_model.dart';
 
 class TripPlannerPage extends ConsumerStatefulWidget {
   const TripPlannerPage({super.key});
