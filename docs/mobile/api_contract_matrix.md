@@ -8,19 +8,30 @@
 path below and attaches `Authorization: Bearer <Firebase ID token>` when
 `requiresAuth` is true.
 
-## Important mounting finding
+## Actual FastAPI mounting
 
-The Website has two route families in the current checkout:
+`backend/main.py` mounts the analytics, bookings, payments, and wallet route
+groups under `/api/analytics`, `/api/bookings`, `/api/payments`, and
+`/api/wallet`. Router-level prefixes then determine the final path:
 
-1. Legacy/AI routers are mounted by `backend/main.py` below `/api/*`.
-2. SQL trips/bookings/payments/wallet routers declare their own `/trips`,
-   `/bookings`, `/payments`, and `/wallet` prefixes, but `main.py` includes
-   them **without** an additional `/api` prefix. Therefore their actual
-   FastAPI paths are root-level (`/wallet/*`, etc.) in this source revision.
+- `routers/analytics.py` has no additional prefix, so analytics is
+  `/api/analytics/track` and `/api/analytics/reset`.
+- `app/api/wallet.py` has no additional prefix, so wallet is
+  `/api/wallet/account`, `/api/wallet/transactions`, `/api/wallet/debit`,
+  `/api/wallet/refund`, and `/api/wallet/coupons/apply`.
+- `app/api/bookings.py` declares `prefix="/bookings"`, so the effective SQL
+  booking paths are double-prefixed under the mount:
+  `/api/bookings/bookings`, `/api/bookings/bookings/{booking_id}`,
+  `/api/bookings/bookings/{booking_id}/cancel`, and
+  `/api/bookings/bookings/{booking_id}/confirm`.
+- `app/api/payments.py` declares `prefix="/payments"`, so the effective SQL
+  payment paths are `/api/payments/payments/order`,
+  `/api/payments/payments/verify`, and `/api/payments/payments/webhook`.
+- `backend/app/api/trips.py` exists but is not included by `backend/main.py`.
+  Its declared SQL trip routes are therefore currently not mounted.
 
-The matrix records the actual mounted path, not the path suggested by an old
-client or a planning document. The Website should be changed in a separate
-backend-contract phase if `/api/wallet/*` and `/api/bookings/*` are intended.
+These paths are recorded as-is. This phase does not normalize or redesign the
+Website route mounting.
 
 ## Endpoints used by the current mobile client
 
@@ -32,9 +43,9 @@ backend-contract phase if `/api/wallet/*` and `/api/bookings/*` are intended.
 | `GET` | `/api/places/details` | Public | Query `lat`, `lng`, `type`, `query`, `radius` | `{success, results:[{id,name,rating,userRatingsTotal,priceLevel,vicinity,lat,lng,isOpen,types,photo}], total?}` | Missing provider key returns honest empty results; upstream failure returns empty/error result | `PlacesRepository.getPlaceDetails` | **Covered** |
 | `GET` | `/api/weather/` | Public | Optional query `lat`, `lng` | `{current, daily, source}`; unavailable data is `current:null`, `daily:[]`, `source:"none"` | Provider failure is represented as unavailable data | `PlacesRepository.getWeather` and weather providers | **Covered** |
 | `POST` | `/api/explore/events` | Public | `{destination:string}` | `{events:[...]}` | `400` missing destination, `500` upstream failure | `PlacesRepository.getEvents` | **Covered** |
-| `POST` | `/wallet/coupons/apply` | Required | `{code:string, bookingAmountMinor:int >= 0}` | `{code, discountType, discountValue, discountAmountMinor, finalAmountMinor, description?}` | Auth, validation, coupon eligibility/expiry errors | `WalletRepository.validateCoupon` | **Corrected**; old mobile path `/api/wallet/coupons/apply` was not mounted by current Website |
-| `POST` | `/wallet/debit` | Required | `{amountMinor:int > 0, referenceId?, idempotencyKey?, description?}` | `WalletTransactionRead`: transaction ID, wallet/user IDs, type/direction, amount/balance, status, references, timestamps | Auth, validation, insufficient/locked wallet, idempotency/state errors | `WalletRepository.requestDebit` | **Corrected** |
-| `POST` | `/wallet/refund` | Required | `{amountMinor:int > 0, referenceId?, idempotencyKey?, reason?}` | `WalletTransactionRead` | Auth, validation, idempotency/state errors | `WalletRepository.requestRefund` | **Corrected** |
+| `POST` | `/api/wallet/coupons/apply` | Required | `{code:string, bookingAmountMinor:int >= 0}` | `{code, discountType, discountValue, discountAmountMinor, finalAmountMinor, description?}` | Auth, validation, coupon eligibility/expiry errors | `WalletRepository.validateCoupon` | **Covered** |
+| `POST` | `/api/wallet/debit` | Required | `{amountMinor:int > 0, referenceId?, idempotencyKey?, description?}` | `WalletTransactionRead`: transaction ID, wallet/user IDs, type/direction, amount/balance, status, references, timestamps | Auth, validation, insufficient/locked wallet, idempotency/state errors | `WalletRepository.requestDebit` | **Covered** |
+| `POST` | `/api/wallet/refund` | Required | `{amountMinor:int > 0, referenceId?, idempotencyKey?, reason?}` | `WalletTransactionRead` | Auth, validation, idempotency/state errors | `WalletRepository.requestRefund` | **Covered** |
 
 ## Production endpoints available but not currently called by mobile
 
@@ -55,27 +66,21 @@ backend-contract phase if `/api/wallet/*` and `/api/bookings/*` are intended.
 
 ## SQL API routes present in Website source
 
-These are **not `/api/*` in the current `backend/main.py` mount**. They use a
-separate SQL database and `CurrentUserId` Firebase dependency. They are listed
-so mobile work does not infer a route from the filename or expected family.
+These use a separate SQL database and `CurrentUserId` Firebase dependency. The
+effective paths below include both the `main.py` mount and each router's own
+prefix. They are listed so mobile work does not infer a route from the filename
+or expected family.
 
 | Method | Actual path | Request/response | Mobile status |
 |---|---|---|---|
-| `POST`/`GET` | `/trips`, `/trips/{tripId}` | `TripCreate`/`TripRead`, summary list; UUID IDs; owner-only | Not called; mobile uses Firestore itinerary contract |
-| `PATCH` | `/trips/{tripId}` | `TripUpdate` → `TripRead` | Not called |
-| `POST` | `/trips/{tripId}/status` | `{status, reason?}` → `TripRead` | Not called |
-| `POST` | `/trips/{tripId}/days`, `/trips/{tripId}/days/{dayId}/items` | Typed day/item payloads → `TripRead` | Not called |
-| `PATCH`/`DELETE` | `/trips/{tripId}/items/{itemId}` | Typed item update → `TripRead` | Not called |
-| `POST` | `/trips/{tripId}/undo` | Empty body → `TripRead` | Not called |
-| `GET` | `/trips/{tripId}/versions` | `limit` query → version list | Not called |
-| `POST` | `/trips/{tripId}/chat` | `{message}` → `{reply, trip}` | Not called |
-| `POST`/`GET` | `/bookings`, `/bookings/{bookingId}` | `BookingCreate` → `BookingRead`; owner-only | Not called; mobile booking display is Firestore-backed |
-| `POST` | `/bookings/{bookingId}/cancel`, `/bookings/{bookingId}/confirm` | cancel reason or empty body → `BookingRead` | Not called |
-| `POST` | `/payments/order` | `{booking_id, method?, description?, idempotency_key}` → `PaymentRead` | Not called |
-| `POST` | `/payments/verify` | Razorpay order/payment/signature IDs → `PaymentRead` | Not called |
-| `POST` | `/payments/webhook` | Raw Razorpay body + `X-Razorpay-Signature` | Server webhook only; never mobile |
-| `GET` | `/wallet/account` | Empty body → authoritative `WalletAccountRead` | Not called; mobile currently streams Firestore wallet account |
-| `GET` | `/wallet/transactions?limit=1..100` | Empty body → `WalletTransactionRead[]` | Not called; mobile currently streams Firestore ledger |
+| `POST`/`GET` | **Not mounted** | `backend/app/api/trips.py` declares `/trips` routes, but `backend/main.py` does not include this router | Not called; mobile uses Firestore itinerary contract |
+| `POST`/`GET` | `/api/bookings/bookings`, `/api/bookings/bookings/{bookingId}` | `BookingCreate` → `BookingRead`; owner-only | Not called; mobile booking display is Firestore-backed |
+| `POST` | `/api/bookings/bookings/{bookingId}/cancel`, `/api/bookings/bookings/{bookingId}/confirm` | cancel reason or empty body → `BookingRead` | Not called |
+| `POST` | `/api/payments/payments/order` | `{booking_id, method?, description?, idempotency_key}` → `PaymentRead` | Not called |
+| `POST` | `/api/payments/payments/verify` | Razorpay order/payment/signature IDs → `PaymentRead` | Not called |
+| `POST` | `/api/payments/payments/webhook` | Raw Razorpay body + `X-Razorpay-Signature` | Server webhook only; never mobile |
+| `GET` | `/api/wallet/account` | Empty body → authoritative `WalletAccountRead` | Not called; mobile currently streams Firestore wallet account |
+| `GET` | `/api/wallet/transactions?limit=1..100` | Empty body → `WalletTransactionRead[]` | Not called; mobile currently streams Firestore ledger |
 
 ## Firebase/Firestore contracts used alongside HTTP
 

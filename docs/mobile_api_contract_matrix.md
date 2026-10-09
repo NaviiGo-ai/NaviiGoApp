@@ -9,7 +9,13 @@ Key audited findings:
 
 - AI/places/weather/transport/taste/analytics routes are mounted under
   `/api/*` by the current Website `backend/main.py`.
-- The SQL wallet, bookings, payments, and trips routers are currently mounted
-  at root-level `/wallet/*`, `/bookings/*`, `/payments/*`, and `/trips/*`.
-- Mobile wallet mutation paths were corrected to the current mounted `/wallet/*`
-  contract. The Website was not modified in this phase.
+- Wallet is mounted at `/api/wallet/*`, producing `/api/wallet/account`,
+  `/api/wallet/transactions`, `/api/wallet/debit`, `/api/wallet/refund`, and
+  `/api/wallet/coupons/apply`.
+- The bookings router adds its own `/bookings` prefix to the `/api/bookings`
+  mount, so effective SQL booking routes are `/api/bookings/bookings...`.
+- The payments router similarly produces `/api/payments/payments/order`,
+  `/api/payments/payments/verify`, and `/api/payments/payments/webhook`.
+- `backend/app/api/trips.py` is not included by `backend/main.py`; SQL trip
+  routes are not mounted.
+- The Website was not modified in this phase.

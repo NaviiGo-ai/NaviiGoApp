@@ -65,7 +65,7 @@ class WalletRepository {
     required int bookingAmountMinor,
   }) async {
     final res = await _apiClient.post(
-      '/wallet/coupons/apply',
+      '/api/wallet/coupons/apply',
       body: {
         'code': code.trim().toUpperCase(),
         'bookingAmountMinor': bookingAmountMinor,
@@ -94,7 +94,7 @@ class WalletRepository {
     String description = 'Booking checkout via Naviigo Credit',
   }) async {
     final res = await _apiClient.post(
-      '/wallet/debit',
+      '/api/wallet/debit',
       body: {
         'amountMinor': amountMinor,
         'referenceId': referenceId,
@@ -123,7 +123,7 @@ class WalletRepository {
     String reason = 'Booking cancellation refund',
   }) async {
     final res = await _apiClient.post(
-      '/wallet/refund',
+      '/api/wallet/refund',
       body: {
         'amountMinor': amountMinor,
         'referenceId': referenceId,
