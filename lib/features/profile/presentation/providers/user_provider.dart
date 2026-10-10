@@ -25,5 +25,8 @@ final userPreferencesStreamProvider = StreamProvider<UserPreferencesModel>((
     return Stream.value(const UserPreferencesModel());
   }
   final repo = ref.watch(userRepositoryProvider);
-  return repo.getUserPreferencesStream(currentUser.uid);
+  final uid = currentUser.uid;
+  return repo
+      .getUserPreferencesStream(uid)
+      .map((preferences) => preferences.copyWith(sourceUserId: uid));
 });

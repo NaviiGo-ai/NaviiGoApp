@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
@@ -26,7 +28,7 @@ class AuthRepository {
       password: password,
     );
     if (credential.user != null) {
-      await syncUserProfile(credential.user!);
+      unawaited(syncUserProfile(credential.user!));
     }
     return credential;
   }
@@ -45,7 +47,9 @@ class AuthRepository {
       if (displayName != null && displayName.isNotEmpty) {
         await credential.user!.updateDisplayName(displayName.trim());
       }
-      await syncUserProfile(credential.user!, initialDisplayName: displayName);
+      unawaited(
+        syncUserProfile(credential.user!, initialDisplayName: displayName),
+      );
     }
     return credential;
   }
@@ -86,11 +90,11 @@ class AuthRepository {
 
   /// Sign out and safely purge user-specific local caches
   Future<void> signOut() async {
+    await _auth.signOut();
     try {
       await HiveService.clearCache();
     } catch (e) {
       debugPrint('[AuthRepository] Error clearing Hive cache on logout: $e');
     }
-    await _auth.signOut();
   }
 }

@@ -15,6 +15,7 @@ class NaviiGoApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final router = ref.watch(appRouterProvider);
     final preferences =
         ref.watch(userPreferencesStreamProvider).value ??
         const UserPreferencesModel();
@@ -70,7 +71,8 @@ class NaviiGoApp extends ConsumerWidget {
             profile: experience.motion,
             child: child ?? const SizedBox.shrink(),
           ),
-          routerConfig: appRouter,
+          restorationScopeId: 'naviigo',
+          routerConfig: router,
         );
       },
     );

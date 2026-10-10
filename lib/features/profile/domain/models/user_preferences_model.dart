@@ -9,6 +9,13 @@ class UserPreferencesModel {
   final String? homeCity;
   final bool adaptiveAppearanceEnabled;
 
+  /// Explicit completion, never inferred from populated preference fields.
+  final bool onboardingCompleted;
+
+  /// Local stream provenance only. Never serialized or collected from a user.
+  /// Prevents AsyncValue's previous data from unlocking a different account.
+  final String? sourceUserId;
+
   const UserPreferencesModel({
     this.travelStyle,
     this.preferredGroup,
@@ -17,6 +24,8 @@ class UserPreferencesModel {
     this.accessibilityNeeds = const [],
     this.homeCity,
     this.adaptiveAppearanceEnabled = true,
+    this.onboardingCompleted = false,
+    this.sourceUserId,
   });
 
   UserPreferencesModel copyWith({
@@ -27,6 +36,8 @@ class UserPreferencesModel {
     List<String>? accessibilityNeeds,
     String? homeCity,
     bool? adaptiveAppearanceEnabled,
+    bool? onboardingCompleted,
+    String? sourceUserId,
   }) {
     return UserPreferencesModel(
       travelStyle: travelStyle ?? this.travelStyle,
@@ -37,6 +48,8 @@ class UserPreferencesModel {
       homeCity: homeCity ?? this.homeCity,
       adaptiveAppearanceEnabled:
           adaptiveAppearanceEnabled ?? this.adaptiveAppearanceEnabled,
+      onboardingCompleted: onboardingCompleted ?? this.onboardingCompleted,
+      sourceUserId: sourceUserId ?? this.sourceUserId,
     );
   }
 
@@ -62,6 +75,7 @@ class UserPreferencesModel {
       homeCity: data['homeCity'] as String?,
       adaptiveAppearanceEnabled:
           data['adaptiveAppearanceEnabled'] as bool? ?? true,
+      onboardingCompleted: data['onboardingCompleted'] == true,
     );
   }
 
@@ -85,6 +99,8 @@ class UserPreferencesModel {
       // Preference writes merge into the stored document. Include both values
       // so re-enabling appearance overwrites a previously persisted opt-out.
       'adaptiveAppearanceEnabled': adaptiveAppearanceEnabled,
+      // Ordinary partial preference updates must not undo completion.
+      if (onboardingCompleted) 'onboardingCompleted': true,
     };
   }
 }

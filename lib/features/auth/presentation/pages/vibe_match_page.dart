@@ -1,317 +1,237 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/auth/auth_provider.dart';
 import '../../../../core/constants/master_destinations.dart';
-import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/app_typography.dart';
+import '../../../../core/motion/nav_haptics.dart';
+import '../../../../core/motion/nav_motion.dart';
+import '../../../../core/router/entry_guard.dart';
 import '../../../profile/domain/models/user_preferences_model.dart';
 import '../../../profile/presentation/providers/user_provider.dart';
-import '../../../../core/motion/nav_haptics.dart';
+import '../widgets/entry_frame.dart';
 
-class VibeMatchPage extends ConsumerStatefulWidget {
+class VibeMatchPage extends StatelessWidget {
   const VibeMatchPage({super.key});
-
   @override
-  ConsumerState<VibeMatchPage> createState() => _VibeMatchPageState();
+  Widget build(BuildContext context) => EntryPreferencesGate(
+    builder: (uid, preferences) => _VibeEditor(uid: uid, initial: preferences),
+  );
 }
 
-class _VibeMatchPageState extends ConsumerState<VibeMatchPage> {
-  static const List<String> _vibeIds = [
-    'jaipur',
-    'varanasi',
-    'kerala',
-    'ladakh',
+class _VibeEditor extends ConsumerStatefulWidget {
+  final String uid;
+  final UserPreferencesModel initial;
+  const _VibeEditor({required this.uid, required this.initial});
+  @override
+  ConsumerState<_VibeEditor> createState() => _VibeEditorState();
+}
+
+class _VibeEditorState extends ConsumerState<_VibeEditor> {
+  // Explicit, visible interest labels, not destination IDs or inferred scores.
+  static const _cards = [
+    ('jaipur', 'culture', 'Culture'),
+    ('varanasi', 'spiritual', 'Spiritual'),
+    ('kochi', 'nature', 'Nature'),
+    ('ladakh', 'adventure', 'Adventure'),
   ];
-
-  late final List<MasterDestination> _vibes = _vibeIds
-      .map((id) => kMasterDestinations.where((d) => d.id == id).firstOrNull)
-      .whereType<MasterDestination>()
+  late final _vibes = _cards
+      .where((c) => findDestinationById(c.$1) != null)
       .toList();
+  late Set<String> _interests = widget.initial.interests.toSet();
+  final _undo = <Set<String>>[];
+  final _pages = PageController();
+  int _index = 0;
+  bool _saving = false;
+  String? _error;
 
-  final Set<String> _likedIds = {};
-  int _currentIndex = 0;
-  bool _isLiked = false;
-  bool _isPassed = false;
-  bool _isCompleting = false;
+  @override
+  void dispose() {
+    _pages.dispose();
+    super.dispose();
+  }
 
-  Future<void> _completeOnboarding() async {
-    if (_isCompleting) return;
-    _isCompleting = true;
+  void _toggle(String interest) {
+    NavHaptics.fire(NavHaptic.light);
+    setState(() {
+      _undo.add({..._interests});
+      _interests.contains(interest)
+          ? _interests.remove(interest)
+          : _interests.add(interest);
+    });
+  }
 
-    try {
-      final uid = ref.read(currentUserProvider)?.uid;
-      if (uid != null && _likedIds.isNotEmpty) {
-        await ref
-            .read(userRepositoryProvider)
-            .updateUserPreferences(
-              uid,
-              UserPreferencesModel(interests: _likedIds.toList()),
-            );
-      }
-    } catch (_) {
-      // Non-blocking preference persistence
-    } finally {
-      if (mounted) {
-        context.go('/home');
-      }
+  void _move(int next) {
+    if (NavReduce.of(context)) {
+      _pages.jumpToPage(next);
+    } else {
+      _pages.animateToPage(
+        next,
+        duration: NavMotion.fast,
+        curve: NavMotion.settle,
+      );
     }
   }
 
-  void _handleSwipe(bool liked) {
-    if (_vibes.isEmpty) {
-      context.go('/home');
-      return;
-    }
-
-    NavHaptics.fire(NavHaptic.light);
-    if (liked) {
-      _likedIds.add(_vibes[_currentIndex].id);
-    }
-
+  Future<void> _finish() async {
+    if (_saving) return;
     setState(() {
-      if (liked) {
-        _isLiked = true;
-      } else {
-        _isPassed = true;
-      }
+      _saving = true;
+      _error = null;
     });
-
-    Future.delayed(const Duration(milliseconds: 280), () {
-      if (!mounted) return;
-      if (_currentIndex < _vibes.length - 1) {
-        setState(() {
-          _currentIndex++;
-          _isLiked = false;
-          _isPassed = false;
-        });
-      } else {
-        _completeOnboarding();
+    try {
+      if (ref.read(currentUserProvider)?.uid != widget.uid) {
+        throw StateError('Session changed');
       }
-    });
+      await ref
+          .read(userRepositoryProvider)
+          .completeOnboarding(
+            widget.uid,
+            widget.initial.copyWith(interests: _interests.toList()),
+          )
+          .timeout(const Duration(seconds: 15));
+      ref.invalidate(userPreferencesStreamProvider);
+      // The guard enters Home (or the retained deep link) only when the
+      // confirmed preferences stream reports explicit completion.
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () => _error =
+              'Completion is not confirmed yet. Check your connection and retry. Your choices are still here.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final currentVibe = _vibes[_currentIndex];
-
-    return Scaffold(
-      backgroundColor: AppColors.canvas,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Top Bar
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 24.0,
-                vertical: 16.0,
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'VIBE MATCH',
-                        style: AppTypography.micro(
-                          color: AppColors.primary,
-                        ).copyWith(fontWeight: FontWeight.bold),
-                      ),
-                      Text(
-                        'Curate Your Journey',
-                        style: AppTypography.editorialTitle(
-                          color: AppColors.brown,
-                        ).copyWith(fontSize: 20),
-                      ),
-                    ],
-                  ),
-                  TextButton(
-                    onPressed: () => context.go('/home'),
-                    child: Text(
-                      'Skip',
-                      style: AppTypography.button(
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+    return EntryFrame(
+      eyebrow: 'VIBE MATCH',
+      title: 'Follow what draws you in.',
+      subtitle:
+          'Swipe to browse. Tap an interest to add or remove it. Only the choices shown below are saved.',
+      onBack: _saving
+          ? null
+          : () => context.go(
+              entryLocation('/onboarding', GoRouterState.of(context).uri),
             ),
-            const SizedBox(height: 8),
-
-            // Card
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24.0,
-                  vertical: 12.0,
-                ),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 250),
-                  transform: Matrix4.translationValues(
-                    _isLiked ? 80.0 : (_isPassed ? -80.0 : 0.0),
-                    0.0,
-                    0.0,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: AppColors.border),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.brown.withAlpha(18),
-                        blurRadius: 20,
-                        offset: const Offset(0, 8),
-                      ),
-                    ],
-                  ),
+      children: [
+        if (_vibes.isEmpty)
+          const EntryMessage(
+            'No inspiration cards available. You can still finish with your current interests.',
+          )
+        else ...[
+          SizedBox(
+            height: 180,
+            child: PageView.builder(
+              controller: _pages,
+              itemCount: _vibes.length,
+              onPageChanged: (i) {
+                NavHaptics.fire(NavHaptic.light);
+                setState(() => _index = i);
+              },
+              itemBuilder: (context, i) {
+                final destination = findDestinationById(_vibes[i].$1)!;
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(24),
-                    child: Stack(
-                      children: [
-                        Positioned.fill(
-                          child: Image.network(
-                            currentVibe.image,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Container(
-                              color: AppColors.surfaceWarm,
-                              child: const Icon(
-                                Icons.terrain_rounded,
-                                size: 64,
-                                color: AppColors.border,
-                              ),
-                            ),
-                          ),
-                        ),
-                        // Bottom Gradient
-                        Positioned.fill(
-                          child: Container(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                                colors: [
-                                  Colors.transparent,
-                                  Colors.black.withAlpha(50),
-                                  Colors.black.withAlpha(200),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                        // Vibe Information
-                        Positioned(
-                          left: 20,
-                          right: 20,
-                          bottom: 24,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: AppColors.primary,
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Text(
-                                  currentVibe.category.toUpperCase(),
-                                  style: AppTypography.micro(
-                                    color: Colors.white,
-                                  ).copyWith(fontWeight: FontWeight.bold),
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                currentVibe.name,
-                                style: AppTypography.editorialTitle(
-                                  color: Colors.white,
-                                ).copyWith(fontSize: 32),
-                              ),
-                              Text(
-                                '${currentVibe.state} • Best Season: ${currentVibe.bestTime}',
-                                style: AppTypography.bodySmall(
-                                  color: Colors.white70,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                currentVibe.description,
-                                style: AppTypography.caption(
-                                  color: Colors.white.withAlpha(220),
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+                    borderRadius: BorderRadius.circular(20),
+                    child: Image.asset(
+                      destination.image,
+                      height: 180,
+                      fit: BoxFit.cover,
+                      semanticLabel: destination.name,
+                      errorBuilder: (_, __, ___) => const SizedBox(
+                        height: 180,
+                        child: Center(child: Text('Image unavailable')),
+                      ),
                     ),
                   ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '${findDestinationById(_vibes[_index].$1)!.name} · ${_vibes[_index].$3}',
+            textAlign: TextAlign.center,
+          ),
+          Wrap(
+            alignment: WrapAlignment.center,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 8,
+            children: [
+              IconButton(
+                tooltip: 'Previous inspiration',
+                onPressed: _index == 0 ? null : () => _move(_index - 1),
+                icon: const Icon(Icons.arrow_back_rounded),
+              ),
+              Text('${_index + 1} of ${_vibes.length}'),
+              IconButton(
+                tooltip: 'Next inspiration',
+                onPressed: _index == _vibes.length - 1
+                    ? null
+                    : () => _move(_index + 1),
+                icon: const Icon(Icons.arrow_forward_rounded),
+              ),
+            ],
+          ),
+          FilterChip(
+            label: Text(
+              '${_interests.contains(_vibes[_index].$2) ? 'Remove' : 'Add'} ${_vibes[_index].$3} interest',
+            ),
+            selected: _interests.contains(_vibes[_index].$2),
+            onSelected: _saving ? null : (_) => _toggle(_vibes[_index].$2),
+          ),
+        ],
+        const SizedBox(height: 20),
+        const Text('Your selected interests'),
+        if (_interests.isEmpty)
+          const EntryMessage(
+            'No interests selected. That is okay — interests are optional.',
+          ),
+        Wrap(
+          spacing: 8,
+          children: _interests
+              .map(
+                (v) => InputChip(
+                  label: Text(v),
+                  onDeleted: _saving ? null : () => _toggle(v),
                 ),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Controls
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 40.0,
-                vertical: 20.0,
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _buildActionButton(
-                    icon: Icons.close_rounded,
-                    color: AppColors.error,
-                    onTap: () => _handleSwipe(false),
-                  ),
-                  _buildActionButton(
-                    icon: Icons.favorite_rounded,
-                    color: AppColors.primary,
-                    isLarge: true,
-                    onTap: () => _handleSwipe(true),
-                  ),
-                ],
-              ),
-            ),
-          ],
+              )
+              .toList(),
         ),
-      ),
-    );
-  }
-
-  Widget _buildActionButton({
-    required IconData icon,
-    required Color color,
-    required VoidCallback onTap,
-    bool isLarge = false,
-  }) {
-    final size = isLarge ? 68.0 : 54.0;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          shape: BoxShape.circle,
-          border: Border.all(color: color.withAlpha(80), width: 2),
-          boxShadow: [
-            BoxShadow(
-              color: color.withAlpha(25),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
+        TextButton.icon(
+          onPressed: _saving || _undo.isEmpty
+              ? null
+              : () {
+                  NavHaptics.fire(NavHaptic.light);
+                  setState(() => _interests = _undo.removeLast());
+                },
+          icon: const Icon(Icons.undo_rounded),
+          label: const Text('Undo last change'),
         ),
-        child: Icon(icon, color: color, size: isLarge ? 32 : 24),
-      ),
+        const EntryMessage(
+          'Finish confirms your travel identity. You do not need to add any more interests.',
+        ),
+        if (_error != null) EntryMessage(_error!),
+        if (_saving)
+          const LinearProgressIndicator(
+            semanticsLabel: 'Confirming onboarding',
+          ),
+        ElevatedButton(
+          onPressed: _saving ? null : _finish,
+          child: Text(
+            _saving
+                ? 'Waiting for confirmation…'
+                : _error == null
+                ? 'Finish & start exploring'
+                : 'Retry completion',
+          ),
+        ),
+      ],
     );
   }
 }

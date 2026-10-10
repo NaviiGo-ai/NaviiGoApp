@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/auth/auth_provider.dart';
+import '../../../../core/auth/auth_actions.dart';
 import '../../../navigation/presentation/nav_hub_page.dart';
 import '../providers/user_provider.dart';
 
@@ -212,10 +213,7 @@ class ProfilePage extends ConsumerWidget {
               height: 52,
               child: OutlinedButton.icon(
                 onPressed: () async {
-                  await ref.read(authControllerProvider.notifier).signOut();
-                  if (context.mounted) {
-                    context.go('/login');
-                  }
+                  await signOutFrom(context, ref);
                 },
                 icon: const Icon(Icons.logout_rounded, color: Colors.redAccent),
                 label: const Text(

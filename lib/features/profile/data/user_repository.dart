@@ -45,7 +45,10 @@ class UserRepository {
         .doc(uid)
         .collection('preferences')
         .doc('main')
-        .snapshots()
+        .snapshots(includeMetadataChanges: true)
+        // A local optimistic write is not confirmation of onboarding success.
+        // Confirmed cached snapshots remain usable while offline.
+        .where((doc) => !doc.metadata.hasPendingWrites)
         .map((doc) => UserPreferencesModel.fromFirestore(doc));
   }
 
@@ -63,9 +66,10 @@ class UserRepository {
   /// Update user preferences
   Future<void> updateUserPreferences(
     String uid,
-    UserPreferencesModel prefs,
-  ) async {
-    final data = prefs.toMap();
+    UserPreferencesModel prefs, {
+    bool includeEmptyLists = false,
+  }) async {
+    final data = prefs.toMap(includeEmptyLists: includeEmptyLists);
     data['updatedAt'] = FieldValue.serverTimestamp();
     await _firestore
         .collection('users')
@@ -73,5 +77,15 @@ class UserRepository {
         .collection('preferences')
         .doc('main')
         .set(data, SetOptions(merge: true));
+  }
+
+  /// The final explicit confirmation writes selections and completion atomically
+  /// to the existing document. This Future resolves only after server ack.
+  Future<void> completeOnboarding(String uid, UserPreferencesModel prefs) {
+    return updateUserPreferences(
+      uid,
+      prefs.copyWith(onboardingCompleted: true),
+      includeEmptyLists: true,
+    );
   }
 }

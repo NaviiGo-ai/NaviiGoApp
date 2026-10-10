@@ -7,7 +7,7 @@ import '../../../core/motion/nav_haptics.dart';
 import '../../../core/motion/nav_motion.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
-import '../../../core/auth/auth_provider.dart';
+import '../../../core/auth/auth_actions.dart';
 
 /// ─────────────────────────────────────────────────────────────────────────────
 /// Scroll-driven chrome compaction (§4 / §60).
@@ -195,10 +195,9 @@ class _NavHubPageState extends ConsumerState<NavHubPage> {
         },
         child: widget.child,
       ),
-      bottomNavigationBar: _NavBottomBar(
-        currentIndex: currentIndex,
-        collapse: collapse,
-      ),
+      bottomNavigationBar: MediaQuery.viewInsetsOf(context).bottom > 0
+          ? null
+          : _NavBottomBar(currentIndex: currentIndex, collapse: collapse),
     );
   }
 }
@@ -225,7 +224,9 @@ class _NavBottomBar extends StatelessWidget {
     final double safeCollapse = collapse.clamp(0.0, 1.0);
     // Expanded: 62 px — enough for icon + label.
     // Collapsed: 54 px — enough for icon only, never squeezes to zero.
-    final double height = lerpDouble(62, 54, safeCollapse);
+    final labelHeight = MediaQuery.textScalerOf(context).scale(10.5) * 2.4;
+    final expandedHeight = (38 + labelHeight).clamp(62.0, double.infinity);
+    final double height = lerpDouble(expandedHeight, 54, safeCollapse);
 
     return Container(
       decoration: BoxDecoration(
@@ -236,7 +237,7 @@ class _NavBottomBar extends StatelessWidget {
         top: false,
         child: TweenAnimationBuilder<double>(
           tween: Tween<double>(begin: height, end: height),
-          duration: NavMotion.standard,
+          duration: NavReduce.duration(context, NavMotion.standard),
           curve: NavMotion.settle,
           builder: (context, h, _) {
             return SizedBox(
@@ -316,6 +317,7 @@ class _NavItem extends StatelessWidget {
 
     return Expanded(
       child: Semantics(
+        excludeSemantics: true,
         selected: isSelected,
         button: true,
         label: destination.label,
@@ -343,7 +345,9 @@ class _NavItem extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   AnimatedScale(
-                    scale: isSelected ? NavMotion.navIconScale : 1.0,
+                    scale: isSelected && !NavReduce.of(context)
+                        ? NavMotion.navIconScale
+                        : 1.0,
                     duration: NavReduce.duration(context, NavMotion.fast),
                     curve: NavMotion.response,
                     child: Icon(
@@ -375,7 +379,12 @@ class _NavItem extends StatelessWidget {
                           ),
                           child: Padding(
                             padding: const EdgeInsets.only(top: 2),
-                            child: Text(destination.label),
+                            child: Text(
+                              destination.label,
+                              textAlign: TextAlign.center,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                         ),
                       ),
@@ -626,10 +635,7 @@ class NavDrawer extends ConsumerWidget {
               ),
               onTap: () async {
                 Navigator.of(context).pop();
-                await ref.read(authControllerProvider.notifier).signOut();
-                if (context.mounted) {
-                  context.go('/login');
-                }
+                await signOutFrom(context, ref);
               },
             ),
             const SizedBox(height: 8),

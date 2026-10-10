@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
+import '../../../../core/auth/auth_actions.dart';
 import '../../../../core/auth/auth_provider.dart';
 import '../../../profile/presentation/providers/user_provider.dart';
 import '../../../navigation/presentation/nav_hub_page.dart';
@@ -18,11 +19,52 @@ class SettingsPage extends ConsumerStatefulWidget {
 class _SettingsPageState extends ConsumerState<SettingsPage> {
   bool _notifications = true;
   bool _location = true;
+  bool _savingAppearance = false;
+  bool? _requestedAppearance;
+  String? _appearanceError;
+
+  Future<void> _saveAppearance(bool enabled) async {
+    final uid = ref.read(currentUserProvider)?.uid;
+    final preferences = ref.read(userPreferencesStreamProvider).valueOrNull;
+    if (uid == null ||
+        preferences == null ||
+        preferences.sourceUserId != uid ||
+        _savingAppearance) {
+      return;
+    }
+    setState(() {
+      _savingAppearance = true;
+      _appearanceError = null;
+      _requestedAppearance = enabled;
+    });
+    try {
+      await ref
+          .read(userRepositoryProvider)
+          .updateUserPreferences(
+            uid,
+            preferences.copyWith(adaptiveAppearanceEnabled: enabled),
+          )
+          .timeout(const Duration(seconds: 15));
+      ref.invalidate(userPreferencesStreamProvider);
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () => _appearanceError =
+              'Save not confirmed. Check your connection and retry.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _savingAppearance = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final userProfile = ref.watch(userProfileStreamProvider).valueOrNull;
     final authUser = ref.watch(currentUserProvider);
+    final preferences = authUser == null
+        ? null
+        : ref.watch(userPreferencesStreamProvider);
 
     final String displayName =
         (userProfile?.displayName != null &&
@@ -32,7 +74,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final String email =
         (userProfile?.email != null && userProfile!.email!.isNotEmpty)
         ? userProfile.email!
-        : (authUser?.email ?? 'traveler@naviigo.in');
+        : (authUser?.email ?? 'No email available');
     final String initials = userProfile?.initials ?? 'NV';
 
     return Scaffold(
@@ -131,6 +173,32 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           _buildSectionHeader('PREFERENCES'),
           const SizedBox(height: 10),
           _buildSettingsBlock([
+            SwitchListTile.adaptive(
+              title: const Text('Adaptive Appearance'),
+              subtitle: Text(
+                _appearanceError ?? 'Subtle visual rhythm for your journey.',
+              ),
+              value:
+                  preferences?.valueOrNull?.adaptiveAppearanceEnabled ?? true,
+              onChanged: _savingAppearance || preferences?.valueOrNull == null
+                  ? null
+                  : _saveAppearance,
+            ),
+            if (_savingAppearance)
+              const LinearProgressIndicator(
+                semanticsLabel: 'Saving appearance',
+              ),
+            if (_appearanceError != null)
+              TextButton(
+                onPressed: () => _saveAppearance(_requestedAppearance!),
+                child: const Text('Retry appearance save'),
+              ),
+            if (preferences?.hasError == true)
+              TextButton(
+                onPressed: () => ref.invalidate(userPreferencesStreamProvider),
+                child: const Text('Retry preferences'),
+              ),
+            _buildDivider(),
             _buildToggleRow(
               'Push Notifications',
               Icons.notifications_outlined,
@@ -253,10 +321,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 );
 
                 if (confirm == true && context.mounted) {
-                  await ref.read(authControllerProvider.notifier).signOut();
-                  if (context.mounted) {
-                    context.go('/login');
-                  }
+                  await signOutFrom(context, ref);
                 }
               },
               icon: const Icon(

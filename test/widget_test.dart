@@ -233,10 +233,11 @@ void main() {
 
       // Verify switch toggles
       final switches = find.byType(Switch);
-      expect(switches, findsNWidgets(2));
+      expect(switches, findsNWidgets(3));
+      expect(find.text('Adaptive Appearance'), findsOneWidget);
 
       // Tap Push Notifications switch
-      await tester.tap(switches.first);
+      await tester.tap(switches.at(1));
       await tester.pumpAndSettle();
 
       // Tap Location Services switch

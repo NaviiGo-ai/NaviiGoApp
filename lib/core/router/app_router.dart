@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'entry_guard.dart';
 
 import '../../core/motion/nav_route_transition.dart';
 import '../../features/splash/presentation/splash_page.dart';
@@ -53,9 +55,23 @@ Page<void> _page(
   return NavRouteTransition.page(state: state, child: child, kind: kind);
 }
 
-final GoRouter appRouter = GoRouter(
+final appRouterProvider = Provider<GoRouter>((ref) {
+  final refresh = ValueNotifier(ref.read(entryStatusProvider));
+  ref.listen(entryStatusProvider, (_, next) => refresh.value = next);
+  final router = createAppRouter(refresh);
+  ref.onDispose(() {
+    router.dispose();
+    refresh.dispose();
+  });
+  return router;
+});
+
+GoRouter createAppRouter(ValueNotifier<EntryStatus> entryState) => GoRouter(
   navigatorKey: _rootNavigatorKey,
+  restorationScopeId: 'naviigo-router',
   initialLocation: '/',
+  refreshListenable: entryState,
+  redirect: (_, state) => entryRedirect(state.uri, entryState.value),
   routes: <RouteBase>[
     // ── AUTH & ONBOARDING (modal / entry flows outside shell) ────────────
     GoRoute(path: '/', builder: (context, state) => const SplashPage()),

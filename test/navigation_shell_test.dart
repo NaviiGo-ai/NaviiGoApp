@@ -46,6 +46,19 @@ GoRouter _router({String initial = '/home'}) {
         builder: (context, state, child) => NavHubPage(child: child),
         routes: [
           GoRoute(path: '/home', builder: (_, __) => _probePage('HOME PAGE')),
+          GoRoute(
+            path: '/explore-discover',
+            builder: (_, __) => _probePage('EXPLORE PAGE'),
+          ),
+          GoRoute(path: '/trips', builder: (_, __) => _probePage('TRIPS PAGE')),
+          GoRoute(
+            path: '/digital-passport',
+            builder: (_, __) => _probePage('PASSPORT PAGE'),
+          ),
+          GoRoute(
+            path: '/profile',
+            builder: (_, __) => _probePage('PROFILE PAGE'),
+          ),
           GoRoute(path: '/scrollable', builder: (_, __) => _scrollablePage()),
           GoRoute(
             path: '/upcoming-trips',
@@ -132,10 +145,8 @@ void main() {
       await tester.tap(find.text('Profile'));
       await tester.pumpAndSettle();
 
-      // 'Profile' is not part of this minimal test router, so go_router shows
-      // its not-found route. What matters is that the tap routed at all rather
-      // than being swallowed by the shell.
       expect(find.text('HOME PAGE'), findsNothing);
+      expect(find.text('PROFILE PAGE'), findsOneWidget);
     });
 
     testWidgets('the leading degrades to the menu without a GoRouter', (
@@ -312,6 +323,128 @@ void main() {
 
       expect(find.text('UPCOMING PAGE'), findsOneWidget);
       expect(container.read(navChromeCollapseProvider), 0.0);
+    });
+  });
+
+  group('Shell accessibility and entry integration', () {
+    testWidgets(
+      'five roots retain ordering and route correctly at 320px with large text',
+      (tester) async {
+        tester.view.physicalSize = const Size(320, 700);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final router = _router();
+        addTearDown(router.dispose);
+        await tester.pumpWidget(
+          ProviderScope(
+            child: MaterialApp.router(
+              routerConfig: router,
+              builder: (context, child) => MediaQuery(
+                data: MediaQuery.of(
+                  context,
+                ).copyWith(textScaler: TextScaler.linear(2.5)),
+                child: child!,
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        double previousX = -1;
+        for (final (label, path) in [
+          ('Home', '/home'),
+          ('Explore', '/explore-discover'),
+          ('Trips', '/trips'),
+          ('Passport', '/digital-passport'),
+          ('Profile', '/profile'),
+        ]) {
+          final x = tester.getCenter(find.text(label)).dx;
+          expect(x, greaterThan(previousX));
+          previousX = x;
+          await tester.tap(find.text(label));
+          await tester.pumpAndSettle();
+          expect(router.routeInformationProvider.value.uri.path, path);
+          expect(tester.takeException(), isNull);
+        }
+      },
+    );
+
+    testWidgets(
+      'reduced-motion chrome collapses quickly and retains tab semantics',
+      (tester) async {
+        final router = _router(initial: '/scrollable');
+        addTearDown(router.dispose);
+        final semantics = tester.ensureSemantics();
+        await tester.pumpWidget(
+          ProviderScope(
+            child: MaterialApp.router(
+              routerConfig: router,
+              builder: (context, child) => MediaQuery(
+                data: MediaQuery.of(context).copyWith(disableAnimations: true),
+                child: child!,
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.drag(find.byType(ListView), const Offset(0, -400));
+        await tester.pumpAndSettle();
+        expect(
+          tester
+              .widget<TweenAnimationBuilder<double>>(
+                find.byType(TweenAnimationBuilder<double>).first,
+              )
+              .duration
+              .inMilliseconds,
+          1,
+        );
+        for (final label in [
+          'Home',
+          'Explore',
+          'Trips',
+          'Passport',
+          'Profile',
+        ]) {
+          expect(find.bySemanticsLabel(label), findsOneWidget);
+        }
+        expect(tester.takeException(), isNull);
+        semantics.dispose();
+      },
+    );
+
+    testWidgets('keyboard hides bottom chrome without losing the route', (
+      tester,
+    ) async {
+      final router = _router();
+      addTearDown(router.dispose);
+      final keyboard = ValueNotifier(0.0);
+      addTearDown(keyboard.dispose);
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp.router(
+            routerConfig: router,
+            builder: (context, child) => ValueListenableBuilder<double>(
+              valueListenable: keyboard,
+              builder: (_, inset, _) => MediaQuery(
+                data: MediaQuery.of(
+                  context,
+                ).copyWith(viewInsets: EdgeInsets.only(bottom: inset)),
+                child: child!,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Home'), findsOneWidget);
+      keyboard.value = 300;
+      await tester.pumpAndSettle();
+      expect(find.text('Home'), findsNothing);
+      expect(find.text('HOME PAGE'), findsOneWidget);
+      keyboard.value = 0;
+      await tester.pumpAndSettle();
+      expect(find.text('Home'), findsOneWidget);
+      expect(router.routeInformationProvider.value.uri.path, '/home');
     });
   });
 }

@@ -13,7 +13,8 @@ final authStateProvider = StreamProvider<User?>((ref) {
 
 final currentUserProvider = Provider<User?>((ref) {
   final authState = ref.watch(authStateProvider);
-  return authState.value ?? ref.watch(authRepositoryProvider).currentUser;
+  if (authState.hasValue) return authState.value;
+  return ref.watch(authRepositoryProvider).currentUser;
 });
 
 enum AuthStatus { initial, loading, authenticated, unauthenticated, error }
@@ -46,10 +47,10 @@ class AuthController extends StateNotifier<AuthState> {
         errorMessage: _formatAuthError(e),
       );
       return false;
-    } catch (e) {
+    } catch (_) {
       state = state.copyWith(
         status: AuthStatus.error,
-        errorMessage: e.toString(),
+        errorMessage: 'Could not sign in. Please try again.',
       );
       return false;
     }
@@ -75,20 +76,31 @@ class AuthController extends StateNotifier<AuthState> {
         errorMessage: _formatAuthError(e),
       );
       return false;
-    } catch (e) {
+    } catch (_) {
       state = state.copyWith(
         status: AuthStatus.error,
-        errorMessage: e.toString(),
+        errorMessage: 'Could not create your account. Please try again.',
       );
       return false;
     }
   }
 
-  Future<void> signOut() async {
+  Future<bool> signOut() async {
     state = state.copyWith(status: AuthStatus.loading);
-    await _repo.signOut();
-    state = state.copyWith(status: AuthStatus.unauthenticated);
+    try {
+      await _repo.signOut();
+      state = state.copyWith(status: AuthStatus.unauthenticated);
+      return true;
+    } catch (_) {
+      state = state.copyWith(
+        status: AuthStatus.error,
+        errorMessage: 'Could not sign out. Please try again.',
+      );
+      return false;
+    }
   }
+
+  void clearError() => state = const AuthState();
 
   String _formatAuthError(FirebaseAuthException e) {
     switch (e.code) {
@@ -102,9 +114,15 @@ class AuthController extends StateNotifier<AuthState> {
       case 'invalid-email':
         return 'The email address is invalid.';
       case 'weak-password':
-        return 'The password is too weak.';
+        return 'Choose a stronger password with at least 6 characters.';
+      case 'network-request-failed':
+        return 'Check your connection and try again.';
+      case 'too-many-requests':
+        return 'Too many attempts. Please wait a little and try again.';
+      case 'user-disabled':
+        return 'This account is unavailable. Please contact support.';
       default:
-        return e.message ?? 'Authentication failed.';
+        return 'Unable to sign in right now. Please try again.';
     }
   }
 }
