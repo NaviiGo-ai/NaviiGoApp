@@ -19,15 +19,7 @@ class NaviiGoApp extends ConsumerWidget {
         ref.watch(userPreferencesStreamProvider).value ??
         const UserPreferencesModel();
     final activeTrip = ref.watch(activeTripProvider);
-    final upcomingTrips = ref.watch(upcomingTripsProvider);
-    final pastTrips = ref.watch(pastTripsProvider);
-    final lifecycle = activeTrip != null
-        ? AdaptiveJourneyLifecycle.activeTrip
-        : upcomingTrips.isNotEmpty
-        ? AdaptiveJourneyLifecycle.upcoming
-        : pastTrips.isNotEmpty
-        ? AdaptiveJourneyLifecycle.postTrip
-        : AdaptiveJourneyLifecycle.discover;
+    final lifecycle = ref.watch(adaptiveJourneyLifecycleProvider);
     final destinationCategory = AdaptiveDestinationCategoryParsing.fromExplicit(
       activeTrip?.form['purpose']?.toString(),
     );

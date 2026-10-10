@@ -1,11 +1,15 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:naviigo_app/core/adaptive/adaptive_experience_controller.dart';
 import 'package:naviigo_app/core/adaptive/adaptive_experience_profile.dart';
+import 'package:naviigo_app/core/adaptive/adaptive_experience_provider.dart';
 import 'package:naviigo_app/core/adaptive/adaptive_experience_state.dart';
 import 'package:naviigo_app/core/adaptive/adaptive_motion_profile.dart';
 import 'package:naviigo_app/core/adaptive/adaptive_theme_extension.dart';
 import 'package:naviigo_app/core/theme/app_colors.dart';
 import 'package:naviigo_app/features/profile/domain/models/user_preferences_model.dart';
+import 'package:naviigo_app/features/trips/domain/models/trip_itinerary_model.dart';
+import 'package:naviigo_app/features/trips/presentation/providers/trip_provider.dart';
 
 void main() {
   const controller = AdaptiveExperienceController();
@@ -182,7 +186,12 @@ void main() {
     () {
       const defaults = UserPreferencesModel();
       expect(defaults.adaptiveAppearanceEnabled, isTrue);
-      expect(defaults.toMap(), isEmpty);
+      expect(defaults.toMap()['adaptiveAppearanceEnabled'], isTrue);
+      expect(
+        UserPreferencesModel.fromMap({}).adaptiveAppearanceEnabled,
+        isTrue,
+        reason: 'Legacy documents without the field remain enabled',
+      );
 
       const disabled = UserPreferencesModel(adaptiveAppearanceEnabled: false);
       expect(disabled.toMap()['adaptiveAppearanceEnabled'], isFalse);
@@ -194,4 +203,89 @@ void main() {
       );
     },
   );
+
+  test('stored false -> toggle true overwrites the opt-out in a merge', () {
+    final stored = <String, dynamic>{
+      'adaptiveAppearanceEnabled': false,
+      'homeCity': 'Jaipur',
+    };
+    final preferences = UserPreferencesModel.fromMap(stored);
+    expect(preferences.adaptiveAppearanceEnabled, isFalse);
+
+    final update = preferences
+        .copyWith(adaptiveAppearanceEnabled: true)
+        .toMap();
+    expect(update['adaptiveAppearanceEnabled'], isTrue);
+
+    // Model the existing SetOptions(merge: true) write to the document.
+    stored.addAll(update);
+    expect(
+      UserPreferencesModel.fromMap(stored).adaptiveAppearanceEnabled,
+      isTrue,
+    );
+    expect(stored['homeCity'], 'Jaipur');
+  });
+
+  group('Adaptive app lifecycle', () {
+    const historicalTrip = TripItineraryModel(
+      id: 'historical',
+      uuid: 'historical',
+      destId: 'jaipur',
+      destName: 'Jaipur',
+      status: TripStatus.completed,
+      form: {'startDate': '2000-01-01', 'days': 2},
+    );
+    final upcomingTrip = TripItineraryModel(
+      id: 'upcoming',
+      uuid: 'upcoming',
+      destId: 'jaipur',
+      destName: 'Jaipur',
+      status: TripStatus.upcoming,
+      form: {
+        'startDate': DateTime.now()
+            .add(const Duration(days: 365))
+            .toIso8601String(),
+        'days': 2,
+      },
+    );
+    const activeTrip = TripItineraryModel(
+      id: 'active',
+      uuid: 'active',
+      destId: 'jaipur',
+      destName: 'Jaipur',
+      status: TripStatus.active,
+      isActive: true,
+    );
+
+    for (final (name, trips, expected) in [
+      (
+        'historical trips alone resolve to discover',
+        [historicalTrip],
+        AdaptiveJourneyLifecycle.discover,
+      ),
+      (
+        'active overrides upcoming and historical trips',
+        [historicalTrip, upcomingTrip, activeTrip],
+        AdaptiveJourneyLifecycle.activeTrip,
+      ),
+      (
+        'upcoming resolves correctly alongside historical trips',
+        [historicalTrip, upcomingTrip],
+        AdaptiveJourneyLifecycle.upcoming,
+      ),
+    ]) {
+      test(name, () async {
+        final container = ProviderContainer(
+          overrides: [
+            userTripsStreamProvider.overrideWith((ref) => Stream.value(trips)),
+          ],
+        );
+        addTearDown(container.dispose);
+        await container.read(userTripsStreamProvider.future);
+
+        expect(container.read(pastTripsProvider), contains(historicalTrip));
+        expect(container.read(adaptiveJourneyLifecycleProvider), expected);
+      });
+    }
+  });
 }

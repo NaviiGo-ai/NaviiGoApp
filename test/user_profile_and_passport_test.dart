@@ -10,11 +10,12 @@ void main() {
   group('Domain Models Unit Tests', () {
     test('UserPreferencesModel partial merge and serialization', () {
       const emptyPrefs = UserPreferencesModel();
-      expect(emptyPrefs.toMap(), isEmpty);
+      expect(emptyPrefs.toMap(), {'adaptiveAppearanceEnabled': true});
       expect(emptyPrefs.toMap(includeEmptyLists: true), {
         'interests': <String>[],
         'dietaryPreferences': <String>[],
         'accessibilityNeeds': <String>[],
+        'adaptiveAppearanceEnabled': true,
       });
 
       const prefs = UserPreferencesModel(

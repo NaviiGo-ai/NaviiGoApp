@@ -1,6 +1,6 @@
 # Mobile API Contract Matrix
 
-**Audited Website commit:** `a7fd4249128994fedf64576ab59458b44d695ad` on
+**Audited Website commit:** `a7fd4249128994fed167e4a89ba97fc054e2f958` on
 `NaviiGo-Website/main`.
 
 **Base URL:** `AppConfig.apiBaseUrl` (production default

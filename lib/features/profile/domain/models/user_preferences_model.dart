@@ -82,9 +82,9 @@ class UserPreferencesModel {
       if (includeEmptyLists || accessibilityNeeds.isNotEmpty)
         'accessibilityNeeds': accessibilityNeeds,
       if (homeCity != null) 'homeCity': homeCity,
-      // The default is enabled, so omit it to preserve the existing empty
-      // preference document shape. Only the opt-out needs to be persisted.
-      if (!adaptiveAppearanceEnabled) 'adaptiveAppearanceEnabled': false,
+      // Preference writes merge into the stored document. Include both values
+      // so re-enabling appearance overwrites a previously persisted opt-out.
+      'adaptiveAppearanceEnabled': adaptiveAppearanceEnabled,
     };
   }
 }
