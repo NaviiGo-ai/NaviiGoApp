@@ -63,8 +63,20 @@ unknown exceptions never appear verbatim in UI. Passwords are not trimmed.
 ApiClient retains sole responsibility for token refresh. Profile sync is
 best-effort after genuine Firebase auth so it cannot block offline entry.
 Logout awaits Firebase sign-out and clears the existing user-specific Hive
-itinerary/profile caches, not shared preferences or remote documents. Failed
-logout stays on the current screen with a retryable message.
+itinerary/profile caches and the signed-out user's local analytics queue, not
+shared preferences or remote documents. Analytics envelopes carry a
+local-only `ownerUid`; this is queue isolation metadata, never backend
+identity, and is omitted from `POST /api/analytics/track`. Flushes select only
+the current UID's envelopes and pass that expected UID through the existing
+ApiClient token authority, so backend identity remains exclusively the Firebase
+bearer token. Legacy unowned/malformed queue entries are discarded safely and
+never submitted. Failed logout stays on the current screen with a retryable
+message; flush-time ownership checks remain effective if cleanup fails.
+
+The adaptive composition root uses one safe preference selector. Preferences
+are accepted only when the authenticated UID exists and the in-memory
+`sourceUserId` matches it. A retained value from another account, including
+during an auth dependency reload, resolves to standard Naviigo defaults.
 
 ## Visual and accessibility scope
 

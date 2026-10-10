@@ -30,3 +30,19 @@ final userPreferencesStreamProvider = StreamProvider<UserPreferencesModel>((
       .getUserPreferencesStream(uid)
       .map((preferences) => preferences.copyWith(sourceUserId: uid));
 });
+
+/// The only composition-root selector for adaptive user preferences.
+///
+/// AsyncValue may retain data while a stream dependency changes. Same-UID
+/// cached data remains usable during a refresh; a different UID always gets
+/// standard Naviigo defaults.
+final safeAdaptivePreferencesProvider = Provider<UserPreferencesModel>((ref) {
+  final uid = ref.watch(currentUserProvider)?.uid;
+  if (uid == null) return const UserPreferencesModel();
+
+  final preferences = ref.watch(userPreferencesStreamProvider).valueOrNull;
+  if (preferences == null || preferences.sourceUserId != uid) {
+    return const UserPreferencesModel();
+  }
+  return preferences;
+});

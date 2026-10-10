@@ -90,9 +90,10 @@ class AuthRepository {
 
   /// Sign out and safely purge user-specific local caches
   Future<void> signOut() async {
+    final signedOutUid = _auth.currentUser?.uid;
     await _auth.signOut();
     try {
-      await HiveService.clearCache();
+      await HiveService.clearCache(analyticsOwnerUid: signedOutUid);
     } catch (e) {
       debugPrint('[AuthRepository] Error clearing Hive cache on logout: $e');
     }

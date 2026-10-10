@@ -18,9 +18,18 @@ class ApiClient {
   String get baseUrl => _baseUrl;
 
   /// Helper to get current Firebase ID token
-  Future<String?> _getIdToken({bool forceRefresh = false}) async {
+  Future<String?> _getIdToken({
+    bool forceRefresh = false,
+    String? expectedAuthUid,
+  }) async {
     try {
       final user = FirebaseAuth.instance.currentUser;
+      // Capture the matching Firebase User before asking for a token. If auth
+      // changes after this point, this object can only produce the original
+      // account's token.
+      if (expectedAuthUid != null && user?.uid != expectedAuthUid) {
+        return null;
+      }
       if (user == null) return null;
       return await user.getIdToken(forceRefresh);
     } catch (e) {
@@ -34,6 +43,7 @@ class ApiClient {
     bool requiresAuth = true,
     Map<String, String>? extraHeaders,
     bool forceTokenRefresh = false,
+    String? expectedAuthUid,
   }) async {
     final headers = <String, String>{
       'Content-Type': 'application/json',
@@ -41,7 +51,13 @@ class ApiClient {
     };
 
     if (requiresAuth) {
-      final token = await _getIdToken(forceRefresh: forceTokenRefresh);
+      final token = await _getIdToken(
+        forceRefresh: forceTokenRefresh,
+        expectedAuthUid: expectedAuthUid,
+      );
+      if (expectedAuthUid != null && (token == null || token.isEmpty)) {
+        throw const AuthRequiredException();
+      }
       if (token != null && token.isNotEmpty) {
         headers['Authorization'] = 'Bearer $token';
       }
@@ -63,6 +79,7 @@ class ApiClient {
     bool requiresAuth = true,
     Duration? timeout,
     Map<String, String>? extraHeaders,
+    String? expectedAuthUid,
   }) async {
     final resolvedTimeout = timeout ?? AppConfig.standardTimeout;
     final uri = _buildUri(path, queryParams);
@@ -74,6 +91,7 @@ class ApiClient {
       requiresAuth: requiresAuth,
       timeout: resolvedTimeout,
       extraHeaders: extraHeaders,
+      expectedAuthUid: expectedAuthUid,
       isRetry: false,
     );
   }
@@ -85,12 +103,14 @@ class ApiClient {
     required bool requiresAuth,
     required Duration timeout,
     required Map<String, String>? extraHeaders,
+    String? expectedAuthUid,
     required bool isRetry,
   }) async {
     final headers = await _buildHeaders(
       requiresAuth: requiresAuth,
       extraHeaders: extraHeaders,
       forceTokenRefresh: isRetry,
+      expectedAuthUid: expectedAuthUid,
     );
 
     if (kDebugMode) {
@@ -154,7 +174,10 @@ class ApiClient {
       debugPrint(
         '[API] 401 received. Attempting Firebase token force refresh and single retry...',
       );
-      final refreshed = await _getIdToken(forceRefresh: true);
+      final refreshed = await _getIdToken(
+        forceRefresh: true,
+        expectedAuthUid: expectedAuthUid,
+      );
       if (refreshed != null) {
         return _executeWithRetry(
           method: method,
@@ -163,6 +186,7 @@ class ApiClient {
           requiresAuth: requiresAuth,
           timeout: timeout,
           extraHeaders: extraHeaders,
+          expectedAuthUid: expectedAuthUid,
           isRetry: true,
         );
       }
@@ -248,6 +272,7 @@ class ApiClient {
     Map<String, String>? queryParams,
     bool requiresAuth = true,
     Duration? timeout,
+    String? expectedAuthUid,
   }) => _send(
     'POST',
     path,
@@ -255,6 +280,7 @@ class ApiClient {
     body: body,
     requiresAuth: requiresAuth,
     timeout: timeout,
+    expectedAuthUid: expectedAuthUid,
   );
 
   Future<dynamic> put(

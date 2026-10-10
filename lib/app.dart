@@ -8,7 +8,6 @@ import 'core/theme/app_theme.dart';
 import 'core/router/app_router.dart';
 import 'features/profile/presentation/providers/user_provider.dart';
 import 'features/trips/presentation/providers/trip_provider.dart';
-import 'features/profile/domain/models/user_preferences_model.dart';
 
 class NaviiGoApp extends ConsumerWidget {
   const NaviiGoApp({super.key});
@@ -16,9 +15,7 @@ class NaviiGoApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(appRouterProvider);
-    final preferences =
-        ref.watch(userPreferencesStreamProvider).value ??
-        const UserPreferencesModel();
+    final preferences = ref.watch(safeAdaptivePreferencesProvider);
     final activeTrip = ref.watch(activeTripProvider);
     final lifecycle = ref.watch(adaptiveJourneyLifecycleProvider);
     final destinationCategory = AdaptiveDestinationCategoryParsing.fromExplicit(
