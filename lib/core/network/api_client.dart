@@ -7,13 +7,32 @@ import 'package:http/http.dart' as http;
 import '../config/app_config.dart';
 import 'api_exceptions.dart';
 
+bool tokenBelongsToUid({
+  required String? token,
+  required Map<String, dynamic>? claims,
+  required String expectedUid,
+}) {
+  if (token == null || token.isEmpty || claims == null) return false;
+
+  final subject = claims['sub'];
+  final firebaseUid = claims['user_id'];
+  if (subject != null && subject != expectedUid) return false;
+  if (firebaseUid != null && firebaseUid != expectedUid) return false;
+  return subject == expectedUid || firebaseUid == expectedUid;
+}
+
 class ApiClient {
   final http.Client _httpClient;
   final String _baseUrl;
+  final User? Function() _currentUser;
 
-  ApiClient({http.Client? httpClient, String? baseUrl})
-    : _httpClient = httpClient ?? http.Client(),
-      _baseUrl = baseUrl ?? AppConfig.apiBaseUrl;
+  ApiClient({
+    http.Client? httpClient,
+    String? baseUrl,
+    User? Function()? currentUser,
+  }) : _httpClient = httpClient ?? http.Client(),
+       _baseUrl = baseUrl ?? AppConfig.apiBaseUrl,
+       _currentUser = currentUser ?? (() => FirebaseAuth.instance.currentUser);
 
   String get baseUrl => _baseUrl;
 
@@ -23,7 +42,7 @@ class ApiClient {
     String? expectedAuthUid,
   }) async {
     try {
-      final user = FirebaseAuth.instance.currentUser;
+      final user = _currentUser();
       // Capture the matching Firebase User before asking for a token. If auth
       // changes after this point, this object can only produce the original
       // account's token.
@@ -31,7 +50,23 @@ class ApiClient {
         return null;
       }
       if (user == null) return null;
-      return await user.getIdToken(forceRefresh);
+      if (expectedAuthUid == null) {
+        return await user.getIdToken(forceRefresh);
+      }
+
+      final result = await user.getIdTokenResult(forceRefresh);
+      final token = result.token;
+      if (!tokenBelongsToUid(
+        token: token,
+        claims: result.claims,
+        expectedUid: expectedAuthUid,
+      )) {
+        return null;
+      }
+      // Native Firebase resolves the current native user when the method
+      // channel call completes. Reject transitions during that await too.
+      if (_currentUser()?.uid != expectedAuthUid) return null;
+      return token;
     } catch (e) {
       debugPrint('[ApiClient] Error acquiring Firebase ID token: $e');
       return null;
@@ -60,6 +95,9 @@ class ApiClient {
       }
       if (token != null && token.isNotEmpty) {
         headers['Authorization'] = 'Bearer $token';
+      }
+      if (expectedAuthUid != null && _currentUser()?.uid != expectedAuthUid) {
+        throw const AuthRequiredException();
       }
     }
 

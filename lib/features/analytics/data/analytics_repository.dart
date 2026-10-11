@@ -84,6 +84,29 @@ class _QueuedAnalyticsEvent {
   }
 }
 
+class _AnalyticsQueueMutex {
+  Future<void> _tail = Future<void>.value();
+
+  Future<T> run<T>(Future<T> Function() operation) {
+    final result = Completer<T>();
+    final previous = _tail;
+    final current = Completer<void>();
+    _tail = current.future;
+
+    unawaited(() async {
+      try {
+        await previous;
+        result.complete(await operation());
+      } catch (error, stackTrace) {
+        result.completeError(error, stackTrace);
+      } finally {
+        current.complete();
+      }
+    }());
+    return result.future;
+  }
+}
+
 /// Bounded, account-owned offline analytics queue.
 ///
 /// Events are retained when the request is offline or rejected. A successful
@@ -96,7 +119,9 @@ class AnalyticsRepository {
   final String _queueBoxName;
   final String? Function() _currentUid;
   final bool _flushOnLog;
+  final _AnalyticsQueueMutex _queueMutex = _AnalyticsQueueMutex();
   bool _isFlushing = false;
+  bool _flushRequested = false;
   int _eventSequence = 0;
 
   AnalyticsRepository(
@@ -136,18 +161,23 @@ class AnalyticsRepository {
       metadata: metadata,
     );
 
-    final box = await _openQueue();
-    // Do not attribute an event to an account if auth changed while the local
-    // write was waiting for Hive.
-    if (_currentUid() != ownerUid) return;
+    await _queueMutex.run<void>(() async {
+      final box = await _openQueue();
+      // Do not attribute an event to an account if auth changed while the
+      // local write was waiting for Hive.
+      if (_currentUid() != ownerUid) return;
 
-    final ownedKeys = await _ownedKeys(box, ownerUid);
-    while (ownedKeys.length >= maxQueueLength) {
-      await box.delete(ownedKeys.removeAt(0));
-    }
-    await box.add(
-      _QueuedAnalyticsEvent(ownerUid: ownerUid, event: event.toJson()).encode(),
-    );
+      final ownedKeys = await _ownedKeys(box, ownerUid);
+      while (ownedKeys.length >= maxQueueLength) {
+        await box.delete(ownedKeys.removeAt(0));
+      }
+      await box.add(
+        _QueuedAnalyticsEvent(
+          ownerUid: ownerUid,
+          event: event.toJson(),
+        ).encode(),
+      );
+    });
     if (_flushOnLog) unawaited(_flushQueue());
   }
 
@@ -173,45 +203,49 @@ class AnalyticsRepository {
   }
 
   Future<void> _flushQueue() async {
-    if (_isFlushing) return;
-
-    final box = await _openQueue();
-    final ownerUid = _currentUid();
-    // Safe cleanup is allowed while signed out, but no event can be sent
-    // without an authenticated owner.
-    if (ownerUid == null || ownerUid.isEmpty) {
-      for (final key in box.keys.toList()) {
-        if (_decode(box.get(key)) == null) await box.delete(key);
-      }
+    if (_isFlushing) {
+      _flushRequested = true;
       return;
     }
-
     _isFlushing = true;
     try {
-      final keys = <dynamic>[];
-      final events = <Map<String, dynamic>>[];
-      for (final key in box.keys.toList()) {
-        final queued = _decode(box.get(key));
-        if (queued == null) {
-          await box.delete(key);
-          continue;
+      await _queueMutex.run<void>(() async {
+        final box = await _openQueue();
+        final ownerUid = _currentUid();
+        // Safe cleanup is allowed while signed out, but no event can be sent
+        // without an authenticated owner.
+        if (ownerUid == null || ownerUid.isEmpty) {
+          for (final key in box.keys.toList()) {
+            if (_decode(box.get(key)) == null) await box.delete(key);
+          }
+          return;
         }
-        if (queued.ownerUid != ownerUid) continue;
-        keys.add(key);
-        events.add(queued.event);
-      }
 
-      if (events.isEmpty || _currentUid() != ownerUid) return;
+        final keys = <dynamic>[];
+        final events = <Map<String, dynamic>>[];
+        for (final key in box.keys.toList()) {
+          final queued = _decode(box.get(key));
+          if (queued == null) {
+            await box.delete(key);
+            continue;
+          }
+          if (queued.ownerUid != ownerUid) continue;
+          keys.add(key);
+          events.add(queued.event);
+        }
 
-      // The /api prefix is part of the production Website contract. The
-      // expected UID prevents ApiClient from acquiring another account's
-      // token if auth changes during this flush.
-      await _apiClient.post(
-        '/api/analytics/track',
-        body: {'events': events},
-        expectedAuthUid: ownerUid,
-      );
-      await box.deleteAll(keys);
+        if (events.isEmpty || _currentUid() != ownerUid) return;
+
+        // Keep queue mutation behind the mutex until the request completes.
+        // A concurrent log must not trim an in-flight event before a failed
+        // request has a chance to retry it.
+        await _apiClient.post(
+          '/api/analytics/track',
+          body: {'events': events},
+          expectedAuthUid: ownerUid,
+        );
+        await box.deleteAll(keys);
+      });
     } on NetworkException {
       // Keep this user's queue for a later retry when connectivity returns.
     } on AuthRequiredException {
@@ -220,6 +254,10 @@ class AnalyticsRepository {
       debugPrint('[AnalyticsRepository] Flush deferred: $error');
     } finally {
       _isFlushing = false;
+      if (_flushRequested) {
+        _flushRequested = false;
+        unawaited(_flushQueue());
+      }
     }
   }
 

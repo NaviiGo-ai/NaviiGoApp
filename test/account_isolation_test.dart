@@ -29,6 +29,8 @@ class _AuthRepository extends Fake implements AuthRepository {
 class _RecordingApiClient extends ApiClient {
   final requests = <Map<String, dynamic>>[];
   Object? failure;
+  Completer<void>? postStarted;
+  Completer<void>? postGate;
 
   _RecordingApiClient() : super(baseUrl: 'https://analytics.test');
 
@@ -47,6 +49,8 @@ class _RecordingApiClient extends ApiClient {
       'body': body,
       'expectedAuthUid': expectedAuthUid,
     });
+    postStarted?.complete();
+    if (postGate != null) await postGate!.future;
     return const <String, dynamic>{'ok': true};
   }
 }
@@ -86,6 +90,45 @@ void main() {
   }
 
   group('offline analytics account ownership', () {
+    test('expected token claims must identify the queued owner', () {
+      expect(
+        tokenBelongsToUid(
+          token: 'token-a',
+          claims: {'sub': 'A', 'user_id': 'A'},
+          expectedUid: 'A',
+        ),
+        isTrue,
+      );
+      expect(
+        tokenBelongsToUid(
+          token: 'token-b',
+          claims: {'sub': 'B'},
+          expectedUid: 'A',
+        ),
+        isFalse,
+      );
+      expect(
+        tokenBelongsToUid(
+          token: 'token-a',
+          claims: {'user_id': 'A'},
+          expectedUid: 'A',
+        ),
+        isTrue,
+      );
+      expect(
+        tokenBelongsToUid(
+          token: 'token-a',
+          claims: {'sub': 'A', 'user_id': 'B'},
+          expectedUid: 'A',
+        ),
+        isFalse,
+      );
+      expect(
+        tokenBelongsToUid(token: 'token-a', claims: const {}, expectedUid: 'A'),
+        isFalse,
+      );
+    });
+
     test(
       'User A queue never flushes under User B, while B can flush own events',
       () async {
@@ -181,6 +224,90 @@ void main() {
       await repository.forceFlush();
       expect(api.requests, hasLength(1));
       expect(box, isEmpty);
+    });
+
+    test('concurrent flushes submit once', () async {
+      final api = _RecordingApiClient()
+        ..postStarted = Completer<void>()
+        ..postGate = Completer<void>();
+      final boxName = nextBox();
+      final repository = AnalyticsRepository(
+        api,
+        currentUid: () => 'A',
+        queueBoxName: boxName,
+        flushOnLog: false,
+      );
+
+      await repository.logEvent(eventType: 'before_flush');
+      final first = repository.forceFlush();
+      await api.postStarted!.future;
+      final second = repository.forceFlush();
+      await Future<void>.delayed(Duration.zero);
+      expect(api.requests, hasLength(1));
+
+      api.postGate!.complete();
+      await Future.wait([first, second]);
+      await Future<void>.delayed(Duration.zero);
+      expect(api.requests, hasLength(1));
+    });
+
+    test(
+      'events queued during a request are not deleted with its batch',
+      () async {
+        final api = _RecordingApiClient()
+          ..postStarted = Completer<void>()
+          ..postGate = Completer<void>();
+        final boxName = nextBox();
+        final repository = AnalyticsRepository(
+          api,
+          currentUid: () => 'A',
+          queueBoxName: boxName,
+          flushOnLog: false,
+        );
+
+        await repository.logEvent(eventType: 'before_flush');
+        final first = repository.forceFlush();
+        await api.postStarted!.future;
+        var logFinished = false;
+        final during = repository.logEvent(eventType: 'during_flush').then((_) {
+          logFinished = true;
+        });
+        await Future<void>.delayed(Duration.zero);
+        expect(logFinished, isFalse);
+        api.postGate!.complete();
+        await first;
+        await during;
+
+        final box = await Hive.openBox<String>(boxName);
+        expect(box, hasLength(1));
+        expect(
+          (jsonDecode(box.values.single)
+              as Map<String, dynamic>)['event']['eventType'],
+          'during_flush',
+        );
+      },
+    );
+
+    test('concurrent logging preserves the 200-entry per-user bound', () async {
+      final api = _RecordingApiClient();
+      final boxName = nextBox();
+      final repository = AnalyticsRepository(
+        api,
+        currentUid: () => 'A',
+        queueBoxName: boxName,
+        flushOnLog: false,
+      );
+
+      for (var i = 0; i < AnalyticsRepository.maxQueueLength; i++) {
+        await repository.logEvent(eventType: 'existing_$i');
+      }
+      await Future.wait([
+        repository.logEvent(eventType: 'concurrent_1'),
+        repository.logEvent(eventType: 'concurrent_2'),
+      ]);
+
+      final box = await Hive.openBox<String>(boxName);
+      expect(box.length, AnalyticsRepository.maxQueueLength);
     });
 
     test(

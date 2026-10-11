@@ -69,9 +69,14 @@ local-only `ownerUid`; this is queue isolation metadata, never backend
 identity, and is omitted from `POST /api/analytics/track`. Flushes select only
 the current UID's envelopes and pass that expected UID through the existing
 ApiClient token authority, so backend identity remains exclusively the Firebase
-bearer token. Legacy unowned/malformed queue entries are discarded safely and
-never submitted. Failed logout stays on the current screen with a retryable
-message; flush-time ownership checks remain effective if cleanup fails.
+bearer token. ApiClient validates the returned token's Firebase subject/user
+claims against that expected UID after asynchronous acquisition and on refresh,
+then rechecks the session before sending. Queue mutation, request, and success
+deletion are serialized so concurrent flushes cannot duplicate events or trim
+an in-flight event before a failed request can retry. Legacy unowned/malformed
+queue entries are discarded safely and never submitted. Failed logout stays on
+the current screen with a retryable message; flush-time ownership checks remain
+effective if cleanup fails.
 
 The adaptive composition root uses one safe preference selector. Preferences
 are accepted only when the authenticated UID exists and the in-memory
