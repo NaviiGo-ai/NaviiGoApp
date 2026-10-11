@@ -134,6 +134,7 @@ GoRouter createAppRouter(ValueNotifier<EntryStatus> entryState) => GoRouter(
               trip: state.extra is TripItineraryModel
                   ? state.extra as TripItineraryModel
                   : null,
+              fallbackToStoredTrip: true,
             ),
             kind: NavRouteKind.tab,
           ),

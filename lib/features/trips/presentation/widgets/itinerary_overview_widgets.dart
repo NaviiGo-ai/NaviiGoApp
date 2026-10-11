@@ -169,44 +169,58 @@ class ItineraryViewSwitcher extends StatelessWidget {
     required bool isSelected,
     required VoidCallback onTap,
   }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.brown : Colors.transparent,
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: AppColors.brown.withAlpha(50),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ]
-              : null,
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              size: 15,
-              color: isSelected ? Colors.white : AppColors.textSecondary,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              title,
-              style:
-                  AppTypography.micro(
-                    color: isSelected ? Colors.white : AppColors.textSecondary,
-                  ).copyWith(
-                    fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                    letterSpacing: 0.8,
-                  ),
-            ),
-          ],
+    return Semantics(
+      button: true,
+      selected: isSelected,
+      label: title,
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: isSelected ? AppColors.brown : Colors.transparent,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: AppColors.brown.withAlpha(50),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 15,
+                color: isSelected ? Colors.white : AppColors.textSecondary,
+              ),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style:
+                      AppTypography.micro(
+                        color: isSelected
+                            ? Colors.white
+                            : AppColors.textSecondary,
+                      ).copyWith(
+                        fontWeight: isSelected
+                            ? FontWeight.w800
+                            : FontWeight.w600,
+                        letterSpacing: 0.8,
+                      ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -228,10 +242,44 @@ class ItineraryStatsRow extends StatelessWidget {
       totalWaypoints += dp.activities.length;
     }
 
-    final budget = trip.form['budget'] ?? 18500;
-    final budgetFormatted =
-        '₹${budget.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}';
-    final pace = trip.form['pace']?.toString() ?? 'Balanced Pace';
+    final statItems = <({String label, String value, IconData icon})>[
+      if (trip.dayPlans.isNotEmpty || trip.form['days'] != null)
+        (
+          label: 'DURATION',
+          value: '${trip.totalDays} DAYS',
+          icon: Icons.calendar_today_outlined,
+        ),
+      (
+        label: 'WAYPOINTS',
+        value: '$totalWaypoints STOPS',
+        icon: Icons.pin_drop_outlined,
+      ),
+    ];
+
+    final pace = trip.form['pace']?.toString().trim();
+    if (pace != null && pace.isNotEmpty) {
+      statItems.add((
+        label: 'PACING',
+        value: pace.toUpperCase(),
+        icon: Icons.speed_rounded,
+      ));
+    }
+
+    final rawBudget = trip.form['budget'];
+    final budget = rawBudget is num
+        ? rawBudget.toDouble()
+        : double.tryParse(rawBudget?.toString() ?? '');
+    if (budget != null && budget.isFinite && budget > 0) {
+      final budgetValue = budget.toInt().toString().replaceAllMapped(
+        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+        (Match m) => '${m[1]},',
+      );
+      statItems.add((
+        label: 'ALLOCATION',
+        value: '₹$budgetValue',
+        icon: Icons.account_balance_wallet_outlined,
+      ));
+    }
 
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 10, 20, 14),
@@ -242,32 +290,13 @@ class ItineraryStatsRow extends StatelessWidget {
         border: Border.all(color: AppColors.border),
         boxShadow: AppColors.cardShadow,
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
+      child: Wrap(
+        alignment: WrapAlignment.spaceAround,
+        spacing: 12,
+        runSpacing: 10,
         children: [
-          _buildStatItem(
-            'DURATION',
-            '${trip.totalDays} DAYS',
-            Icons.calendar_today_outlined,
-          ),
-          _buildDivider(),
-          _buildStatItem(
-            'WAYPOINTS',
-            '$totalWaypoints STOPS',
-            Icons.pin_drop_outlined,
-          ),
-          _buildDivider(),
-          _buildStatItem(
-            'PACING',
-            pace.toUpperCase().split(' ').first,
-            Icons.speed_rounded,
-          ),
-          _buildDivider(),
-          _buildStatItem(
-            'ALLOCATION',
-            budgetFormatted,
-            Icons.account_balance_wallet_outlined,
-          ),
+          for (final stat in statItems)
+            _buildStatItem(stat.label, stat.value, stat.icon),
         ],
       ),
     );
@@ -302,10 +331,6 @@ class ItineraryStatsRow extends StatelessWidget {
         ),
       ],
     );
-  }
-
-  Widget _buildDivider() {
-    return Container(width: 1, height: 24, color: AppColors.border);
   }
 }
 
@@ -444,12 +469,21 @@ class ItineraryChapterCard extends StatelessWidget {
                       const SizedBox(height: 8),
 
                       // Chapter Headline in Epilogue
-                      Text(
-                        dayPlan.theme ?? 'Expedition Chapter',
-                        style: AppTypography.tripTitle(
-                          color: AppColors.brown,
-                        ).copyWith(fontSize: 18, height: 1.25),
-                      ),
+                      if (dayPlan.theme != null &&
+                          dayPlan.theme!.trim().isNotEmpty)
+                        Text(
+                          dayPlan.theme!,
+                          style: AppTypography.tripTitle(
+                            color: AppColors.brown,
+                          ).copyWith(fontSize: 18, height: 1.25),
+                        )
+                      else
+                        Text(
+                          'Theme unavailable',
+                          style: AppTypography.tripTitle(
+                            color: AppColors.textSecondary,
+                          ).copyWith(fontSize: 18, height: 1.25),
+                        ),
                       const SizedBox(height: 10),
 
                       // Stop Highlights Sequence (Compact Chips)
@@ -550,53 +584,6 @@ class ItineraryChapterCard extends StatelessWidget {
 }
 
 /// ─────────────────────────────────────────────────────────────────────────────
-/// INTER-CHAPTER TRANSIT / OVERNIGHT MOMENT
-/// ─────────────────────────────────────────────────────────────────────────────
-class InterChapterTransitNode extends StatelessWidget {
-  final int index;
-
-  const InterChapterTransitNode({super.key, required this.index});
-
-  @override
-  Widget build(BuildContext context) {
-    final isStay = index % 2 == 0;
-    final label = isStay
-        ? 'OVERNIGHT REST · HERITAGE STAY'
-        : 'EVENING LEISURE & TRANSIT';
-    final icon = isStay ? Icons.hotel_rounded : Icons.nightlife_rounded;
-
-    return Padding(
-      padding: const EdgeInsets.only(left: 24, bottom: 16),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: AppColors.cream.withAlpha(80),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(icon, size: 12, color: AppColors.primary),
-                const SizedBox(width: 6),
-                Text(
-                  label,
-                  style: AppTypography.micro(
-                    color: AppColors.brown,
-                  ).copyWith(fontWeight: FontWeight.w700, letterSpacing: 0.5),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// ─────────────────────────────────────────────────────────────────────────────
 /// ROUTE MAP SHORTCUT CARD
 /// ─────────────────────────────────────────────────────────────────────────────
 class ExpeditionRouteMapCard extends StatelessWidget {
@@ -643,7 +630,7 @@ class ExpeditionRouteMapCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'FULL EXPEDITION ROUTE MAP',
+                      'EXPEDITION WAYPOINTS',
                       style: AppTypography.micro(color: AppColors.yellow)
                           .copyWith(
                             fontWeight: FontWeight.w800,
@@ -652,14 +639,14 @@ class ExpeditionRouteMapCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      'Interactive Waypoints & Transfers',
+                      'Generated waypoints & transfers',
                       style: AppTypography.caption(
                         color: Colors.white,
                       ).copyWith(fontWeight: FontWeight.w700, fontSize: 14),
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '${trip.totalDays} Days · Verified navigation paths',
+                      '${trip.totalDays} Days · Route details from itinerary',
                       style: AppTypography.micro(color: Colors.white70),
                     ),
                   ],

@@ -224,6 +224,17 @@ class TripDayPlanModel {
       activities: activities ?? this.activities,
     );
   }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'day': dayNumber,
+      if (theme != null) 'theme': theme,
+      if (areaFocus != null) 'areaFocus': areaFocus,
+      if (weatherContext != null) 'weatherContext': weatherContext,
+      if (dateFormatted != null) 'date': dateFormatted,
+      'activities': activities.map((activity) => activity.toMap()).toList(),
+    };
+  }
 }
 
 /// ─────────────────────────────────────────────────────────────────────────────
@@ -380,6 +391,10 @@ class TripItineraryModel {
   /// derived from dates and [isActive] — see [tripStatus].
   final TripStatus? status;
 
+  /// A generation response has no mobile-visible persistence receipt. Such a
+  /// model is safe to render, but must not be presented as a saved/live trip.
+  final bool isEphemeral;
+
   const TripItineraryModel({
     required this.id,
     required this.uuid,
@@ -399,6 +414,7 @@ class TripItineraryModel {
     this.startLat,
     this.startLng,
     this.status,
+    this.isEphemeral = false,
   });
 
   factory TripItineraryModel.fromFirestore(
@@ -517,6 +533,7 @@ class TripItineraryModel {
           : TripStatus.fromString(
               (data['status'] ?? form['status']).toString(),
             ),
+      isEphemeral: data['isEphemeral'] == true,
     );
   }
 
@@ -544,6 +561,7 @@ class TripItineraryModel {
 
   static DateTime? _parseDate(dynamic value) {
     if (value is Timestamp) return value.toDate();
+    if (value is DateTime) return value;
     if (value is String) return DateTime.tryParse(value);
     if (value is int) return DateTime.fromMillisecondsSinceEpoch(value);
     return null;
@@ -677,6 +695,10 @@ class TripItineraryModel {
     double? startLat,
     double? startLng,
     TripStatus? status,
+    Map<String, dynamic>? generationMetadata,
+    List<String>? warnings,
+    Map<String, dynamic>? costSummary,
+    bool? isEphemeral,
   }) {
     return TripItineraryModel(
       id: id ?? this.id,
@@ -694,7 +716,38 @@ class TripItineraryModel {
       startLat: startLat ?? this.startLat,
       startLng: startLng ?? this.startLng,
       status: status ?? this.status,
+      generationMetadata: generationMetadata ?? this.generationMetadata,
+      warnings: warnings ?? this.warnings,
+      costSummary: costSummary ?? this.costSummary,
+      isEphemeral: isEphemeral ?? this.isEphemeral,
     );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'uuid': uuid,
+      'destId': destId,
+      'destName': destName,
+      'form': Map<String, dynamic>.from(form),
+      if (generatedData != null)
+        'generatedData': Map<String, dynamic>.from(generatedData!),
+      'isActive': isActive,
+      'isPublic': isPublic,
+      if (createdAt != null) 'createdAt': createdAt,
+      if (updatedAt != null) 'updatedAt': updatedAt,
+      'dayPlans': dayPlans.map((dayPlan) => dayPlan.toMap()).toList(),
+      if (generationMetadata != null)
+        'generationMetadata': Map<String, dynamic>.from(generationMetadata!),
+      if (warnings.isNotEmpty) 'warnings': List<String>.from(warnings),
+      if (costSummary != null)
+        'costSummary': Map<String, dynamic>.from(costSummary!),
+      if (userId != null) 'userId': userId,
+      if (startLat != null) 'startLat': startLat,
+      if (startLng != null) 'startLng': startLng,
+      if (status != null) 'status': status!.wireName,
+      if (isEphemeral) 'isEphemeral': true,
+    };
   }
 
   String get heroImage {

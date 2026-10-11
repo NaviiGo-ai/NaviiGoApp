@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
+import '../../../../core/auth/auth_provider.dart';
 import '../providers/trip_provider.dart';
 import '../../domain/models/trip_itinerary_model.dart';
 import '../widgets/itinerary_overview_widgets.dart';
@@ -14,8 +15,13 @@ import '../../../../core/motion/nav_haptics.dart';
 
 class GeneratedItineraryPage extends ConsumerStatefulWidget {
   final TripItineraryModel? trip;
+  final bool fallbackToStoredTrip;
 
-  const GeneratedItineraryPage({super.key, this.trip});
+  const GeneratedItineraryPage({
+    super.key,
+    this.trip,
+    this.fallbackToStoredTrip = false,
+  });
 
   @override
   ConsumerState<GeneratedItineraryPage> createState() =>
@@ -30,35 +36,82 @@ class _GeneratedItineraryPageState
 
   @override
   Widget build(BuildContext context) {
+    final currentUid = ref.watch(currentUserProvider)?.uid;
     TripItineraryModel? activeTrip = widget.trip;
-    if (activeTrip == null) {
+    if (activeTrip != null) {
+      if (currentUid == null || activeTrip.userId != currentUid) {
+        return _buildEmptyState(
+          title: 'Itinerary Unavailable',
+          message: 'This itinerary belongs to a different account.',
+        );
+      }
+    } else if (widget.fallbackToStoredTrip) {
+      final tripsAsync = ref.watch(userTripsStreamProvider);
+      if (tripsAsync.isLoading) {
+        return _buildLoadingState();
+      }
+      if (tripsAsync.hasError) {
+        return _buildEmptyState(
+          title: 'Itineraries Unavailable',
+          message:
+              'Your saved itineraries could not be loaded. Try again later.',
+        );
+      }
+
       activeTrip = ref.watch(activeTripProvider);
       if (activeTrip == null) {
-        final allTrips = ref.watch(userTripsStreamProvider).value ?? [];
-        if (allTrips.isNotEmpty) {
-          activeTrip = allTrips.first;
-        }
+        final allTrips = tripsAsync.value ?? const <TripItineraryModel>[];
+        if (allTrips.isNotEmpty) activeTrip = allTrips.first;
       }
     }
 
     // No trip means nothing to show — never invent an itinerary.
     if (activeTrip == null) {
-      return Scaffold(
-        backgroundColor: AppColors.background,
-        appBar: AppBar(
-          backgroundColor: AppColors.background,
-          elevation: 0,
-          leading: const NavHubLeading(),
-        ),
-        body: const NoJourneyState(
-          title: 'No Itinerary Yet',
-          message:
-              'Craft a journey and NaviiGo will lay out every chapter, day by day.',
-        ),
+      return _buildEmptyState(
+        title: 'No Itinerary Yet',
+        message: widget.fallbackToStoredTrip
+            ? 'Craft a journey and NaviiGo will lay out every chapter, day by day.'
+            : 'The generated itinerary is no longer available on this screen.',
+      );
+    }
+    if (activeTrip.dayPlans.isEmpty) {
+      return _buildEmptyState(
+        title: 'Itinerary Incomplete',
+        message: 'This itinerary did not include usable day plans.',
       );
     }
 
     return _buildItineraryView(context, activeTrip);
+  }
+
+  Widget _buildLoadingState() {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        backgroundColor: AppColors.background,
+        elevation: 0,
+        leading: const NavHubLeading(),
+      ),
+      body: Center(
+        child: Semantics(
+          label: 'Loading saved itineraries',
+          liveRegion: true,
+          child: const CircularProgressIndicator(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState({required String title, required String message}) {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        backgroundColor: AppColors.background,
+        elevation: 0,
+        leading: const NavHubLeading(),
+      ),
+      body: NoJourneyState(title: title, message: message),
+    );
   }
 
   Widget _buildItineraryView(BuildContext context, TripItineraryModel trip) {
@@ -81,38 +134,44 @@ class _GeneratedItineraryPageState
             backgroundColor: AppColors.background,
             elevation: 0,
             leading: const NavHubLeading(iconColor: Colors.white),
-            actions: [
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: CircleAvatar(
-                  backgroundColor: Colors.black.withAlpha((0.4 * 255).round()),
-                  child: IconButton(
-                    icon: const Icon(
-                      Icons.share_outlined,
-                      color: Colors.white,
-                      size: 18,
-                    ),
-                    onPressed: () {
-                      Clipboard.setData(
-                        ClipboardData(
-                          text: 'https://naviigo.com/itinerary/${trip.uuid}',
+            actions: trip.isEphemeral || !trip.isPublic
+                ? null
+                : [
+                    Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: CircleAvatar(
+                        backgroundColor: Colors.black.withAlpha(
+                          (0.4 * 255).round(),
                         ),
-                      );
-                      NavHaptics.fire(NavHaptic.light);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            'Itinerary link copied: https://naviigo.com/itinerary/${trip.uuid}',
+                        child: IconButton(
+                          tooltip: 'Copy itinerary link',
+                          icon: const Icon(
+                            Icons.share_outlined,
+                            color: Colors.white,
+                            size: 18,
                           ),
-                          backgroundColor: AppColors.teal,
-                          behavior: SnackBarBehavior.floating,
+                          onPressed: () {
+                            Clipboard.setData(
+                              ClipboardData(
+                                text:
+                                    'https://naviigo.com/itinerary/${trip.uuid}',
+                              ),
+                            );
+                            NavHaptics.fire(NavHaptic.light);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Itinerary link copied: https://naviigo.com/itinerary/${trip.uuid}',
+                                ),
+                                backgroundColor: AppColors.teal,
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          },
                         ),
-                      );
-                    },
-                  ),
-                ),
-              ),
-            ],
+                      ),
+                    ),
+                  ],
             flexibleSpace: FlexibleSpaceBar(
               background: Stack(
                 fit: StackFit.expand,
@@ -176,16 +235,23 @@ class _GeneratedItineraryPageState
                           ).copyWith(fontSize: 34, height: 1.1),
                         ),
                         const SizedBox(height: 4),
-                        Text(
-                          '${trip.startDateFormatted.toUpperCase()} · ${trip.form['group']?.toString().toUpperCase() ?? 'DUO EXPLORATION'}',
-                          style:
-                              AppTypography.micro(
-                                color: AppColors.textSecondary,
-                              ).copyWith(
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 0.8,
-                              ),
-                        ),
+                        if (trip.form['startDate'] != null ||
+                            trip.form['group'] != null)
+                          Text(
+                            [
+                              if (trip.form['startDate'] != null)
+                                trip.startDateFormatted.toUpperCase(),
+                              if (trip.form['group'] != null)
+                                trip.form['group'].toString().toUpperCase(),
+                            ].join(' · '),
+                            style:
+                                AppTypography.micro(
+                                  color: AppColors.textSecondary,
+                                ).copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.8,
+                                ),
+                          ),
                       ],
                     ),
                   ),
@@ -193,6 +259,37 @@ class _GeneratedItineraryPageState
               ),
             ),
           ),
+
+          if (trip.isEphemeral)
+            SliverToBoxAdapter(
+              child: Container(
+                margin: const EdgeInsets.fromLTRB(20, 12, 20, 2),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceWarm,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.auto_awesome_outlined,
+                      color: AppColors.primary,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Generated preview · save status unconfirmed',
+                        style: AppTypography.caption(
+                          color: AppColors.textPrimary,
+                        ).copyWith(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
 
           // 2. View Mode Switcher (CHAPTERS OVERVIEW vs. DAY IN MOTION)
           SliverToBoxAdapter(
@@ -252,8 +349,6 @@ class _GeneratedItineraryPageState
                         });
                       },
                     ),
-                    if (idx < dayPlans.length - 1)
-                      InterChapterTransitNode(index: idx),
                   ],
                 );
               }, childCount: dayPlans.length),
@@ -414,7 +509,8 @@ class _GeneratedItineraryPageState
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         _buildActivityMotionCard(idx, act),
-                        if (!isLast)
+                        if (!isLast &&
+                            _hasTransferDetails(act, activities[idx + 1]))
                           _buildTransferStrip(act, activities[idx + 1]),
                       ],
                     );
@@ -428,84 +524,88 @@ class _GeneratedItineraryPageState
       ),
 
       // Sticky Bottom Action Bar
-      bottomNavigationBar: Container(
-        padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
-        decoration: const BoxDecoration(
-          color: AppColors.surface,
-          border: Border(top: BorderSide(color: AppColors.border, width: 1)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black12,
-              blurRadius: 10,
-              offset: Offset(0, -2),
+      bottomNavigationBar: trip.isEphemeral
+          ? null
+          : Container(
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
+              decoration: const BoxDecoration(
+                color: AppColors.surface,
+                border: Border(
+                  top: BorderSide(color: AppColors.border, width: 1),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black12,
+                    blurRadius: 10,
+                    offset: Offset(0, -2),
+                  ),
+                ],
+              ),
+              child: SafeArea(
+                top: false,
+                child: Row(
+                  children: [
+                    Expanded(
+                      flex: 3,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          NavHaptics.fire(NavHaptic.strong);
+                          // Beginning a journey has exactly one gate, and it lives on
+                          // the live screen: permission, fix freshness, accuracy,
+                          // proximity, ownership and the one-journey-at-a-time rule.
+                          // This button only walks the traveller to that gate — it
+                          // never marks a trip active on its own.
+                          context.push('/live-tracking', extra: trip);
+                        },
+                        icon: const Icon(
+                          Icons.navigation_rounded,
+                          size: 18,
+                          color: Colors.white,
+                        ),
+                        label: const Text('START LIVE JOURNEY'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 15),
+                          elevation: 0,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      flex: 2,
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          NavHaptics.fire(NavHaptic.light);
+                          context.push('/transportation');
+                        },
+                        icon: const Icon(
+                          Icons.directions_transit_outlined,
+                          size: 16,
+                          color: AppColors.brown,
+                        ),
+                        label: Text(
+                          'TRANSIT',
+                          style: AppTypography.button(color: AppColors.brown),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(
+                            color: AppColors.borderStrong,
+                            width: 1.5,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 15),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ],
-        ),
-        child: SafeArea(
-          top: false,
-          child: Row(
-            children: [
-              Expanded(
-                flex: 3,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    NavHaptics.fire(NavHaptic.strong);
-                    // Beginning a journey has exactly one gate, and it lives on
-                    // the live screen: permission, fix freshness, accuracy,
-                    // proximity, ownership and the one-journey-at-a-time rule.
-                    // This button only walks the traveller to that gate — it
-                    // never marks a trip active on its own.
-                    context.push('/live-tracking', extra: trip);
-                  },
-                  icon: const Icon(
-                    Icons.navigation_rounded,
-                    size: 18,
-                    color: Colors.white,
-                  ),
-                  label: const Text('START LIVE JOURNEY'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 15),
-                    elevation: 0,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                flex: 2,
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    NavHaptics.fire(NavHaptic.light);
-                    context.push('/transportation');
-                  },
-                  icon: const Icon(
-                    Icons.directions_transit_outlined,
-                    size: 16,
-                    color: AppColors.brown,
-                  ),
-                  label: Text(
-                    'TRANSIT',
-                    style: AppTypography.button(color: AppColors.brown),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(
-                      color: AppColors.borderStrong,
-                      width: 1.5,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 15),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 
@@ -519,6 +619,8 @@ class _GeneratedItineraryPageState
     } else if (cat.contains('dining') || cat.contains('food')) {
       catColor = const Color(0xFFD84315);
     }
+    final hasCategory = act.category != null && act.category!.trim().isNotEmpty;
+    final hasDuration = act.duration != null && act.duration!.trim().isNotEmpty;
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -530,7 +632,7 @@ class _GeneratedItineraryPageState
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                act.time ?? '09:00 AM',
+                act.time ?? ' ',
                 style: AppTypography.micro(
                   color: AppColors.primary,
                 ).copyWith(fontWeight: FontWeight.w900, fontSize: 11),
@@ -570,45 +672,54 @@ class _GeneratedItineraryPageState
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 7,
-                        vertical: 2.5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: catColor.withAlpha(25),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        (act.category ?? 'EXPERIENCE').toUpperCase(),
-                        style: AppTypography.micro(
-                          color: catColor,
-                        ).copyWith(fontSize: 9, fontWeight: FontWeight.w800),
-                      ),
-                    ),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.schedule_rounded,
-                          size: 11,
-                          color: AppColors.textTertiary,
-                        ),
-                        const SizedBox(width: 3),
-                        Text(
-                          act.duration ?? '~1.5 HRS',
-                          style: AppTypography.micro(
-                            color: AppColors.textTertiary,
-                          ).copyWith(fontSize: 10),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
+                if (hasCategory || hasDuration)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      if (hasCategory)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 7,
+                            vertical: 2.5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: catColor.withAlpha(25),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            act.category!.toUpperCase(),
+                            style: AppTypography.micro(color: catColor)
+                                .copyWith(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                          ),
+                        )
+                      else
+                        const SizedBox.shrink(),
+                      if (hasDuration)
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.schedule_rounded,
+                              size: 11,
+                              color: AppColors.textTertiary,
+                            ),
+                            const SizedBox(width: 3),
+                            Text(
+                              act.duration!,
+                              style: AppTypography.micro(
+                                color: AppColors.textTertiary,
+                              ).copyWith(fontSize: 10),
+                            ),
+                          ],
+                        )
+                      else
+                        const SizedBox.shrink(),
+                    ],
+                  ),
+                if (hasCategory || hasDuration) const SizedBox(height: 6),
                 Text(
                   act.title,
                   style: AppTypography.tripTitle(
@@ -632,10 +743,33 @@ class _GeneratedItineraryPageState
     );
   }
 
+  bool _hasTransferDetails(TripActivityModel current, TripActivityModel next) {
+    return [
+      current.transferOrigin,
+      current.transferDestination,
+      current.transferMode,
+      next.transferOrigin,
+      next.transferDestination,
+      next.transferMode,
+    ].any((value) => value != null && value.trim().isNotEmpty);
+  }
+
   Widget _buildTransferStrip(
     TripActivityModel current,
     TripActivityModel next,
   ) {
+    final origin = current.transferOrigin ?? next.transferOrigin;
+    final destination = current.transferDestination ?? next.transferDestination;
+    final mode = current.transferMode ?? next.transferMode;
+    final details = [
+      if (origin != null &&
+          origin.trim().isNotEmpty &&
+          destination != null &&
+          destination.trim().isNotEmpty)
+        '$origin → $destination',
+      if (mode != null && mode.trim().isNotEmpty) mode,
+    ].join(' · ');
+
     return Padding(
       padding: const EdgeInsets.only(left: 32, top: 4, bottom: 12),
       child: Row(
@@ -659,7 +793,7 @@ class _GeneratedItineraryPageState
                 ),
                 const SizedBox(width: 6),
                 Text(
-                  '15 MIN · 3.2 KM · AUTO / CAB',
+                  details.isEmpty ? 'Transfer details unavailable' : details,
                   style: AppTypography.micro(
                     color: AppColors.textSecondary,
                   ).copyWith(fontWeight: FontWeight.w700, letterSpacing: 0.5),
@@ -712,7 +846,7 @@ class _GeneratedItineraryPageState
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'TODAY’S ROUTE MAP',
+                        'GENERATED WAYPOINTS',
                         style: AppTypography.eyebrow(color: AppColors.primary),
                       ),
                       const SizedBox(height: 2),
@@ -810,7 +944,7 @@ class _GeneratedItineraryPageState
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Explore verified places to populate this day.',
+                          'Explore more places to populate this day.',
                           style: AppTypography.caption(),
                         ),
                         const SizedBox(height: 14),

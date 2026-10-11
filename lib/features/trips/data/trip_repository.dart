@@ -5,15 +5,33 @@ import '../../../core/config/app_config.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_exceptions.dart';
 import '../../../core/network/firebase_client.dart';
+import '../../../core/constants/master_destinations.dart';
 import '../domain/models/trip_itinerary_model.dart';
+
+class ItineraryGenerationResponseException implements Exception {
+  final String message;
+
+  const ItineraryGenerationResponseException([
+    this.message = 'The itinerary service returned malformed generation data.',
+  ]);
+
+  @override
+  String toString() => message;
+}
 
 class TripRepository {
   final FirebaseFirestore _firestore;
   final ApiClient _apiClient;
+  final String? Function() _currentUserUid;
 
-  TripRepository({FirebaseFirestore? firestore, ApiClient? apiClient})
-    : _firestore = firestore ?? FirebaseClient.firestore,
-      _apiClient = apiClient ?? ApiClient();
+  TripRepository({
+    FirebaseFirestore? firestore,
+    ApiClient? apiClient,
+    String? Function()? currentUserUid,
+  }) : _firestore = firestore ?? FirebaseClient.firestore,
+       _apiClient = apiClient ?? ApiClient(),
+       _currentUserUid =
+           currentUserUid ?? (() => FirebaseClient.auth.currentUser?.uid);
 
   /// Stream user itineraries directly from users/{uid}/itineraries in naviigo-db
   Stream<List<TripItineraryModel>> getUserTripsStream(String uid) {
@@ -276,20 +294,72 @@ class TripRepository {
     String? originCity,
     List<Map<String, dynamic>>? mustDo,
     List<Map<String, dynamic>>? routeStops,
+    required String expectedAuthUid,
   }) async {
+    if (expectedAuthUid.trim().isEmpty ||
+        _currentUserUid() != expectedAuthUid) {
+      throw const AuthRequiredException(
+        'Your account is no longer available for this request.',
+      );
+    }
+
+    final trimmedDestName = destName.trim();
+    if (trimmedDestName.isEmpty) {
+      throw const ValidationException(
+        'Choose a supported destination before generating an itinerary.',
+      );
+    }
+    if (days < 1 || days > 14) {
+      throw const ValidationException(
+        'Journey duration must be between 1 and 14 days.',
+      );
+    }
+    if (budget < 0) {
+      throw const ValidationException('Journey budget cannot be negative.');
+    }
+    if (destination != null && destination.trim().isEmpty) {
+      throw const ValidationException(
+        'The destination identifier cannot be empty.',
+      );
+    }
+    final supportedDestination = findDestinationById(destination ?? destName);
+    if (supportedDestination == null) {
+      throw const ValidationException(
+        'Choose a destination from the supported registry.',
+      );
+    }
+    final canonicalDestinationId = supportedDestination.id;
+    if (startDate != null && startDate.trim().isEmpty) {
+      throw const ValidationException('The departure date cannot be empty.');
+    }
+    const supportedTravelerTypes = {
+      'backpacker',
+      'comfort',
+      'luxury',
+      'family',
+      'flash',
+      'slow',
+    };
+    if (!supportedTravelerTypes.contains(travelerType)) {
+      throw const ValidationException(
+        'Choose a supported traveler preset before generating an itinerary.',
+      );
+    }
+    const supportedGroups = {'solo', 'couple', 'family', 'friends', 'large'};
+    if (!supportedGroups.contains(group)) {
+      throw const ValidationException(
+        'Choose a supported travel group before generating an itinerary.',
+      );
+    }
+
     final payload = {
-      'destName': destName,
-      'destination': destination ?? destName.toLowerCase().replaceAll(' ', ''),
+      'destName': trimmedDestName,
+      if (destination != null) 'destination': destination.trim(),
       'purpose': purpose,
       'group': group,
       'days': days,
       'budget': budget,
-      'startDate':
-          startDate ??
-          DateTime.now()
-              .add(const Duration(days: 7))
-              .toIso8601String()
-              .split('T')[0],
+      if (startDate != null) 'startDate': startDate.trim(),
       'travelerType': travelerType,
       if (preferences != null) 'preferences': preferences,
       if (browsingSignals != null) 'browsingSignals': browsingSignals,
@@ -308,41 +378,146 @@ class TripRepository {
       body: payload,
       requiresAuth: true,
       timeout: AppConfig.aiGenerationTimeout,
+      expectedAuthUid: expectedAuthUid,
     );
 
-    if (response is Map && response['itinerary'] != null) {
-      final itinData = response['itinerary'] as Map<String, dynamic>;
-      final tripId =
-          (itinData['id'] ?? 'trip_${DateTime.now().millisecondsSinceEpoch}')
-              .toString();
-
-      // The owner is stamped at creation. Start-trip validation treats an
-      // owner-less journey as unverifiable and refuses to begin it, so a trip
-      // that never carried one would be unstartable.
-      final uid = FirebaseClient.auth.currentUser?.uid;
-
-      final tripModel = TripItineraryModel.fromMap(tripId, {
-        'id': tripId,
-        'uuid': tripId,
-        'destId': payload['destination'],
-        'destName': destName,
-        if (uid != null) 'userId': uid,
-        'form': payload,
-        'generatedData': itinData,
-        'isActive': false,
-        'createdAt': DateTime.now(),
-        'updatedAt': DateTime.now(),
-      });
-
-      // Save to Firebase & local cache
-      if (uid != null) {
-        await saveTrip(uid, tripModel);
-      }
-      return tripModel;
+    if (_currentUserUid() != expectedAuthUid) {
+      throw const AuthRequiredException(
+        'Your account changed while the itinerary was generating.',
+      );
     }
 
-    throw const ServerException(
-      'Invalid response received from itinerary generation engine.',
-    );
+    if (response is! Map || response['success'] != true) {
+      throw const ItineraryGenerationResponseException(
+        'The itinerary service returned an invalid generation response.',
+      );
+    }
+
+    final responseUid = response['userId'];
+    if (responseUid is! String || responseUid.trim() != expectedAuthUid) {
+      throw const ItineraryGenerationResponseException(
+        'The itinerary response owner could not be verified.',
+      );
+    }
+
+    final itineraryRaw = response['itinerary'];
+    if (itineraryRaw is! Map) {
+      throw const ItineraryGenerationResponseException(
+        'The itinerary service returned no itinerary data.',
+      );
+    }
+
+    final itinData = Map<String, dynamic>.from(itineraryRaw);
+    _validateGeneratedItinerary(itinData);
+
+    final responseId = _nonEmptyString(itinData['id']);
+    final responseUuid = _nonEmptyString(itinData['uuid']);
+    final tripId =
+        responseId ??
+        responseUuid ??
+        'generated_${DateTime.now().millisecondsSinceEpoch}';
+    final now = DateTime.now();
+    final responseMetadata = <String, dynamic>{
+      if (response['source'] is String) 'source': response['source'],
+      if (response['dataSources'] is List)
+        'dataSources': List<dynamic>.from(response['dataSources'] as List),
+    };
+
+    // The direct backend route has no durable ID/receipt contract. Keep this
+    // result ephemeral and let the explicit result screen render it; do not
+    // issue a second client-side save that could be mistaken for authoritative
+    // persistence.
+    return TripItineraryModel.fromMap(tripId, {
+      'id': responseId ?? tripId,
+      'uuid': responseUuid ?? responseId ?? tripId,
+      'destId': canonicalDestinationId,
+      'destName': trimmedDestName,
+      'userId': expectedAuthUid,
+      'form': payload,
+      'generatedData': itinData,
+      if (responseMetadata.isNotEmpty) 'generationMetadata': responseMetadata,
+      'isActive': false,
+      'isEphemeral': true,
+      'createdAt': itinData['createdAt'] ?? now,
+      'updatedAt': itinData['updatedAt'] ?? now,
+    });
+  }
+
+  static String? _nonEmptyString(dynamic value) {
+    if (value is! String) return null;
+    final stringValue = value.trim();
+    return stringValue.isEmpty ? null : stringValue;
+  }
+
+  static dynamic _firstPresent(Map<String, dynamic> data, List<String> keys) {
+    for (final key in keys) {
+      if (data.containsKey(key) && data[key] != null) return data[key];
+    }
+    return null;
+  }
+
+  static void _validateGeneratedItinerary(Map<String, dynamic> itinerary) {
+    if (itinerary.isEmpty) {
+      throw const ItineraryGenerationResponseException(
+        'The itinerary service returned an empty itinerary.',
+      );
+    }
+
+    final rawPlans = _firstPresent(itinerary, const [
+      'dayPlans',
+      'days',
+      'dailyPlans',
+      'itinerary',
+      'schedule',
+      'plan',
+    ]);
+    if (rawPlans is! List || rawPlans.isEmpty) {
+      throw const ItineraryGenerationResponseException(
+        'The itinerary service returned no usable day plans.',
+      );
+    }
+
+    var hasActivity = false;
+    for (final rawPlan in rawPlans) {
+      if (rawPlan is! Map) {
+        throw const ItineraryGenerationResponseException(
+          'The itinerary service returned malformed day plan data.',
+        );
+      }
+
+      final plan = Map<String, dynamic>.from(rawPlan);
+      final rawActivities = _firstPresent(plan, const [
+        'activities',
+        'items',
+        'schedule',
+      ]);
+      if (rawActivities is! List) {
+        throw const ItineraryGenerationResponseException(
+          'The itinerary service returned malformed activity data.',
+        );
+      }
+
+      for (final rawActivity in rawActivities) {
+        if (rawActivity is! Map) {
+          throw const ItineraryGenerationResponseException(
+            'The itinerary service returned malformed activity data.',
+          );
+        }
+        final activity = Map<String, dynamic>.from(rawActivity);
+        final rawTitle = activity['title'] ?? activity['name'];
+        if (rawTitle is! String || rawTitle.trim().isEmpty) {
+          throw const ItineraryGenerationResponseException(
+            'The itinerary service returned an activity without a name.',
+          );
+        }
+        hasActivity = true;
+      }
+    }
+
+    if (!hasActivity) {
+      throw const ItineraryGenerationResponseException(
+        'The itinerary service returned no usable activities.',
+      );
+    }
   }
 }

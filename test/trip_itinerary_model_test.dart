@@ -161,6 +161,62 @@ void main() {
       expect(shared.isPublic, isTrue);
     });
 
+    test('round-trips generation metadata, warnings, costs, dates and IDs', () {
+      final createdAt = DateTime(2026, 10, 1, 9, 30);
+      final updatedAt = DateTime(2026, 10, 2, 10, 45);
+      final trip = TripItineraryModel.fromMap('doc-1', {
+        'id': 'response-id',
+        'uuid': 'response-uuid',
+        'destId': 'varanasi',
+        'destName': 'Varanasi',
+        'userId': 'traveller-1',
+        'createdAt': createdAt,
+        'updatedAt': updatedAt,
+        'generationMetadata': {'model': 'gemini', 'weather': null},
+        'warnings': ['Weather unavailable'],
+        'costSummary': {'currency': 'INR', 'total': 24000},
+        'isEphemeral': true,
+        'form': {'days': 1, 'startDate': '2026-10-10'},
+        'dayPlans': [
+          {
+            'day': 1,
+            'areaFocus': 'Ghats',
+            'weatherContext': 'Clear',
+            'activities': [
+              {
+                'title': 'Sunrise boat ride',
+                'transferMode': 'walk',
+                'warnings': ['Arrive early'],
+              },
+            ],
+          },
+        ],
+      });
+
+      final roundTripped = TripItineraryModel.fromMap(trip.id, trip.toMap());
+
+      expect(roundTripped.id, 'doc-1');
+      expect(roundTripped.uuid, 'response-uuid');
+      expect(roundTripped.generationMetadata, {
+        'model': 'gemini',
+        'weather': null,
+      });
+      expect(roundTripped.warnings, ['Weather unavailable']);
+      expect(roundTripped.costSummary, {'currency': 'INR', 'total': 24000});
+      expect(roundTripped.createdAt, createdAt);
+      expect(roundTripped.updatedAt, updatedAt);
+      expect(roundTripped.isEphemeral, isTrue);
+      expect(roundTripped.dayPlans.single.areaFocus, 'Ghats');
+      expect(roundTripped.dayPlans.single.weatherContext, 'Clear');
+      expect(
+        roundTripped.dayPlans.single.activities.single.transferMode,
+        'walk',
+      );
+      expect(roundTripped.dayPlans.single.activities.single.warnings, [
+        'Arrive early',
+      ]);
+    });
+
     testWidgets(
       'ItineraryStatsRow renders truthful 0 STOPS when itinerary has no activities',
       (tester) async {
