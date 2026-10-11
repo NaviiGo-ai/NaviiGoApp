@@ -31,6 +31,14 @@ class PlaceModel {
     this.website,
   });
 
+  bool get hasCoordinates =>
+      lat != null &&
+      lng != null &&
+      lat!.isFinite &&
+      lng!.isFinite &&
+      lat!.abs() <= 90 &&
+      lng!.abs() <= 180;
+
   factory PlaceModel.fromBackendJson(
     Map<String, dynamic> json, {
     String? baseUrl,

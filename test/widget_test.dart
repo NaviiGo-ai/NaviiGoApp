@@ -439,9 +439,7 @@ void main() {
             userTripsStreamProvider.overrideWith(
               (ref) => Stream.value(mockTrips),
             ),
-            savedPlacesStreamProvider.overrideWith(
-              (ref) => Stream.value(mockSavedPlaces),
-            ),
+            safeSavedPlacesProvider.overrideWithValue(mockSavedPlaces),
           ],
         ),
       );

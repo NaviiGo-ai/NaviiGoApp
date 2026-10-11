@@ -8,6 +8,9 @@ class SavedPlaceModel {
   final String? location;
   final DateTime? createdAt;
 
+  /// In-memory stream provenance. Never persisted to Firestore.
+  final String? sourceUserId;
+
   const SavedPlaceModel({
     required this.id,
     required this.name,
@@ -15,6 +18,7 @@ class SavedPlaceModel {
     this.image,
     this.location,
     this.createdAt,
+    this.sourceUserId,
   });
 
   factory SavedPlaceModel.fromFirestore(
@@ -30,6 +34,16 @@ class SavedPlaceModel {
       createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
     );
   }
+
+  SavedPlaceModel copyWith({String? sourceUserId}) => SavedPlaceModel(
+    id: id,
+    name: name,
+    type: type,
+    image: image,
+    location: location,
+    createdAt: createdAt,
+    sourceUserId: sourceUserId ?? this.sourceUserId,
+  );
 
   Map<String, dynamic> toMap() {
     return {

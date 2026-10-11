@@ -401,14 +401,17 @@ class _HiddenGemsPageState extends ConsumerState<HiddenGemsPage> {
                           createdAt: DateTime.now(),
                         );
 
-                        await ref
+                        final success = await ref
                             .read(savedPlacesRepositoryProvider)
                             .toggleSavedPlace(user.uid, savedPlace);
-                        if (mounted) {
+                        if (mounted &&
+                            ref.read(currentUserProvider)?.uid == user.uid) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(
-                                'Added ${gem.name} to your Saved Places',
+                                success
+                                    ? 'Added ${gem.name} to your Saved Places'
+                                    : 'Could not update saved places. Please retry.',
                               ),
                               backgroundColor: AppColors.teal,
                             ),

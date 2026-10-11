@@ -1,178 +1,132 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../../core/theme/app_colors.dart';
+
+import '../../../../core/adaptive/adaptive_theme_extension.dart';
 import '../../../../core/theme/app_typography.dart';
-import '../providers/dashboard_providers.dart';
-import '../widgets/home_journal_widgets.dart';
+import '../../../bookings/presentation/providers/saved_places_provider.dart';
 import '../../../trips/presentation/providers/trip_provider.dart';
-import '../../../trips/domain/models/trip_itinerary_model.dart';
+import '../providers/dashboard_providers.dart';
+import '../providers/home_provider.dart';
+import '../widgets/home_journal_widgets.dart';
+import '../widgets/home_phase3_widgets.dart';
 
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // 1. Lifecycle state providers
+    final tokens = AdaptiveThemeExtension.of(context);
+    final surface = ref.watch(homeJourneySurfaceProvider);
+    final trips = ref.watch(userTripsStreamProvider);
     final activeTrip = ref.watch(activeTripProvider);
     final upcomingTrips = ref.watch(upcomingTripsProvider);
+    final upcomingTrip = upcomingTrips.isEmpty ? null : upcomingTrips.first;
     final pastTrips = ref.watch(pastTripsProvider);
+    final savedPlaces = ref.watch(safeSavedPlacesProvider);
+    final destinations =
+        ref.watch(topDestinationsProvider).valueOrNull ?? const [];
 
-    // 2. Curated travel data
-    final destinationsAsync = ref.watch(topDestinationsProvider);
-    final articlesAsync = ref.watch(journalArticlesProvider);
-
-    final destinations = destinationsAsync.valueOrNull ?? [];
-    final articles = articlesAsync.valueOrNull ?? [];
-
-    // No Scaffold here: the shell (NavHubPage) owns the drawer and the bottom
-    // bar. Nesting one locally shadowed both, which is why Home was the only
-    // screen with a drawer and none of them had a way to open it.
     return ColoredBox(
-      color: AppColors.background,
+      color: tokens.background,
       child: SafeArea(
         bottom: false,
         child: CustomScrollView(
           physics: const BouncingScrollPhysics(),
           slivers: [
-            // Minimalist Editorial Header
             const SliverToBoxAdapter(child: HomeJournalHeader()),
-
-            // Asymmetric Editorial Masthead
-            SliverToBoxAdapter(
-              child: HomeEditorialMasthead(
-                activeTrip: activeTrip,
-                upcomingTrip: upcomingTrips.isNotEmpty
-                    ? upcomingTrips.first
-                    : null,
-                pastTrip: pastTrips.isNotEmpty ? pastTrips.first : null,
-              ),
-            ),
-
-            // Dominant Photographic Moment (Bleeds off right edge)
-            SliverToBoxAdapter(
-              child: HomeDominantTravelVisual(
-                activeTrip: activeTrip,
-                upcomingTrip: upcomingTrips.isNotEmpty
-                    ? upcomingTrips.first
-                    : null,
-                pastTrip: pastTrips.isNotEmpty ? pastTrips.first : null,
-              ),
-            ),
-
-            // Active or Upcoming Journey Secondary Strip (if trip exists)
-            if (activeTrip != null || upcomingTrips.isNotEmpty)
+            if (trips.isLoading && activeTrip == null && upcomingTrip == null)
+              const SliverToBoxAdapter(child: _HomeLoading()),
+            if (trips.hasError)
               SliverToBoxAdapter(
-                child: _buildTripProgressStrip(
-                  context,
-                  activeTrip ?? upcomingTrips.first,
-                  isLive: activeTrip != null,
+                child: _HomeError(
+                  onRetry: () => ref.invalidate(userTripsStreamProvider),
                 ),
               ),
-
-            // Exploration Section: Typography pills & alternating editorial aspect frames
-            SliverToBoxAdapter(
-              child: HomeEditorialExplorationRail(destinations: destinations),
-            ),
-
-            // Single Curated Travel Journal Moment
-            SliverToBoxAdapter(
-              child: HomeFeaturedJournalMoment(
-                article: articles.isNotEmpty ? articles.first : null,
+            if (surface == HomeJourneySurface.active && activeTrip != null)
+              SliverToBoxAdapter(child: HomeActiveCard(trip: activeTrip))
+            else if (surface == HomeJourneySurface.upcoming &&
+                upcomingTrip != null)
+              SliverToBoxAdapter(child: HomeUpcomingCard(trip: upcomingTrip))
+            else
+              SliverToBoxAdapter(
+                child: HomeStateIntro(
+                  kicker: 'YOUR NEXT CHAPTER',
+                  title: 'Know what to do next.',
+                  body:
+                      'Browse grounded destinations, save places you can return to, and start a plan when the moment is right.',
+                  actionLabel: 'Start exploring',
+                  onAction: () => context.push('/explore'),
+                  image: null,
+                ),
               ),
+            SliverToBoxAdapter(
+              child: HomeDestinationRail(destinations: destinations),
             ),
-
-            // Quiet Editorial Footer
-            const SliverToBoxAdapter(child: HomeJournalFooter()),
+            if (savedPlaces.isNotEmpty)
+              SliverToBoxAdapter(
+                child: HomeSavedPlacesRail(places: savedPlaces),
+              ),
+            if (surface == HomeJourneySurface.discovery && pastTrips.isNotEmpty)
+              SliverToBoxAdapter(
+                child: HomeArchiveCard(completedCount: pastTrips.length),
+              ),
+            const SliverToBoxAdapter(child: SizedBox(height: 64)),
           ],
         ),
       ),
     );
   }
+}
 
-  /// Compact, tactile strip connecting to active or scheduled journey route
-  Widget _buildTripProgressStrip(
-    BuildContext context,
-    TripItineraryModel trip, {
-    required bool isLive,
-  }) {
+class _HomeLoading extends StatelessWidget {
+  const _HomeLoading();
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = AdaptiveThemeExtension.of(context);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 22),
-      child: InkWell(
-        onTap: () {
-          if (isLive) {
-            context.push('/ongoing-trips');
-          } else {
-            context.push('/itinerary', extra: trip);
-          }
-        },
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: isLive ? AppColors.teal.withAlpha(120) : AppColors.border,
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: tokens.primaryAction,
             ),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.brown.withAlpha(8),
-                blurRadius: 10,
-                offset: const Offset(0, 3),
-              ),
-            ],
           ),
-          child: Row(
-            children: [
-              Container(
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(
-                  color: isLive
-                      ? AppColors.teal.withAlpha(30)
-                      : AppColors.surfaceWarm,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  isLive ? Icons.near_me_rounded : Icons.route_rounded,
-                  size: 18,
-                  color: isLive ? AppColors.teal : AppColors.primary,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      isLive
-                          ? 'ACTIVE ROUTE IN PROGRESS'
-                          : 'SCHEDULED ITINERARY',
-                      style: AppTypography.micro(
-                        color: isLive ? AppColors.teal : AppColors.textTertiary,
-                      ).copyWith(fontWeight: FontWeight.w800),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${trip.destName} · ${trip.totalDays} Days',
-                      style: AppTypography.plusJakartaSans.copyWith(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.brown,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Icon(
-                Icons.arrow_forward_ios_rounded,
-                size: 14,
-                color: AppColors.textTertiary,
-              ),
-            ],
+          const SizedBox(width: 10),
+          Text(
+            'Opening your journey ledger…',
+            style: AppTypography.bodySmall(color: tokens.textSecondary),
           ),
-        ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HomeError extends StatelessWidget {
+  final VoidCallback onRetry;
+  const _HomeError({required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = AdaptiveThemeExtension.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 10, 20, 12),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              'Your journey data is temporarily unavailable.',
+              style: AppTypography.bodySmall(color: tokens.textSecondary),
+            ),
+          ),
+          TextButton(onPressed: onRetry, child: const Text('Retry')),
+        ],
       ),
     );
   }

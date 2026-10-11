@@ -5,10 +5,12 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../places/domain/models/place_model.dart';
 import '../../../places/presentation/providers/places_provider.dart';
+import '../../../../core/constants/master_destinations.dart';
 import '../../../navigation/presentation/nav_hub_page.dart';
 
 class RestaurantsPage extends ConsumerStatefulWidget {
-  const RestaurantsPage({super.key});
+  final MasterDestination? destination;
+  const RestaurantsPage({super.key, this.destination});
 
   @override
   ConsumerState<RestaurantsPage> createState() => _RestaurantsPageState();
@@ -19,6 +21,8 @@ class _RestaurantsPageState extends ConsumerState<RestaurantsPage> {
   String _searchQuery = '';
   List<PlaceModel>? _restaurants;
   bool _isLoading = false;
+  String? _errorMessage;
+  int _requestGeneration = 0;
 
   @override
   void initState() {
@@ -27,26 +31,47 @@ class _RestaurantsPageState extends ConsumerState<RestaurantsPage> {
   }
 
   Future<void> _fetchRestaurants([String query = '']) async {
-    setState(() => _isLoading = true);
+    final requestGeneration = ++_requestGeneration;
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+        _restaurants = null;
+      });
+    }
+    final destination = widget.destination;
+    if (destination == null) {
+      if (mounted && requestGeneration == _requestGeneration) {
+        setState(() {
+          _restaurants = [];
+          _isLoading = false;
+        });
+      }
+      return;
+    }
     final repo = ref.read(placesRepositoryProvider);
 
     try {
       final results = await repo.getPlaceDetails(
-        lat: 26.9124, // Default Jaipur / current hub
-        lng: 75.7873,
+        lat: destination.lat,
+        lng: destination.lng,
         type: 'restaurant',
         query: query.isNotEmpty ? query : 'authentic dining restaurant',
       );
 
-      if (mounted) {
+      if (mounted && requestGeneration == _requestGeneration) {
         setState(() {
           _restaurants = results;
           _isLoading = false;
         });
       }
     } catch (e) {
-      if (mounted) {
-        setState(() => _isLoading = false);
+      if (mounted && requestGeneration == _requestGeneration) {
+        setState(() {
+          _restaurants = [];
+          _isLoading = false;
+          _errorMessage = 'Dining spots are unavailable right now.';
+        });
       }
     }
   }
@@ -121,6 +146,31 @@ class _RestaurantsPageState extends ConsumerState<RestaurantsPage> {
                 ? const Center(
                     child: CircularProgressIndicator(color: AppColors.primary),
                   )
+                : _errorMessage != null
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(
+                          Icons.cloud_off_outlined,
+                          size: 48,
+                          color: AppColors.border,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          _errorMessage!,
+                          style: AppTypography.sectionTitle(
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        TextButton(
+                          onPressed: () => _fetchRestaurants(_searchQuery),
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    ),
+                  )
                 : (_restaurants == null || _restaurants!.isEmpty)
                 ? Center(
                     child: Column(
@@ -133,14 +183,18 @@ class _RestaurantsPageState extends ConsumerState<RestaurantsPage> {
                         ),
                         const SizedBox(height: 12),
                         Text(
-                          'No dining spots found',
+                          widget.destination == null
+                              ? 'Choose a destination first'
+                              : 'No dining spots found',
                           style: AppTypography.sectionTitle(
                             color: AppColors.textPrimary,
                           ),
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Try searching for another cuisine or dish',
+                          widget.destination == null
+                              ? 'Open food discovery from a destination'
+                              : 'Try searching for another cuisine or dish',
                           style: AppTypography.caption(
                             color: AppColors.textSecondary,
                           ),

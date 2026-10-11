@@ -20,17 +20,39 @@ final placeAutocompleteProvider =
     });
 
 /// Nearby places provider
-final nearbyPlacesProvider =
-    FutureProvider.family<
-      List<PlaceModel>,
-      ({double lat, double lng, String type})
-    >((ref, arg) async {
+final nearbyPlacesProvider = FutureProvider.autoDispose
+    .family<List<PlaceModel>, ({double lat, double lng, String type})>((
+      ref,
+      arg,
+    ) async {
       final repo = ref.watch(placesRepositoryProvider);
       return await repo.getNearbyPlaces(
         lat: arg.lat,
         lng: arg.lng,
         type: arg.type,
       );
+    });
+
+typedef PlaceSearch = ({
+  String ownerUid,
+  String query,
+  String type,
+  double? lat,
+  double? lng,
+});
+
+/// Query and owner are part of the cache key; no retained response can cross
+/// an account or query change. Defaults are API search bias, never user GPS.
+final discoveryPlacesProvider = FutureProvider.autoDispose
+    .family<List<PlaceModel>, PlaceSearch>((ref, request) {
+      return ref
+          .watch(placesRepositoryProvider)
+          .getPlaceDetails(
+            query: request.query,
+            type: request.type,
+            lat: request.lat ?? 20.5937,
+            lng: request.lng ?? 78.9629,
+          );
     });
 
 /// Destination weather provider

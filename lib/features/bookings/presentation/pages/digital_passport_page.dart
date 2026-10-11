@@ -11,6 +11,7 @@ import '../../../trips/domain/models/trip_itinerary_model.dart';
 import '../../../places/domain/models/place_model.dart';
 import '../../../navigation/presentation/nav_hub_page.dart';
 import '../../../../core/constants/master_destinations.dart';
+import '../../../explore/presentation/widgets/discovery_widgets.dart';
 
 class DigitalPassportPage extends ConsumerWidget {
   const DigitalPassportPage({super.key});
@@ -20,12 +21,11 @@ class DigitalPassportPage extends ConsumerWidget {
     final statsAsync = ref.watch(passportStatsStreamProvider);
     final stampsAsync = ref.watch(passportStampsStreamProvider);
     final userTripsAsync = ref.watch(userTripsStreamProvider);
-    final savedPlacesAsync = ref.watch(savedPlacesStreamProvider);
+    final savedPlaces = ref.watch(safeSavedPlacesProvider);
 
     final stats = statsAsync.valueOrNull;
     final stamps = stampsAsync.valueOrNull ?? [];
     final allTrips = userTripsAsync.valueOrNull ?? [];
-    final savedPlaces = savedPlacesAsync.valueOrNull ?? [];
 
     final pastTrips = allTrips.where((t) => t.isPast).toList();
     final upcomingTrips = allTrips.where((t) => !t.isPast).toList();
@@ -262,38 +262,51 @@ class DigitalPassportPage extends ConsumerWidget {
                         margin: const EdgeInsets.only(right: 10),
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(16),
-                          image: DecorationImage(
-                            image:
-                                (place.image != null && place.image!.isNotEmpty)
-                                ? NetworkImage(place.image!) as ImageProvider
-                                : const AssetImage(
-                                    'assets/brand/india-cover-soft.png',
-                                  ),
-                            fit: BoxFit.cover,
-                          ),
                         ),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(16),
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [
-                                Colors.transparent,
-                                Colors.black.withAlpha((0.85 * 255).round()),
-                              ],
+                        clipBehavior: Clip.antiAlias,
+                        child: Stack(
+                          children: [
+                            Positioned.fill(
+                              child: DiscoveryImage(
+                                image: approvedDestinationImage(
+                                  destinationId: place.id,
+                                  image: place.image,
+                                ),
+                                label: place.name,
+                                height: 120,
+                              ),
                             ),
-                          ),
-                          padding: const EdgeInsets.all(12),
-                          alignment: Alignment.bottomLeft,
-                          child: Text(
-                            place.name,
-                            style: AppTypography.tripTitle(
-                              color: Colors.white,
-                            ).copyWith(fontSize: 14),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                            Positioned.fill(
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: [
+                                      Colors.transparent,
+                                      Colors.black.withAlpha(
+                                        (0.85 * 255).round(),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Align(
+                              alignment: Alignment.bottomLeft,
+                              child: Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: Text(
+                                  place.name,
+                                  style: AppTypography.tripTitle(
+                                    color: Colors.white,
+                                  ).copyWith(fontSize: 14),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     );

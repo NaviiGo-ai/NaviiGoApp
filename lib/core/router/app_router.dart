@@ -34,6 +34,7 @@ import '../../features/more/presentation/pages/settings_page.dart';
 import '../../features/more/presentation/pages/help_support_page.dart';
 import '../../features/destinations/presentation/pages/destination_details_page.dart';
 import '../../features/places/domain/models/place_model.dart';
+import '../../core/constants/master_destinations.dart';
 import '../../features/places/presentation/pages/place_details_page.dart';
 import '../../features/explore/presentation/pages/local_guides_page.dart';
 
@@ -103,18 +104,27 @@ GoRouter createAppRouter(ValueNotifier<EntryStatus> entryState) => GoRouter(
         ),
         GoRoute(
           path: '/explore',
-          pageBuilder: (context, state) =>
-              _page(state, const ExploreDiscoverPage(), kind: NavRouteKind.tab),
+          pageBuilder: (context, state) => _page(
+            state,
+            ExploreDiscoverPage(initialQuery: state.uri.queryParameters['q']),
+            kind: NavRouteKind.tab,
+          ),
         ),
         GoRoute(
           path: '/explore-discover',
-          pageBuilder: (context, state) =>
-              _page(state, const ExploreDiscoverPage(), kind: NavRouteKind.tab),
+          pageBuilder: (context, state) => _page(
+            state,
+            ExploreDiscoverPage(initialQuery: state.uri.queryParameters['q']),
+            kind: NavRouteKind.tab,
+          ),
         ),
         GoRoute(
           path: '/places',
-          pageBuilder: (context, state) =>
-              _page(state, const ExploreDiscoverPage(), kind: NavRouteKind.tab),
+          pageBuilder: (context, state) => _page(
+            state,
+            ExploreDiscoverPage(initialQuery: state.uri.queryParameters['q']),
+            kind: NavRouteKind.tab,
+          ),
         ),
         GoRoute(
           path: '/trips',
@@ -232,8 +242,14 @@ GoRouter createAppRouter(ValueNotifier<EntryStatus> entryState) => GoRouter(
         ),
         GoRoute(
           path: '/restaurants',
-          pageBuilder: (context, state) =>
-              _page(state, const RestaurantsPage()),
+          pageBuilder: (context, state) => _page(
+            state,
+            RestaurantsPage(
+              destination: findDestinationById(
+                state.uri.queryParameters['destination'] ?? '',
+              ),
+            ),
+          ),
         ),
         GoRoute(
           path: '/transportation',
@@ -249,8 +265,20 @@ GoRouter createAppRouter(ValueNotifier<EntryStatus> entryState) => GoRouter(
         // (§25).
         GoRoute(
           path: '/map',
-          pageBuilder: (context, state) =>
-              _page(state, const MapPage(), kind: NavRouteKind.expand),
+          pageBuilder: (context, state) => _page(
+            state,
+            MapPage(
+              selectedDestination: state.extra is MasterDestination
+                  ? state.extra as MasterDestination
+                  : findDestinationById(
+                      state.uri.queryParameters['destination'] ?? '',
+                    ),
+              selectedPlace: state.extra is PlaceModel
+                  ? state.extra as PlaceModel
+                  : null,
+            ),
+            kind: NavRouteKind.expand,
+          ),
         ),
         GoRoute(
           path: '/ar-explore',

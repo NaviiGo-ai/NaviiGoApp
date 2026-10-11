@@ -5,6 +5,8 @@ import '../../../../core/auth/auth_provider.dart';
 import '../providers/saved_places_provider.dart';
 import '../../domain/models/saved_place_model.dart';
 import '../../../navigation/presentation/nav_hub_page.dart';
+import '../../../places/domain/models/place_model.dart';
+import '../../../../core/constants/master_destinations.dart';
 
 class SavedPlacesPage extends ConsumerWidget {
   const SavedPlacesPage({super.key});
@@ -38,15 +40,18 @@ class SavedPlacesPage extends ConsumerWidget {
         error: (err, _) =>
             Center(child: Text('Error loading saved places: $err')),
         data: (places) {
-          if (places.isEmpty) {
+          final ownedPlaces = places
+              .where((place) => place.sourceUserId == user?.uid)
+              .toList();
+          if (ownedPlaces.isEmpty) {
             return _buildEmptyState(context);
           }
 
           return ListView.builder(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            itemCount: places.length,
+            itemCount: ownedPlaces.length,
             itemBuilder: (context, index) {
-              final place = places[index];
+              final place = ownedPlaces[index];
               return _buildPlaceItem(context, ref, user?.uid, place);
             },
           );
@@ -170,24 +175,44 @@ class SavedPlacesPage extends ConsumerWidget {
             Icons.bookmark_remove_rounded,
             color: Color(0xFFEC6426),
           ),
-          onPressed: () {
-            if (uid != null) {
-              ref
-                  .read(savedPlacesRepositoryProvider)
-                  .toggleSavedPlace(uid, place);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Removed ${place.name} from saved places'),
-                ),
-              );
+          onPressed: () async {
+            if (uid == null) {
+              return;
             }
+            final success = await ref
+                .read(savedPlacesRepositoryProvider)
+                .toggleSavedPlace(uid, place);
+            if (!context.mounted || ref.read(currentUserProvider)?.uid != uid) {
+              return;
+            }
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  success
+                      ? 'Removed ${place.name} from saved places'
+                      : 'Could not update saved places. Please retry.',
+                ),
+              ),
+            );
           },
         ),
         onTap: () {
-          if (place.id.startsWith('rest_')) {
-            context.push('/restaurants');
+          final isDestination =
+              findDestinationById(place.id) != null ||
+              place.type.toLowerCase() == 'destination';
+          if (isDestination) {
+            context.push('/destination/${place.id}');
           } else {
-            context.push('/trip-planner', extra: {'destination': place.name});
+            context.push(
+              '/place-details',
+              extra: PlaceModel(
+                id: place.id,
+                name: place.name,
+                photoUrl: place.image,
+                vicinity: place.location ?? '',
+                types: [place.type],
+              ),
+            );
           }
         },
       ),

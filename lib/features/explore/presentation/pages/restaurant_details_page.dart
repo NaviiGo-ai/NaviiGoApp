@@ -104,13 +104,18 @@ class RestaurantDetailsPage extends ConsumerWidget {
                 createdAt: DateTime.now(),
               );
 
-              await ref
+              final success = await ref
                   .read(savedPlacesRepositoryProvider)
                   .toggleSavedPlace(user.uid, place);
-              if (context.mounted) {
+              if (context.mounted &&
+                  ref.read(currentUserProvider)?.uid == user.uid) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('Added $title to your Saved Places'),
+                    content: Text(
+                      success
+                          ? 'Added $title to your Saved Places'
+                          : 'Could not update saved places. Please retry.',
+                    ),
                     backgroundColor: AppColors.teal,
                   ),
                 );
