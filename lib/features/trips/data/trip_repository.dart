@@ -33,49 +33,152 @@ class TripRepository {
        _currentUserUid =
            currentUserUid ?? (() => FirebaseClient.auth.currentUser?.uid);
 
-  /// Stream user itineraries directly from users/{uid}/itineraries in naviigo-db
-  Stream<List<TripItineraryModel>> getUserTripsStream(String uid) {
-    return _firestore
-        .collection('users')
-        .doc(uid)
-        .collection('itineraries')
-        .snapshots()
-        .map((snapshot) {
-          final trips = snapshot.docs.map((doc) {
-            return TripItineraryModel.fromFirestore(doc);
-          }).toList();
+  bool _isCurrentUser(String uid) => uid.isNotEmpty && _currentUserUid() == uid;
 
-          // Sort descending by updated / created date
-          trips.sort((a, b) {
-            final timeA = a.updatedAt ?? a.createdAt ?? DateTime(2000);
-            final timeB = b.updatedAt ?? b.createdAt ?? DateTime(2000);
-            return timeB.compareTo(timeA);
-          });
-
-          // Cache trips locally in Hive for offline access. `status` travels
-          // with them: a restart with no network must still resolve the active
-          // journey from its lifecycle, never from today's date.
-          for (final trip in trips) {
-            HiveService.cacheItinerary(trip.id, {
-              'id': trip.id,
-              'uuid': trip.uuid,
-              'destId': trip.destId,
-              'destName': trip.destName,
-              'userId': trip.userId,
-              'form': trip.form,
-              'generatedData': trip.generatedData,
-              'isActive': trip.isActive,
-              if (trip.status != null) 'status': trip.status!.wireName,
-              'updatedAt': trip.updatedAt?.toIso8601String(),
-            });
-          }
-
-          return trips;
-        });
+  void _requireCurrentUser(String uid) {
+    if (!_isCurrentUser(uid)) {
+      throw const AuthRequiredException(
+        'Your account is no longer available for this request.',
+      );
+    }
   }
 
-  /// Get trip by ID: checks Firestore first, falls back to Hive local cache if offline
+  TripItineraryModel? _bindOwnedTrip(String uid, TripItineraryModel trip) {
+    if (trip.userId != null && trip.userId != uid) return null;
+    if (trip.isEphemeral) return null;
+    // The Firestore path or cache envelope is authoritative ownership when a
+    // legacy model omitted userId. Bind it before exposing the model so a
+    // retained provider value cannot be mistaken for another account's trip.
+    return trip.userId == uid ? trip : trip.copyWith(userId: uid);
+  }
+
+  List<TripItineraryModel> _readCachedTrips(String uid) {
+    final trips = <TripItineraryModel>[];
+    for (final payload in HiveService.getCachedItineraries(uid)) {
+      final rawId = payload['id'];
+      if (rawId is! String || rawId.isEmpty) continue;
+      try {
+        final trip = _bindOwnedTrip(
+          uid,
+          TripItineraryModel.fromMap(rawId, payload),
+        );
+        if (trip != null) trips.add(trip);
+      } catch (_) {
+        // A malformed local payload is not usable offline data.
+      }
+    }
+    _sortTrips(trips);
+    return trips;
+  }
+
+  TripItineraryModel? _readCachedTrip(String uid, String tripId) {
+    final cached = HiveService.getCachedItinerary(uid, tripId);
+    if (cached == null) return null;
+    try {
+      return _bindOwnedTrip(uid, TripItineraryModel.fromMap(tripId, cached));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _cacheTrip(String uid, TripItineraryModel trip) async {
+    if (!_isCurrentUser(uid) || trip.isEphemeral) return;
+    try {
+      await HiveService.cacheItinerary(uid, trip.id, trip.toMap());
+    } catch (e) {
+      // Firestore remains authoritative; a local cache failure is non-fatal.
+      debugPrint('[TripRepository] Could not cache itinerary ${trip.id}: $e');
+    }
+  }
+
+  static void _sortTrips(List<TripItineraryModel> trips) {
+    trips.sort((a, b) {
+      final timeA = a.updatedAt ?? a.createdAt ?? DateTime(2000);
+      final timeB = b.updatedAt ?? b.createdAt ?? DateTime(2000);
+      return timeB.compareTo(timeA);
+    });
+  }
+
+  /// Stream user itineraries directly from users/{uid}/itineraries in
+  /// naviigo-db.
+  /// A same-owner cache is emitted before the authoritative stream when useful.
+  Stream<List<TripItineraryModel>> getUserTripsStream(String uid) {
+    Stream<List<TripItineraryModel>> stream() async* {
+      _requireCurrentUser(uid);
+
+      var lastUsableTrips = _readCachedTrips(uid);
+      var hasLastUsableData = lastUsableTrips.isNotEmpty;
+      if (lastUsableTrips.isNotEmpty) yield lastUsableTrips;
+
+      try {
+        await for (final snapshot
+            in _firestore
+                .collection('users')
+                .doc(uid)
+                .collection('itineraries')
+                .snapshots()) {
+          // A late event from account A must not be exposed or cached after
+          // the session has moved to account B.
+          if (!_isCurrentUser(uid)) {
+            yield const [];
+            return;
+          }
+
+          final trips = <TripItineraryModel>[];
+          for (final doc in snapshot.docs) {
+            final parsed = _bindOwnedTrip(
+              uid,
+              TripItineraryModel.fromFirestore(doc),
+            );
+            if (parsed != null) trips.add(parsed);
+          }
+          _sortTrips(trips);
+
+          if (!_isCurrentUser(uid)) {
+            yield const [];
+            return;
+          }
+          try {
+            await HiveService.replaceCachedItineraries(
+              uid,
+              trips.map((trip) => trip.toMap()),
+            );
+          } catch (e) {
+            debugPrint(
+              '[TripRepository] Could not refresh itinerary cache: $e',
+            );
+          }
+          if (!_isCurrentUser(uid)) {
+            yield const [];
+            return;
+          }
+
+          lastUsableTrips = trips;
+          hasLastUsableData = true;
+          yield trips;
+        }
+      } catch (error, stackTrace) {
+        if (!_isCurrentUser(uid)) {
+          yield const [];
+          return;
+        }
+        if (hasLastUsableData) {
+          // Keep the last verified same-user data during a transport failure.
+          yield lastUsableTrips;
+          return;
+        }
+        // Without a usable cache, preserve the existing error signal instead
+        // of manufacturing an empty successful list.
+        Error.throwWithStackTrace(error, stackTrace);
+      }
+    }
+
+    return stream();
+  }
+
+  /// Gets an owner-bound itinerary, falling back only to that owner's cache.
   Future<TripItineraryModel?> getTripById(String uid, String tripId) async {
+    _requireCurrentUser(uid);
     try {
       final doc = await _firestore
           .collection('users')
@@ -83,69 +186,58 @@ class TripRepository {
           .collection('itineraries')
           .doc(tripId)
           .get();
+      _requireCurrentUser(uid);
 
       if (doc.exists) {
-        return TripItineraryModel.fromFirestore(doc);
+        final trip = _bindOwnedTrip(uid, TripItineraryModel.fromFirestore(doc));
+        if (trip == null) return null;
+        await _cacheTrip(uid, trip);
+        _requireCurrentUser(uid);
+        return trip;
       }
 
-      // Check root itineraries collection
-      final rootDoc = await _firestore
-          .collection('itineraries')
-          .doc(tripId)
-          .get();
-      if (rootDoc.exists) {
-        return TripItineraryModel.fromFirestore(rootDoc);
+      // A confirmed authoritative miss means this trip is no longer present.
+      // Cache fallback is reserved for transport failures, so stale deleted
+      // data cannot be resurrected as a current trip.
+      try {
+        await HiveService.deleteCachedItinerary(uid, tripId);
+      } catch (cacheError) {
+        debugPrint(
+          '[TripRepository] Could not clear deleted itinerary cache: $cacheError',
+        );
       }
+      return null;
     } catch (e) {
+      if (e is AuthRequiredException) rethrow;
       debugPrint(
         '[TripRepository] Firestore fetch failed, checking offline cache: $e',
       );
+      _requireCurrentUser(uid);
+      return _readCachedTrip(uid, tripId);
     }
-
-    // Offline cache fallback
-    final cached = HiveService.getCachedItinerary(tripId);
-    if (cached != null) {
-      return TripItineraryModel.fromMap(tripId, cached);
-    }
-
-    return null;
   }
 
-  /// Save or update trip - mirrors to both users/{uid}/itineraries/{id} and root itineraries/{id}
+  /// Saves to the authoritative owner path, then updates the local cache.
   Future<String> saveTrip(String uid, TripItineraryModel trip) async {
-    final now = FieldValue.serverTimestamp();
-    final dayPlansData = trip.dayPlans
-        .map(
-          (dp) => {
-            'day': dp.dayNumber,
-            'theme': dp.theme,
-            'date': dp.dateFormatted,
-            'activities': dp.activities.map((a) => a.toMap()).toList(),
-          },
-        )
-        .toList();
-
-    final Map<String, dynamic> genData = Map<String, dynamic>.from(
-      trip.generatedData ?? {},
-    );
-    if (dayPlansData.isNotEmpty) {
-      genData['dayPlans'] = dayPlansData;
+    _requireCurrentUser(uid);
+    if (trip.id.isEmpty) {
+      throw const ValidationException('An itinerary ID is required to save.');
+    }
+    if (trip.userId != null && trip.userId != uid) {
+      throw const ForbiddenException(
+        'This itinerary belongs to another account.',
+      );
+    }
+    if (trip.isEphemeral) {
+      throw const ValidationException(
+        'Generated previews must be explicitly persisted before saving.',
+      );
     }
 
-    final data = {
-      'id': trip.id,
-      'uuid': trip.uuid,
-      'destId': trip.destId,
-      'destName': trip.destName,
-      'userId': uid,
-      'form': trip.form,
-      'dayPlans': dayPlansData,
-      'generatedData': genData,
-      'isActive': trip.isActive,
-      'isPublic': trip.isPublic,
-      if (trip.status != null) 'status': trip.status!.wireName,
-      'updatedAt': now,
-    };
+    final now = FieldValue.serverTimestamp();
+    final data = trip.toMap();
+    data['userId'] = uid;
+    data['updatedAt'] = now;
 
     // User subcollection
     final userDocRef = _firestore
@@ -155,6 +247,7 @@ class TripRepository {
         .doc(trip.id);
 
     final snap = await userDocRef.get();
+    _requireCurrentUser(uid);
     if (!snap.exists) {
       data['createdAt'] = now;
       // Increment total trips on user profile
@@ -164,50 +257,67 @@ class TripRepository {
           'lastLogin': now,
         });
       } catch (_) {}
+      _requireCurrentUser(uid);
     }
 
     await userDocRef.set(data, SetOptions(merge: true));
+    _requireCurrentUser(uid);
 
     // Only mirror to the public root collection when the traveller has
     // explicitly shared this journey. Mirroring unconditionally made every
     // private itinerary world-readable at `itineraries/{id}`.
+    _requireCurrentUser(uid);
     if (trip.isPublic) {
-      try {
-        final rootData = {...data, 'userId': uid, 'isPublic': true};
-        await _firestore
-            .collection('itineraries')
-            .doc(trip.id)
-            .set(rootData, SetOptions(merge: true));
-      } catch (e) {
+      if (await _canMutatePublicMirror(uid, trip.id)) {
+        try {
+          final rootData = {...data, 'userId': uid, 'isPublic': true};
+          await _firestore
+              .collection('itineraries')
+              .doc(trip.id)
+              .set(rootData, SetOptions(merge: true));
+        } catch (e) {
+          debugPrint(
+            '[TripRepository] Non-fatal mirror to root itineraries failed: $e',
+          );
+        }
+      } else {
         debugPrint(
-          '[TripRepository] Non-fatal mirror to root itineraries failed: $e',
+          '[TripRepository] Skipping public mirror owned by another account.',
         );
       }
     } else {
       // Clear any previously public copy so un-sharing actually un-publishes.
-      try {
-        await _firestore.collection('itineraries').doc(trip.id).delete();
-      } catch (e) {
-        debugPrint('[TripRepository] Could not clear public mirror: $e');
+      if (await _canMutatePublicMirror(uid, trip.id)) {
+        try {
+          await _firestore.collection('itineraries').doc(trip.id).delete();
+        } catch (e) {
+          debugPrint('[TripRepository] Could not clear public mirror: $e');
+        }
       }
     }
+    _requireCurrentUser(uid);
 
     // Cache locally
-    await HiveService.cacheItinerary(trip.id, {
-      'id': trip.id,
-      'uuid': trip.uuid,
-      'destId': trip.destId,
-      'destName': trip.destName,
-      'userId': uid,
-      'form': trip.form,
-      'dayPlans': dayPlansData,
-      'generatedData': genData,
-      'isActive': trip.isActive,
-      if (trip.status != null) 'status': trip.status!.wireName,
-      'updatedAt': DateTime.now().toIso8601String(),
-    });
+    await _cacheTrip(uid, trip.copyWith(userId: uid));
+    _requireCurrentUser(uid);
 
     return trip.id;
+  }
+
+  Future<bool> _canMutatePublicMirror(String uid, String tripId) async {
+    try {
+      final root = await _firestore.collection('itineraries').doc(tripId).get();
+      _requireCurrentUser(uid);
+      if (!root.exists) return true;
+      final data = root.data();
+      return data?['isPublic'] == true && data?['userId'] == uid;
+    } catch (error) {
+      if (error is AuthRequiredException) rethrow;
+      debugPrint(
+        '[TripRepository] Could not verify public mirror owner: $error',
+      );
+      return false;
+    }
   }
 
   /// Mark an itinerary as the active trip.
@@ -218,11 +328,13 @@ class TripRepository {
   /// deliberately intend to end another journey do that explicitly first, via
   /// [endTrip].
   Future<void> setActiveTrip(String uid, String activeTripId) async {
+    _requireCurrentUser(uid);
     final userItinCol = _firestore
         .collection('users')
         .doc(uid)
         .collection('itineraries');
     final allDocs = await userItinCol.get();
+    _requireCurrentUser(uid);
 
     final batch = _firestore.batch();
     for (final doc in allDocs.docs) {
@@ -241,11 +353,13 @@ class TripRepository {
       }
     }
     await batch.commit();
+    _requireCurrentUser(uid);
   }
 
   /// End a journey the traveller chose to leave. Terminal, so it can never
   /// reappear as the active trip whatever its dates say.
   Future<void> endTrip(String uid, String tripId) async {
+    _requireCurrentUser(uid);
     await _firestore
         .collection('users')
         .doc(uid)
@@ -256,22 +370,35 @@ class TripRepository {
           'status': TripStatus.cancelled.wireName,
           'updatedAt': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
+    _requireCurrentUser(uid);
   }
 
   /// Delete itinerary from user subcollection and root collection
   Future<void> deleteTrip(String uid, String tripId) async {
+    _requireCurrentUser(uid);
+    await _firestore
+        .collection('users')
+        .doc(uid)
+        .collection('itineraries')
+        .doc(tripId)
+        .delete();
+    _requireCurrentUser(uid);
     try {
-      await _firestore
-          .collection('users')
-          .doc(uid)
-          .collection('itineraries')
-          .doc(tripId)
-          .delete();
-      await _firestore.collection('itineraries').doc(tripId).delete();
-      await HiveService.itineraryBox.delete(tripId);
+      if (await _canMutatePublicMirror(uid, tripId)) {
+        await _firestore.collection('itineraries').doc(tripId).delete();
+      }
     } catch (e) {
-      debugPrint('[TripRepository] deleteTrip error: $e');
+      // The owner document is authoritative. A stale public mirror must not
+      // turn a confirmed private deletion into a client failure.
+      debugPrint('[TripRepository] public itinerary delete failed: $e');
     }
+    _requireCurrentUser(uid);
+    try {
+      await HiveService.deleteCachedItinerary(uid, tripId);
+    } catch (e) {
+      debugPrint('[TripRepository] local itinerary delete failed: $e');
+    }
+    _requireCurrentUser(uid);
   }
 
   /// Generate itinerary from Render FastAPI backend using Gemini AI Engine & Destination Cache

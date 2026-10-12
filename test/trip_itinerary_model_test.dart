@@ -146,6 +146,32 @@ void main() {
       expect(trip.dayPlans.first.activities.first.title, 'Sunrise boat ride');
     });
 
+    test('preserves nonsequential day numbers and absent optional fields', () {
+      final trip = TripItineraryModel.fromMap('trip-order-1', {
+        'destId': 'jaipur',
+        'destName': 'Jaipur',
+        'dayPlans': [
+          {
+            'day': 4,
+            'theme': 'Heritage morning',
+            'activities': [
+              {'title': 'Amber Fort'},
+            ],
+          },
+          {'day': 9, 'activities': []},
+        ],
+      });
+
+      expect(trip.dayPlans.map((day) => day.dayNumber), [4, 9]);
+      expect(trip.dayPlans.first.theme, 'Heritage morning');
+      expect(trip.dayPlans.first.areaFocus, isNull);
+      expect(trip.dayPlans.first.dateFormatted, isNull);
+      expect(trip.dayPlans[1].theme, isNull);
+      expect(trip.dayPlans[1].areaFocus, isNull);
+      expect(trip.dayPlans[1].weatherContext, isNull);
+      expect(trip.dayPlans[1].activities, isEmpty);
+    });
+
     test('defaults isPublic to false so journeys stay private', () {
       final trip = TripItineraryModel.fromMap('trip-priv-1', {
         'destName': 'Rishikesh',
@@ -218,7 +244,7 @@ void main() {
     });
 
     testWidgets(
-      'ItineraryStatsRow renders truthful 0 STOPS when itinerary has no activities',
+      'ItineraryStatsRow renders truthful 0 ACTIVITIES when itinerary has no activities',
       (tester) async {
         final emptyTrip = TripItineraryModel.fromMap('trip-empty-stops', {
           'destName': 'Varanasi',
@@ -232,13 +258,13 @@ void main() {
           ),
         );
 
-        expect(find.text('0 STOPS'), findsOneWidget);
-        expect(find.text('15 STOPS'), findsNothing);
+        expect(find.text('ACTIVITIES'), findsOneWidget);
+        expect(find.text('0'), findsOneWidget);
       },
     );
 
     testWidgets(
-      'ItineraryStatsRow calculates exact total waypoint count across days',
+      'ItineraryStatsRow calculates exact activity count across days',
       (tester) async {
         final trip = TripItineraryModel.fromMap('trip-with-stops', {
           'destName': 'Jaipur',
@@ -266,7 +292,8 @@ void main() {
           ),
         );
 
-        expect(find.text('3 STOPS'), findsOneWidget);
+        expect(find.text('ACTIVITIES'), findsOneWidget);
+        expect(find.text('3'), findsOneWidget);
       },
     );
   });

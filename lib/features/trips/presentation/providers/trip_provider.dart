@@ -64,5 +64,9 @@ final tripDetailProvider = FutureProvider.family<TripItineraryModel?, String>((
   final user = ref.watch(currentUserProvider);
   if (user == null) return null;
   final repo = ref.watch(tripRepositoryProvider);
-  return repo.getTripById(user.uid, tripId);
+  final trip = await repo.getTripById(user.uid, tripId);
+  final currentUser = ref.read(currentUserProvider);
+  if (currentUser?.uid != user.uid) return null;
+  if (trip == null || trip.userId != user.uid) return null;
+  return trip;
 });

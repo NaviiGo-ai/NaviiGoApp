@@ -764,7 +764,9 @@ class TripItineraryModel {
         return dest.image;
       }
     }
-    return kMasterDestinations.first.image;
+    // Unknown destinations use the neutral brand cover, never another city's
+    // image. All itinerary image consumers can render this approved asset.
+    return 'assets/brand/india-cover-soft.png';
   }
 
   static String _monthName(int month) {

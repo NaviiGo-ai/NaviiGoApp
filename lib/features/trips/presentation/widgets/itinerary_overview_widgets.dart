@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
+
+import '../../../../core/motion/nav_haptics.dart';
+import '../../../../core/motion/nav_motion.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../domain/models/trip_itinerary_model.dart';
-import '../../../../core/motion/nav_haptics.dart';
 
-/// ─────────────────────────────────────────────────────────────────────────────
-/// SAFE IMAGE HELPER (Asset & Network with graceful fallback)
-/// ─────────────────────────────────────────────────────────────────────────────
+/// Asset and network images fail closed to a quiet, useful placeholder.
 class SafeExpeditionImage extends StatelessWidget {
   final String imagePath;
   final BoxFit fit;
@@ -23,6 +23,7 @@ class SafeExpeditionImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (imagePath.trim().isEmpty) return _buildFallback();
     if (imagePath.startsWith('assets/')) {
       return Image.asset(
         imagePath,
@@ -54,10 +55,7 @@ class SafeExpeditionImage extends StatelessWidget {
   }
 }
 
-/// ─────────────────────────────────────────────────────────────────────────────
-/// VERTICAL JOURNEY TRACK PAINTER
-/// Continuous vertical brand spine connecting Day Chapters
-/// ─────────────────────────────────────────────────────────────────────────────
+/// Continuous vertical brand spine connecting the itinerary chapters.
 class VerticalJourneyTrackPainter extends CustomPainter {
   final bool isFirst;
   final bool isLast;
@@ -76,13 +74,11 @@ class VerticalJourneyTrackPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final centerX = size.width / 2;
-
     final trackPaint = Paint()
       ..color = trackColor
       ..strokeWidth = 2.0
       ..style = PaintingStyle.stroke;
 
-    // Top track segment
     if (!isFirst) {
       canvas.drawLine(
         Offset(centerX, 0),
@@ -90,8 +86,6 @@ class VerticalJourneyTrackPainter extends CustomPainter {
         trackPaint,
       );
     }
-
-    // Bottom track segment
     if (!isLast) {
       canvas.drawLine(
         Offset(centerX, nodeCenterY),
@@ -106,15 +100,14 @@ class VerticalJourneyTrackPainter extends CustomPainter {
     return oldDelegate.isFirst != isFirst ||
         oldDelegate.isLast != isLast ||
         oldDelegate.trackColor != trackColor ||
+        oldDelegate.nodeColor != nodeColor ||
         oldDelegate.nodeCenterY != nodeCenterY;
   }
 }
 
-/// ─────────────────────────────────────────────────────────────────────────────
-/// VIEW MODE SWITCHER (CHAPTERS OVERVIEW vs. DAY IN MOTION)
-/// ─────────────────────────────────────────────────────────────────────────────
+/// Switches between the two read-only itinerary views.
 class ItineraryViewSwitcher extends StatelessWidget {
-  final int selectedIndex; // 0 = Chapters Overview, 1 = Day In Motion
+  final int selectedIndex;
   final ValueChanged<int> onSelect;
 
   const ItineraryViewSwitcher({
@@ -137,6 +130,7 @@ class ItineraryViewSwitcher extends StatelessWidget {
         children: [
           Expanded(
             child: _buildPill(
+              context,
               title: 'CHAPTERS OVERVIEW',
               icon: Icons.menu_book_rounded,
               isSelected: selectedIndex == 0,
@@ -149,6 +143,7 @@ class ItineraryViewSwitcher extends StatelessWidget {
           const SizedBox(width: 4),
           Expanded(
             child: _buildPill(
+              context,
               title: 'DAY IN MOTION',
               icon: Icons.alt_route_rounded,
               isSelected: selectedIndex == 1,
@@ -163,35 +158,61 @@ class ItineraryViewSwitcher extends StatelessWidget {
     );
   }
 
-  Widget _buildPill({
+  Widget _buildPill(
+    BuildContext context, {
     required String title,
     required IconData icon,
     required bool isSelected,
     required VoidCallback onTap,
   }) {
-    return Semantics(
-      button: true,
-      selected: isSelected,
-      label: title,
-      child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          decoration: BoxDecoration(
-            color: isSelected ? AppColors.brown : Colors.transparent,
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: isSelected
-                ? [
-                    BoxShadow(
-                      color: AppColors.brown.withAlpha(50),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ]
-                : null,
-          ),
-          child: Row(
+    final child = AnimatedContainer(
+      duration: NavReduce.duration(context, NavMotion.fast),
+      curve: NavMotion.response,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+      decoration: BoxDecoration(
+        color: isSelected ? AppColors.brown : Colors.transparent,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: isSelected
+            ? [
+                BoxShadow(
+                  color: AppColors.brown.withAlpha(50),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ]
+            : null,
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 150;
+          final text = Text(
+            title,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style:
+                AppTypography.micro(
+                  color: isSelected ? Colors.white : AppColors.textSecondary,
+                ).copyWith(
+                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                  letterSpacing: 0.8,
+                ),
+          );
+          if (compact) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  icon,
+                  size: 15,
+                  color: isSelected ? Colors.white : AppColors.textSecondary,
+                ),
+                const SizedBox(height: 3),
+                text,
+              ],
+            );
+          }
+          return Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(
@@ -200,36 +221,34 @@ class ItineraryViewSwitcher extends StatelessWidget {
                 color: isSelected ? Colors.white : AppColors.textSecondary,
               ),
               const SizedBox(width: 8),
-              Flexible(
-                child: Text(
-                  title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style:
-                      AppTypography.micro(
-                        color: isSelected
-                            ? Colors.white
-                            : AppColors.textSecondary,
-                      ).copyWith(
-                        fontWeight: isSelected
-                            ? FontWeight.w800
-                            : FontWeight.w600,
-                        letterSpacing: 0.8,
-                      ),
-                ),
-              ),
+              Flexible(child: text),
             ],
+          );
+        },
+      ),
+    );
+
+    return Semantics(
+      button: true,
+      selected: isSelected,
+      label: '$title${isSelected ? ', selected' : ''}',
+      child: TextButton(
+        onPressed: onTap,
+        style: TextButton.styleFrom(
+          padding: EdgeInsets.zero,
+          minimumSize: const Size(0, 48),
+          tapTargetSize: MaterialTapTargetSize.padded,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
           ),
         ),
+        child: child,
       ),
     );
   }
 }
 
-/// ─────────────────────────────────────────────────────────────────────────────
-/// TRIP MASTHEAD SUMMARY STATS
-/// ─────────────────────────────────────────────────────────────────────────────
+/// Truthful summary values from the itinerary and its input form.
 class ItineraryStatsRow extends StatelessWidget {
   final TripItineraryModel trip;
 
@@ -237,46 +256,38 @@ class ItineraryStatsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    int totalWaypoints = 0;
-    for (final dp in trip.dayPlans) {
-      totalWaypoints += dp.activities.length;
-    }
-
-    final statItems = <({String label, String value, IconData icon})>[
-      if (trip.dayPlans.isNotEmpty || trip.form['days'] != null)
-        (
-          label: 'DURATION',
-          value: '${trip.totalDays} DAYS',
-          icon: Icons.calendar_today_outlined,
-        ),
-      (
-        label: 'WAYPOINTS',
-        value: '$totalWaypoints STOPS',
-        icon: Icons.pin_drop_outlined,
-      ),
-    ];
-
-    final pace = trip.form['pace']?.toString().trim();
-    if (pace != null && pace.isNotEmpty) {
+    final totalActivities = trip.dayPlans.fold<int>(
+      0,
+      (total, day) => total + day.activities.length,
+    );
+    final statItems = <({String label, String value, IconData icon})>[];
+    if (trip.dayPlans.isNotEmpty || _hasValue(trip.form['days'])) {
       statItems.add((
-        label: 'PACING',
+        label: 'DURATION',
+        value: '${trip.totalDays} DAYS',
+        icon: Icons.calendar_today_outlined,
+      ));
+    }
+    statItems.add((
+      label: 'ACTIVITIES',
+      value: '$totalActivities',
+      icon: Icons.event_note_outlined,
+    ));
+
+    final pace = _value(trip.form['pace']);
+    if (pace != null) {
+      statItems.add((
+        label: 'PACE INPUT',
         value: pace.toUpperCase(),
         icon: Icons.speed_rounded,
       ));
     }
 
-    final rawBudget = trip.form['budget'];
-    final budget = rawBudget is num
-        ? rawBudget.toDouble()
-        : double.tryParse(rawBudget?.toString() ?? '');
-    if (budget != null && budget.isFinite && budget > 0) {
-      final budgetValue = budget.toInt().toString().replaceAllMapped(
-        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-        (Match m) => '${m[1]},',
-      );
+    final budget = _budgetValue(trip.form['budget']);
+    if (budget != null) {
       statItems.add((
-        label: 'ALLOCATION',
-        value: '₹$budgetValue',
+        label: 'INPUT BUDGET',
+        value: budget,
         icon: Icons.account_balance_wallet_outlined,
       ));
     }
@@ -292,7 +303,7 @@ class ItineraryStatsRow extends StatelessWidget {
       ),
       child: Wrap(
         alignment: WrapAlignment.spaceAround,
-        spacing: 12,
+        spacing: 16,
         runSpacing: 10,
         children: [
           for (final stat in statItems)
@@ -303,41 +314,49 @@ class ItineraryStatsRow extends StatelessWidget {
   }
 
   Widget _buildStatItem(String label, String value, IconData icon) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 12, color: AppColors.primary),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: AppTypography.micro(color: AppColors.textTertiary)
-                  .copyWith(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.6,
-                  ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 3),
-        Text(
-          value,
-          style: AppTypography.caption(
-            color: AppColors.brown,
-          ).copyWith(fontWeight: FontWeight.w800, fontSize: 12),
-        ),
-      ],
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minWidth: 62, maxWidth: 150),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 12, color: AppColors.primary),
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: AppTypography.micro(color: AppColors.textTertiary)
+                      .copyWith(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.6,
+                      ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 3),
+          Text(
+            value,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: AppTypography.caption(
+              color: AppColors.brown,
+            ).copyWith(fontWeight: FontWeight.w800, fontSize: 12),
+          ),
+        ],
+      ),
     );
   }
 }
 
-/// ─────────────────────────────────────────────────────────────────────────────
-/// CHAPTER CARD ALONG THE JOURNEY LINE (SCREEN 5)
-/// Alternating layout with distinctive personality per day
-/// ─────────────────────────────────────────────────────────────────────────────
+/// One chapter in the backend-provided day order.
 class ItineraryChapterCard extends StatelessWidget {
   final int index;
   final int totalCount;
@@ -356,16 +375,17 @@ class ItineraryChapterCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isFirst = index == 0;
     final isLast = index == totalCount - 1;
-    final acts = dayPlan.activities;
-
-    // Distinguish Day styles (alternating editorial aesthetics)
-    final isAlternate = index % 2 == 1;
+    final isAlternate = index.isOdd;
+    final date = _value(dayPlan.dateFormatted);
+    final theme = _value(dayPlan.theme);
+    final area = _value(dayPlan.areaFocus);
+    final activities = dayPlan.activities;
+    final dayLabel = 'Day ${dayPlan.dayNumber}';
 
     return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Left: Vertical Journey Track Spine
           SizedBox(
             width: 48,
             child: CustomPaint(
@@ -374,7 +394,6 @@ class ItineraryChapterCard extends StatelessWidget {
                 isLast: isLast,
                 trackColor: AppColors.primary.withAlpha(100),
                 nodeColor: AppColors.primary,
-                nodeCenterY: 28.0,
               ),
               child: Align(
                 alignment: const Alignment(0.0, -0.85),
@@ -385,19 +404,10 @@ class ItineraryChapterCard extends StatelessWidget {
                     color: isAlternate ? AppColors.teal : AppColors.primary,
                     shape: BoxShape.circle,
                     border: Border.all(color: Colors.white, width: 2.5),
-                    boxShadow: [
-                      BoxShadow(
-                        color:
-                            (isAlternate ? AppColors.teal : AppColors.primary)
-                                .withAlpha(80),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
                   ),
                   child: Center(
                     child: Text(
-                      '0${index + 1}',
+                      '${dayPlan.dayNumber}',
                       style: AppTypography.micro(
                         color: Colors.white,
                       ).copyWith(fontWeight: FontWeight.w900, fontSize: 11),
@@ -407,171 +417,169 @@ class ItineraryChapterCard extends StatelessWidget {
               ),
             ),
           ),
-
-          // Right: The Chapter Story Card
           Expanded(
             child: Padding(
               padding: const EdgeInsets.only(left: 4, right: 20, bottom: 20),
-              child: GestureDetector(
-                onTap: onExploreDay,
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: isFirst
-                          ? AppColors.primary.withAlpha(120)
-                          : AppColors.border,
-                      width: isFirst ? 1.5 : 1.0,
+              child: Semantics(
+                button: true,
+                label: '$dayLabel, ${activities.length} activities',
+                hint: 'Explore this day in the itinerary',
+                child: InkWell(
+                  onTap: () {
+                    NavHaptics.fire(NavHaptic.medium);
+                    onExploreDay();
+                  },
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: isFirst
+                            ? AppColors.primary.withAlpha(120)
+                            : AppColors.border,
+                        width: isFirst ? 1.5 : 1.0,
+                      ),
+                      boxShadow: AppColors.cardShadow,
                     ),
-                    boxShadow: AppColors.cardShadow,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Top Chapter Eyebrow & Waypoint Count
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 3,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Wrap(
+                          alignment: WrapAlignment.spaceBetween,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: 8,
+                          runSpacing: 5,
+                          children: [
+                            _chapterBadge(
+                              dayLabel,
+                              '$dayLabel · ${activities.length} ACTIVITIES',
+                              isAlternate,
                             ),
-                            decoration: BoxDecoration(
-                              color: isAlternate
-                                  ? AppColors.teal.withAlpha(25)
-                                  : AppColors.cream,
-                              borderRadius: BorderRadius.circular(6),
+                            if (date != null)
+                              Text(
+                                date,
+                                style: AppTypography.micro(
+                                  color: AppColors.textTertiary,
+                                ),
+                              ),
+                          ],
+                        ),
+                        if (theme != null) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            theme,
+                            style: AppTypography.tripTitle(
+                              color: AppColors.brown,
+                            ).copyWith(fontSize: 18, height: 1.25),
+                          ),
+                        ],
+                        if (area != null) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            'Area focus · $area',
+                            style: AppTypography.caption(
+                              color: AppColors.textSecondary,
                             ),
+                          ),
+                        ],
+                        if (theme == null && area == null && activities.isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 10),
                             child: Text(
-                              'CHAPTER 0${index + 1} · ${acts.length} WAYPOINTS',
+                              'No day details were provided.',
+                              style: AppTypography.caption(
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ),
+                        if (activities.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: activities.take(3).map((activity) {
+                              final title = _activityTitle(activity);
+                              final time = _value(activity.time);
+                              if (title == null && time == null) {
+                                return const SizedBox.shrink();
+                              }
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 6),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 6),
+                                      child: Container(
+                                        width: 5,
+                                        height: 5,
+                                        decoration: BoxDecoration(
+                                          color: isAlternate
+                                              ? AppColors.teal
+                                              : AppColors.primary,
+                                          shape: BoxShape.circle,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    if (title != null)
+                                      Expanded(
+                                        child: Text(
+                                          title,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style:
+                                              AppTypography.caption(
+                                                color: AppColors.textPrimary,
+                                              ).copyWith(
+                                                fontWeight: FontWeight.w600,
+                                                fontSize: 13,
+                                              ),
+                                        ),
+                                      ),
+                                    if (time != null) ...[
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        time,
+                                        style: AppTypography.micro(
+                                          color: AppColors.textTertiary,
+                                        ).copyWith(fontSize: 10),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ],
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 4,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            Text(
+                              'VIEW DAY DETAILS',
                               style:
                                   AppTypography.micro(
                                     color: isAlternate
                                         ? AppColors.teal
-                                        : AppColors.brown,
+                                        : AppColors.primary,
                                   ).copyWith(
                                     fontWeight: FontWeight.w800,
-                                    fontSize: 9,
+                                    letterSpacing: 0.5,
                                   ),
                             ),
-                          ),
-                          Text(
-                            dayPlan.dateFormatted ?? 'Day 0${index + 1}',
-                            style: AppTypography.micro(
-                              color: AppColors.textTertiary,
+                            const Icon(
+                              Icons.arrow_forward_rounded,
+                              size: 14,
+                              color: AppColors.brown,
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-
-                      // Chapter Headline in Epilogue
-                      if (dayPlan.theme != null &&
-                          dayPlan.theme!.trim().isNotEmpty)
-                        Text(
-                          dayPlan.theme!,
-                          style: AppTypography.tripTitle(
-                            color: AppColors.brown,
-                          ).copyWith(fontSize: 18, height: 1.25),
-                        )
-                      else
-                        Text(
-                          'Theme unavailable',
-                          style: AppTypography.tripTitle(
-                            color: AppColors.textSecondary,
-                          ).copyWith(fontSize: 18, height: 1.25),
+                          ],
                         ),
-                      const SizedBox(height: 10),
-
-                      // Stop Highlights Sequence (Compact Chips)
-                      if (acts.isNotEmpty) ...[
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: acts.take(3).map((a) {
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 6.0),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  Container(
-                                    width: 5,
-                                    height: 5,
-                                    decoration: BoxDecoration(
-                                      color: isAlternate
-                                          ? AppColors.teal
-                                          : AppColors.primary,
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      a.title,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style:
-                                          AppTypography.caption(
-                                            color: AppColors.textPrimary,
-                                          ).copyWith(
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: 13,
-                                          ),
-                                    ),
-                                  ),
-                                  if (a.time != null)
-                                    Text(
-                                      a.time!,
-                                      style: AppTypography.micro(
-                                        color: AppColors.textTertiary,
-                                      ).copyWith(fontSize: 10),
-                                    ),
-                                ],
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                        const SizedBox(height: 8),
                       ],
-
-                      // Bottom Interactive Action Button
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'TIMELINE & ROUTE',
-                            style:
-                                AppTypography.micro(
-                                  color: isAlternate
-                                      ? AppColors.teal
-                                      : AppColors.primary,
-                                ).copyWith(
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: 0.5,
-                                ),
-                          ),
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                'EXPLORE DAY',
-                                style: AppTypography.micro(
-                                  color: AppColors.brown,
-                                ).copyWith(fontWeight: FontWeight.w800),
-                              ),
-                              const SizedBox(width: 4),
-                              const Icon(
-                                Icons.arrow_forward_rounded,
-                                size: 14,
-                                color: AppColors.brown,
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -581,83 +589,139 @@ class ItineraryChapterCard extends StatelessWidget {
       ),
     );
   }
+
+  Widget _chapterBadge(String dayLabel, String text, bool alternate) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: alternate ? AppColors.teal.withAlpha(25) : AppColors.cream,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        text,
+        style: AppTypography.micro(
+          color: alternate ? AppColors.teal : AppColors.brown,
+        ).copyWith(fontWeight: FontWeight.w800, fontSize: 9),
+      ),
+    );
+  }
 }
 
-/// ─────────────────────────────────────────────────────────────────────────────
-/// ROUTE MAP SHORTCUT CARD
-/// ─────────────────────────────────────────────────────────────────────────────
+/// A map handoff is offered only when at least one activity has coordinates.
 class ExpeditionRouteMapCard extends StatelessWidget {
   final TripItineraryModel trip;
+  final TripDayPlanModel? dayPlan;
   final VoidCallback onTap;
 
   const ExpeditionRouteMapCard({
     super.key,
     required this.trip,
+    this.dayPlan,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
+    final activities = dayPlan == null
+        ? trip.dayPlans.expand((day) => day.activities)
+        : dayPlan!.activities;
+    final coordinateCount = activities
+        .where((activity) => _hasCoordinates(activity.lat, activity.lng))
+        .length;
+    final available = coordinateCount > 0;
+    final label = available
+        ? 'Open coordinate-backed activity locations'
+        : 'Activity map unavailable: no itinerary coordinates were provided';
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 6, 20, 16),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppColors.brown,
-            borderRadius: BorderRadius.circular(18),
-            boxShadow: AppColors.cardShadow,
-          ),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: AppColors.primary,
-                  borderRadius: BorderRadius.circular(12),
+      child: Semantics(
+        button: available,
+        enabled: available,
+        label: label,
+        child: InkWell(
+          onTap: available ? onTap : null,
+          borderRadius: BorderRadius.circular(18),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: available ? AppColors.brown : AppColors.surfaceWarm,
+              borderRadius: BorderRadius.circular(18),
+              border: available ? null : Border.all(color: AppColors.border),
+              boxShadow: available ? AppColors.cardShadow : null,
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: available ? AppColors.primary : AppColors.border,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    available
+                        ? Icons.map_outlined
+                        : Icons.location_off_outlined,
+                    color: available ? Colors.white : AppColors.textSecondary,
+                    size: 22,
+                  ),
                 ),
-                child: const Icon(
-                  Icons.map_outlined,
-                  color: Colors.white,
-                  size: 22,
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        available
+                            ? 'ACTIVITY LOCATIONS'
+                            : 'ACTIVITY MAP UNAVAILABLE',
+                        style:
+                            AppTypography.micro(
+                              color: available
+                                  ? AppColors.yellow
+                                  : AppColors.textSecondary,
+                            ).copyWith(
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.8,
+                            ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        available
+                            ? 'Coordinate-backed map handoff'
+                            : 'This itinerary has no activity coordinates',
+                        style: AppTypography.caption(
+                          color: available
+                              ? Colors.white
+                              : AppColors.textPrimary,
+                        ).copyWith(fontWeight: FontWeight.w700, fontSize: 14),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        available
+                            ? '$coordinateCount activities with coordinates'
+                            : 'A full route map cannot be shown safely',
+                        style: AppTypography.micro(
+                          color: available
+                              ? Colors.white70
+                              : AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'EXPEDITION WAYPOINTS',
-                      style: AppTypography.micro(color: AppColors.yellow)
-                          .copyWith(
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.8,
-                          ),
+                if (available)
+                  const Padding(
+                    padding: EdgeInsets.only(left: 8, top: 4),
+                    child: Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      color: Colors.white,
+                      size: 15,
                     ),
-                    const SizedBox(height: 3),
-                    Text(
-                      'Generated waypoints & transfers',
-                      style: AppTypography.caption(
-                        color: Colors.white,
-                      ).copyWith(fontWeight: FontWeight.w700, fontSize: 14),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${trip.totalDays} Days · Route details from itinerary',
-                      style: AppTypography.micro(color: Colors.white70),
-                    ),
-                  ],
-                ),
-              ),
-              const Icon(
-                Icons.arrow_forward_ios_rounded,
-                color: Colors.white,
-                size: 15,
-              ),
-            ],
+                  ),
+              ],
+            ),
           ),
         ),
       ),
@@ -665,25 +729,25 @@ class ExpeditionRouteMapCard extends StatelessWidget {
   }
 }
 
-/// ─────────────────────────────────────────────────────────────────────────────
-/// DAY SELECTOR PILL RAIL (FOR SCREEN 6)
-/// ─────────────────────────────────────────────────────────────────────────────
+/// Horizontally scrollable, focusable day controls.
 class DaySelectorRail extends StatelessWidget {
   final int totalDays;
   final int selectedIndex;
   final ValueChanged<int> onSelectDay;
+  final List<TripDayPlanModel>? dayPlans;
 
   const DaySelectorRail({
     super.key,
     required this.totalDays,
     required this.selectedIndex,
     required this.onSelectDay,
+    this.dayPlans,
   });
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 42,
+      height: 54,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
@@ -691,35 +755,42 @@ class DaySelectorRail extends StatelessWidget {
         itemCount: totalDays,
         itemBuilder: (context, idx) {
           final isSelected = idx == selectedIndex;
-          return GestureDetector(
-            onTap: () {
-              NavHaptics.fire(NavHaptic.light);
-              onSelectDay(idx);
-            },
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              margin: const EdgeInsets.only(right: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: isSelected ? AppColors.brown : AppColors.surface,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: isSelected ? AppColors.brown : AppColors.border,
-                  width: isSelected ? 1.5 : 1.0,
+          final dayNumber = dayPlans != null && idx < dayPlans!.length
+              ? dayPlans![idx].dayNumber
+              : idx + 1;
+          final label = 'Day $dayNumber';
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: Semantics(
+              button: true,
+              selected: isSelected,
+              label: '$label${isSelected ? ', selected' : ''}',
+              child: TextButton(
+                onPressed: () {
+                  NavHaptics.fire(NavHaptic.light);
+                  onSelectDay(idx);
+                },
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  minimumSize: const Size(0, 48),
+                  backgroundColor: isSelected
+                      ? AppColors.brown
+                      : AppColors.surface,
+                  foregroundColor: isSelected
+                      ? Colors.white
+                      : AppColors.textPrimary,
+                  side: BorderSide(
+                    color: isSelected ? AppColors.brown : AppColors.border,
+                    width: isSelected ? 1.5 : 1.0,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
-                boxShadow: isSelected
-                    ? [
-                        BoxShadow(
-                          color: AppColors.brown.withAlpha(40),
-                          blurRadius: 6,
-                          offset: const Offset(0, 2),
-                        ),
-                      ]
-                    : null,
-              ),
-              child: Center(
-                child: Text(
-                  'DAY 0${idx + 1}',
+                child: AnimatedDefaultTextStyle(
+                  duration: NavReduce.duration(context, NavMotion.fast),
+                  curve: NavMotion.response,
                   style:
                       AppTypography.micro(
                         color: isSelected
@@ -731,6 +802,7 @@ class DaySelectorRail extends StatelessWidget {
                             : FontWeight.w600,
                         letterSpacing: 0.8,
                       ),
+                  child: Text(label),
                 ),
               ),
             ),
@@ -739,4 +811,43 @@ class DaySelectorRail extends StatelessWidget {
       ),
     );
   }
+}
+
+String? _value(Object? value) {
+  if (value == null) return null;
+  final text = value.toString().trim();
+  return text.isEmpty ? null : text;
+}
+
+bool _hasValue(Object? value) => _value(value) != null;
+
+String? _budgetValue(Object? rawBudget) {
+  final value = _value(rawBudget);
+  if (value == null) return null;
+  final numeric = rawBudget is num
+      ? rawBudget.toDouble()
+      : double.tryParse(value.replaceAll(',', ''));
+  if (numeric != null && numeric.isFinite && numeric > 0) {
+    final formatted = numeric.toInt().toString().replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (match) => '${match[1]},',
+    );
+    return '₹$formatted';
+  }
+  return value;
+}
+
+String? _activityTitle(TripActivityModel activity) {
+  final title = _value(activity.title);
+  if (title == null || title.toLowerCase() == 'activity') return null;
+  return title;
+}
+
+bool _hasCoordinates(double? lat, double? lng) {
+  return lat != null &&
+      lng != null &&
+      lat.isFinite &&
+      lng.isFinite &&
+      lat.abs() <= 90 &&
+      lng.abs() <= 180;
 }
