@@ -3,6 +3,12 @@ import '../../../../core/constants/master_destinations.dart';
 
 class TripActivityModel {
   final String title;
+
+  /// Explicit backend identity for this activity, when one was supplied.
+  ///
+  /// This is intentionally nullable: titles, ordering, waypoint keys, hashes,
+  /// and trip UUIDs are not stable activity identities.
+  final String? activityId;
   final String? time;
   final String? description;
   final String? location;
@@ -27,6 +33,7 @@ class TripActivityModel {
 
   const TripActivityModel({
     required this.title,
+    this.activityId,
     this.time,
     this.description,
     this.location,
@@ -60,6 +67,7 @@ class TripActivityModel {
 
     return TripActivityModel(
       title: (map['title'] ?? map['name'] ?? 'Activity').toString(),
+      activityId: _firstExplicitIdentifier(map),
       time: map['time']?.toString(),
       description: map['description']?.toString(),
       location: (map['location'] ?? map['address'])?.toString(),
@@ -87,9 +95,25 @@ class TripActivityModel {
     );
   }
 
+  static String? _parseExplicitIdentifier(dynamic value) {
+    if (value == null) return null;
+    if (value is! String) return null;
+    final identifier = value.trim();
+    return identifier.isEmpty ? null : identifier;
+  }
+
+  static String? _firstExplicitIdentifier(Map<String, dynamic> map) {
+    for (final key in const ['activityId', 'id']) {
+      final identifier = _parseExplicitIdentifier(map[key]);
+      if (identifier != null) return identifier;
+    }
+    return null;
+  }
+
   Map<String, dynamic> toMap() {
     return {
       'title': title,
+      if (activityId != null) 'activityId': activityId,
       if (time != null) 'time': time,
       if (description != null) 'description': description,
       if (location != null) 'location': location,
@@ -115,6 +139,7 @@ class TripActivityModel {
 
   TripActivityModel copyWith({
     String? title,
+    String? activityId,
     String? time,
     String? description,
     String? location,
@@ -137,6 +162,7 @@ class TripActivityModel {
   }) {
     return TripActivityModel(
       title: title ?? this.title,
+      activityId: activityId ?? this.activityId,
       time: time ?? this.time,
       description: description ?? this.description,
       location: location ?? this.location,

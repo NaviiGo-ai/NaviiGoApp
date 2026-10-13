@@ -130,12 +130,19 @@ enum LiveTripPhase {
 /// One waypoint on the live rail, paired with the traveller's check-in.
 class LiveWaypoint {
   final String key;
+
+  /// Zero-based index in the itinerary's ordered `dayPlans` list.
+  ///
+  /// This structural index is deliberately separate from [dayNumber], which is
+  /// supplied by the itinerary and may be non-sequential.
+  final int dayIndex;
   final int dayNumber;
   final TripActivityModel activity;
   final TripCheckIn checkIn;
 
   const LiveWaypoint({
     required this.key,
+    required this.dayIndex,
     required this.dayNumber,
     required this.activity,
     required this.checkIn,
@@ -236,6 +243,7 @@ class LiveTripState {
         result.add(
           LiveWaypoint(
             key: key,
+            dayIndex: d,
             dayNumber: day.dayNumber,
             activity: activity,
             // An explicit check-in wins; a server-side `isCompleted` is
@@ -268,6 +276,65 @@ class LiveTripState {
     return all[index + 1];
   }
 
+  /// The waypoints belonging to the ordered day-plan index [dayIndex].
+  ///
+  /// [dayIndex] is not inferred from the clock or from [LiveWaypoint.dayNumber].
+  /// The latter remains the itinerary-provided display number and may not match
+  /// this zero-based structural index.
+  List<LiveWaypoint> waypointsForDay(int dayIndex) {
+    return List<LiveWaypoint>.unmodifiable(
+      waypoints.where((waypoint) => waypoint.dayIndex == dayIndex),
+    );
+  }
+
+  /// The first unlogged waypoint for [dayIndex], or null when that day is done
+  /// or has no activity details.
+  LiveWaypoint? nowWaypointForDay(int dayIndex) {
+    for (final waypoint in waypointsForDay(dayIndex)) {
+      if (!waypoint.isLogged) return waypoint;
+    }
+    return null;
+  }
+
+  /// The waypoint after the current one within [dayIndex].
+  ///
+  /// This is scoped to the day: it never advances into a later day-plan.
+  LiveWaypoint? nextWaypointForDay(int dayIndex) {
+    final dayWaypoints = waypointsForDay(dayIndex);
+    final currentIndex = dayWaypoints.indexWhere(
+      (waypoint) => !waypoint.isLogged,
+    );
+    if (currentIndex < 0 || currentIndex + 1 >= dayWaypoints.length) {
+      return null;
+    }
+    return dayWaypoints[currentIndex + 1];
+  }
+
+  int totalWaypointsForDay(int dayIndex) => waypointsForDay(dayIndex).length;
+
+  int loggedCountForDay(int dayIndex) =>
+      waypointsForDay(dayIndex).where((waypoint) => waypoint.isLogged).length;
+
+  int completedCountForDay(int dayIndex) => waypointsForDay(
+    dayIndex,
+  ).where((waypoint) => waypoint.checkIn == TripCheckIn.completed).length;
+
+  int skippedCountForDay(int dayIndex) => waypointsForDay(
+    dayIndex,
+  ).where((waypoint) => waypoint.checkIn == TripCheckIn.skipped).length;
+
+  /// Logged progress for [dayIndex], expressed as a fraction from 0 to 1.
+  /// An empty day has no progress to report and returns 0.
+  double dayProgressForDay(int dayIndex) {
+    final total = totalWaypointsForDay(dayIndex);
+    if (total == 0) return 0;
+    return loggedCountForDay(dayIndex) / total;
+  }
+
+  /// True only when [dayIndex] has activities and all of them are logged.
+  bool isDayComplete(int dayIndex) =>
+      totalWaypointsForDay(dayIndex) > 0 && nowWaypointForDay(dayIndex) == null;
+
   int get totalWaypoints => waypoints.length;
   int get loggedCount => waypoints.where((w) => w.isLogged).length;
   int get completedCount =>
@@ -290,13 +357,38 @@ class LiveTripState {
     return ArrivalConfidence.unknown;
   }
 
+  ArrivalConfidence arrivalConfidenceForDay(
+    int dayIndex, {
+    bool inferFromLocation = false,
+  }) {
+    final now = nowWaypointForDay(dayIndex);
+    if (now != null && now.checkIn.isConfirmedOnSite) {
+      return ArrivalConfidence.confirmed;
+    }
+    if (inferFromLocation && fix != null && status == TripStatus.active) {
+      return ArrivalConfidence.inferred;
+    }
+    return ArrivalConfidence.unknown;
+  }
+
   /// Straight-line distance from the journey's start region, when both a fix
   /// and a region exist. Null means "not measurable", never "zero".
   double? get distanceFromStartRegionKm {
     final journey = trip;
     final position = fix;
     if (journey == null || position == null) return null;
-    if (journey.startLat == null || journey.startLng == null) return null;
+    if (!TripValidationService.hasValidCoordinates(
+      position.lat,
+      position.lng,
+    )) {
+      return null;
+    }
+    if (!TripValidationService.hasValidCoordinates(
+      journey.startLat,
+      journey.startLng,
+    )) {
+      return null;
+    }
     return _service.calculateDistanceKm(
       lat1: position.lat,
       lng1: position.lng,

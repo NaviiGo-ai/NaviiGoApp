@@ -18,8 +18,21 @@ abstract class CheckInStore {
   Future<void> write(String tripId, Map<String, TripCheckIn> checkIns);
 }
 
-class InMemoryCheckInStore implements CheckInStore {
+abstract class OwnerScopedCheckInStore {
+  Map<String, TripCheckIn> readForOwner(String ownerUid, String tripId);
+  Future<void> writeForOwner(
+    String ownerUid,
+    String tripId,
+    Map<String, TripCheckIn> checkIns,
+  );
+}
+
+class InMemoryCheckInStore implements CheckInStore, OwnerScopedCheckInStore {
   final Map<String, Map<String, TripCheckIn>> _data = {};
+  final Map<String, Map<String, TripCheckIn>> _ownedData = {};
+
+  static String _ownedKey(String ownerUid, String tripId) =>
+      '$ownerUid\u0000$tripId';
 
   @override
   Map<String, TripCheckIn> read(String tripId) =>
@@ -29,14 +42,40 @@ class InMemoryCheckInStore implements CheckInStore {
   Future<void> write(String tripId, Map<String, TripCheckIn> checkIns) async {
     _data[tripId] = Map<String, TripCheckIn>.from(checkIns);
   }
-}
-
-class HiveCheckInStore implements CheckInStore {
-  static String _boxKey(String tripId) => 'trip_checkins_$tripId';
 
   @override
-  Map<String, TripCheckIn> read(String tripId) {
-    final raw = HiveService.itineraryBox.get(_boxKey(tripId));
+  Map<String, TripCheckIn> readForOwner(String ownerUid, String tripId) {
+    return Map<String, TripCheckIn>.from(
+      _ownedData[_ownedKey(ownerUid, tripId)] ?? const {},
+    );
+  }
+
+  @override
+  Future<void> writeForOwner(
+    String ownerUid,
+    String tripId,
+    Map<String, TripCheckIn> checkIns,
+  ) async {
+    _ownedData[_ownedKey(ownerUid, tripId)] = Map<String, TripCheckIn>.from(
+      checkIns,
+    );
+  }
+}
+
+class HiveCheckInStore implements CheckInStore, OwnerScopedCheckInStore {
+  static String _boxKey(String ownerUid, String tripId) =>
+      'trip_checkins:${ownerUid.length}:$ownerUid:$tripId';
+
+  @override
+  Map<String, TripCheckIn> read(String tripId) => const {};
+
+  @override
+  Future<void> write(String tripId, Map<String, TripCheckIn> checkIns) async {}
+
+  @override
+  Map<String, TripCheckIn> readForOwner(String ownerUid, String tripId) {
+    if (ownerUid.isEmpty || tripId.isEmpty) return {};
+    final raw = HiveService.itineraryBox.get(_boxKey(ownerUid, tripId));
     if (raw is Map) {
       return {
         for (final entry in raw.entries)
@@ -49,8 +88,13 @@ class HiveCheckInStore implements CheckInStore {
   }
 
   @override
-  Future<void> write(String tripId, Map<String, TripCheckIn> checkIns) async {
-    await HiveService.itineraryBox.put(_boxKey(tripId), {
+  Future<void> writeForOwner(
+    String ownerUid,
+    String tripId,
+    Map<String, TripCheckIn> checkIns,
+  ) async {
+    if (ownerUid.isEmpty || tripId.isEmpty) return;
+    await HiveService.itineraryBox.put(_boxKey(ownerUid, tripId), {
       for (final entry in checkIns.entries) entry.key: entry.value.wireName,
     });
   }
@@ -103,6 +147,8 @@ final liveTripValidationServiceProvider = Provider<TripValidationService>(
 );
 
 final liveTripFixProvider = StateProvider<LiveFix?>((ref) => null);
+final liveTripFixOwnerProvider = StateProvider<String?>((ref) => null);
+final liveTripFixTripProvider = StateProvider<String?>((ref) => null);
 
 final liveTripPermissionProvider = StateProvider<bool>((ref) => false);
 
@@ -119,6 +165,11 @@ final liveTripOfflineProvider = StateProvider<bool>((ref) => false);
 
 /// Real timestamp of the last successful read or write.
 final liveTripLastSyncProvider = StateProvider<DateTime?>((ref) => null);
+
+/// Scope for transient live command state. A late result for another trip or
+/// account must not remain visible when Riverpod retains the container.
+final liveTripContextOwnerProvider = StateProvider<String?>((ref) => null);
+final liveTripContextTripProvider = StateProvider<String?>((ref) => null);
 
 /// Transient command flags and the last real error from a command.
 class LiveTripCommandState {
@@ -154,25 +205,103 @@ final liveTripCommandProvider = StateProvider<LiveTripCommandState>(
 
 /// The controller owns the traveller's check-ins for one journey.
 class LiveTripController extends StateNotifier<Map<String, TripCheckIn>> {
-  LiveTripController(this._ref, this.tripId, this._store)
-    : super(_store.read(tripId));
+  LiveTripController(this._ref, this.tripId, this._store, this.ownerUid)
+    : super(_readOwnedCheckIns(_store, ownerUid, tripId));
 
   final Ref _ref;
   final String tripId;
   final CheckInStore _store;
+  final String? ownerUid;
+  int _operationGeneration = 0;
+  Future<void> _checkInWriteQueue = Future<void>.value();
+  Map<String, TripCheckIn> _confirmedCheckIns = const {};
+  int _pendingCheckInWrites = 0;
 
-  /// I'M HERE / COMPLETE / SKIP. Logging a check-in always succeeds — it is the
-  /// traveller's own record and must not depend on the network.
+  static Map<String, TripCheckIn> _readOwnedCheckIns(
+    CheckInStore store,
+    String? ownerUid,
+    String tripId,
+  ) {
+    if (ownerUid == null || ownerUid.isEmpty) return {};
+    if (store is OwnerScopedCheckInStore) {
+      final scopedStore = store as OwnerScopedCheckInStore;
+      return scopedStore.readForOwner(ownerUid, tripId);
+    }
+    return {};
+  }
+
+  void _activateContext() {
+    if (ownerUid == null || ownerUid!.isEmpty) return;
+    _ref.read(liveTripContextOwnerProvider.notifier).state = ownerUid;
+    _ref.read(liveTripContextTripProvider.notifier).state = tripId;
+  }
+
+  int _beginOperation() {
+    _activateContext();
+    return ++_operationGeneration;
+  }
+
+  bool _isCurrentOperation(int generation) {
+    return mounted &&
+        generation == _operationGeneration &&
+        ownerUid != null &&
+        _ref.read(currentUserIdProvider) == ownerUid &&
+        _ref.read(liveTripContextOwnerProvider) == ownerUid &&
+        _ref.read(liveTripContextTripProvider) == tripId;
+  }
+
+  void invalidateSession() => _operationGeneration++;
+
+  Future<void> _enqueueCheckInWrite(
+    OwnerScopedCheckInStore store,
+    String uid,
+    Map<String, TripCheckIn> checkIns,
+  ) {
+    final write = _checkInWriteQueue.then<void>((_) async {
+      await store.writeForOwner(uid, tripId, checkIns);
+    });
+    // A failed write must not poison later writes in the queue.
+    _checkInWriteQueue = write.catchError((_) {});
+    return write;
+  }
+
+  /// I'M HERE / COMPLETE / SKIP. The record is local and does not depend on the
+  /// network, but a local persistence failure is surfaced and rolled back.
   Future<void> logCheckIn(String waypointKey, TripCheckIn checkIn) async {
+    final uid = ownerUid;
+    if (uid == null || _ref.read(currentUserIdProvider) != uid) return;
+    final generation = _beginOperation();
     final next = Map<String, TripCheckIn>.from(state);
     if (checkIn == TripCheckIn.pending) {
       next.remove(waypointKey);
     } else {
       next[waypointKey] = checkIn;
     }
+    if (_store is! OwnerScopedCheckInStore) return;
+    if (_pendingCheckInWrites == 0) {
+      _confirmedCheckIns = Map<String, TripCheckIn>.from(state);
+    }
+    _pendingCheckInWrites++;
     state = next;
-    await _store.write(tripId, next);
-    _ref.read(liveTripLastSyncProvider.notifier).state = DateTime.now();
+    final scopedStore = _store as OwnerScopedCheckInStore;
+    try {
+      await _enqueueCheckInWrite(scopedStore, uid, next);
+      _confirmedCheckIns = Map<String, TripCheckIn>.from(next);
+      _pendingCheckInWrites--;
+      if (_isCurrentOperation(generation)) {
+        _ref.read(liveTripLastSyncProvider.notifier).state = DateTime.now();
+      }
+    } catch (_) {
+      _pendingCheckInWrites--;
+      if (!_isCurrentOperation(generation)) return;
+      if (_pendingCheckInWrites == 0) {
+        state = Map<String, TripCheckIn>.from(_confirmedCheckIns);
+      }
+      _ref.read(liveTripCommandProvider.notifier).state = _ref
+          .read(liveTripCommandProvider.notifier)
+          .state
+          .copyWith(error: 'Could not save that check-in locally. Try again.');
+    }
   }
 
   /// Undo a mistake — the traveller changes their mind.
@@ -186,6 +315,9 @@ class LiveTripController extends StateNotifier<Map<String, TripCheckIn>> {
   /// permission prompt — permission is never requested at launch or on a
   /// rebuild.
   Future<void> refreshLocation() async {
+    final uid = ownerUid;
+    if (uid == null || _ref.read(currentUserIdProvider) != uid) return;
+    final generation = _beginOperation();
     final commands = _ref.read(liveTripCommandProvider.notifier);
     commands.state = commands.state.copyWith(
       isResolvingLocation: true,
@@ -195,20 +327,34 @@ class LiveTripController extends StateNotifier<Map<String, TripCheckIn>> {
       final result = await _ref
           .read(locationAdapterProvider)
           .current(userInitiated: true);
+      if (!_isCurrentOperation(generation)) return;
       _ref.read(liveTripPermissionProvider.notifier).state =
           result.permissionGranted;
       _ref.read(liveTripLocationFailureProvider.notifier).state =
           result.failure;
-      if (result.hasFix) {
+      final hasUsableFix = result.hasFix && result.failure == null;
+      if (hasUsableFix) {
         _ref.read(liveTripFixProvider.notifier).state = result.fix;
+        _ref.read(liveTripFixOwnerProvider.notifier).state = uid;
+        _ref.read(liveTripFixTripProvider.notifier).state = tripId;
         _ref.read(liveTripLastSyncProvider.notifier).state = DateTime.now();
+      } else {
+        _ref.read(liveTripFixProvider.notifier).state = null;
+        _ref.read(liveTripFixOwnerProvider.notifier).state = null;
+        _ref.read(liveTripFixTripProvider.notifier).state = null;
       }
       commands.state = commands.state.copyWith(
         isResolvingLocation: false,
-        error: result.hasFix ? null : result.message,
-        clearError: result.hasFix,
+        error: hasUsableFix ? null : result.message,
+        clearError: hasUsableFix,
       );
     } catch (_) {
+      if (!_isCurrentOperation(generation)) return;
+      _ref.read(liveTripLocationFailureProvider.notifier).state =
+          LocationFailure.unavailable;
+      _ref.read(liveTripFixProvider.notifier).state = null;
+      _ref.read(liveTripFixOwnerProvider.notifier).state = null;
+      _ref.read(liveTripFixTripProvider.notifier).state = null;
       commands.state = commands.state.copyWith(
         isResolvingLocation: false,
         error: 'Could not read your location. Try again.',
@@ -229,13 +375,58 @@ class LiveTripController extends StateNotifier<Map<String, TripCheckIn>> {
   /// and every other screen share one lifecycle, then marks it started locally.
   Future<bool> startTrip(TripItineraryModel trip) async {
     final uid = _ref.read(currentUserIdProvider);
-    if (uid == null) return false;
+    if (uid == null ||
+        uid != ownerUid ||
+        trip.id != tripId ||
+        trip.userId != uid ||
+        trip.isEphemeral ||
+        trip.tripStatus.isTerminal ||
+        !trip.tripStatus.canStart) {
+      return false;
+    }
 
     final commands = _ref.read(liveTripCommandProvider.notifier);
 
     // One journey at a time. Beginning a second without ending the first is
     // never a silent side effect — the traveller resolves it explicitly.
     final conflict = otherActiveTrips(trip.id);
+    final fixOwner = _ref.read(liveTripFixOwnerProvider);
+    final fixTrip = _ref.read(liveTripFixTripProvider);
+    final fix =
+        (fixOwner == null && fixTrip == null) ||
+            (fixOwner == uid && fixTrip == trip.id)
+        ? _ref.read(liveTripFixProvider)
+        : null;
+    final contextOwner = _ref.read(liveTripContextOwnerProvider);
+    final contextTrip = _ref.read(liveTripContextTripProvider);
+    final contextMatches =
+        (contextOwner == null && contextTrip == null) ||
+        (contextOwner == uid && contextTrip == trip.id);
+    final check = _ref
+        .read(liveTripValidationServiceProvider)
+        .validateStartTrip(
+          trip: trip,
+          currentUserId: uid,
+          userLat: fix?.lat,
+          userLng: fix?.lng,
+          gpsAccuracyMeters: fix?.accuracyMeters,
+          fixTimestamp: fix?.timestamp,
+          hasLocationPermission: contextMatches
+              ? _ref.read(liveTripPermissionProvider)
+              : false,
+          locationFailure: contextMatches
+              ? _ref.read(liveTripLocationFailureProvider)
+              : null,
+          hasOtherActiveTrip: conflict != null,
+        );
+    if (!check.isValid) {
+      commands.state = commands.state.copyWith(
+        error:
+            check.message ??
+            'The journey cannot start until the start checks pass.',
+      );
+      return false;
+    }
     if (conflict != null) {
       commands.state = commands.state.copyWith(
         isStartingTrip: false,
@@ -244,17 +435,20 @@ class LiveTripController extends StateNotifier<Map<String, TripCheckIn>> {
       return false;
     }
 
+    final generation = _beginOperation();
     commands.state = commands.state.copyWith(
       isStartingTrip: true,
       clearError: true,
     );
     try {
       await _ref.read(startTripWriterProvider)(uid, trip.id);
+      if (!_isCurrentOperation(generation)) return false;
       _ref.read(liveTripLastSyncProvider.notifier).state = DateTime.now();
       _ref.read(liveTripOfflineProvider.notifier).state = false;
       commands.state = commands.state.copyWith(isStartingTrip: false);
       return true;
     } catch (_) {
+      if (!_isCurrentOperation(generation)) return false;
       // Starting genuinely failed — say so and stay in the pre-trip state
       // rather than showing a trip that did not begin.
       _ref.read(liveTripOfflineProvider.notifier).state = true;
@@ -270,16 +464,26 @@ class LiveTripController extends StateNotifier<Map<String, TripCheckIn>> {
   /// conflict resolution card, after the traveller picked it.
   Future<bool> endTrip(TripItineraryModel trip) async {
     final uid = _ref.read(currentUserIdProvider);
-    if (uid == null) return false;
+    if (uid == null ||
+        uid != ownerUid ||
+        trip.userId != uid ||
+        trip.isEphemeral ||
+        trip.tripStatus.isTerminal ||
+        trip.tripStatus != TripStatus.active) {
+      return false;
+    }
 
+    final generation = _beginOperation();
     final commands = _ref.read(liveTripCommandProvider.notifier);
     commands.state = commands.state.copyWith(clearError: true);
     try {
       await _ref.read(endTripWriterProvider)(uid, trip.id);
+      if (!_isCurrentOperation(generation)) return false;
       _ref.read(liveTripLastSyncProvider.notifier).state = DateTime.now();
       _ref.read(liveTripOfflineProvider.notifier).state = false;
       return true;
     } catch (_) {
+      if (!_isCurrentOperation(generation)) return false;
       _ref.read(liveTripOfflineProvider.notifier).state = true;
       commands.state = commands.state.copyWith(
         error: 'Could not end that journey. Check your connection and retry.',
@@ -312,7 +516,15 @@ final liveTripControllerProvider =
       Map<String, TripCheckIn>,
       String
     >((ref, tripId) {
-      return LiveTripController(ref, tripId, ref.watch(checkInStoreProvider));
+      final ownerUid = ref.watch(currentUserIdProvider);
+      final controller = LiveTripController(
+        ref,
+        tripId,
+        ref.watch(checkInStoreProvider),
+        ownerUid,
+      );
+      ref.onDispose(controller.invalidateSession);
+      return controller;
     });
 
 /// Everything the live screen renders, derived from real inputs only.
@@ -322,9 +534,22 @@ final liveTripStateProvider = Provider.family<LiveTripState, TripItineraryModel>
 ) {
   final commands = ref.watch(liveTripCommandProvider);
   final fix = ref.watch(liveTripFixProvider);
+  final fixOwner = ref.watch(liveTripFixOwnerProvider);
+  final fixTrip = ref.watch(liveTripFixTripProvider);
   final permission = ref.watch(liveTripPermissionProvider);
   final locationFailure = ref.watch(liveTripLocationFailureProvider);
   final userId = ref.watch(currentUserIdProvider);
+  final contextOwner = ref.watch(liveTripContextOwnerProvider);
+  final contextTrip = ref.watch(liveTripContextTripProvider);
+  final contextMatches =
+      (contextOwner == null && contextTrip == null) ||
+      (contextOwner == userId && contextTrip == trip.id);
+  final fixMatches =
+      (fixOwner == null && fixTrip == null) ||
+      (fixOwner == userId && fixTrip == trip.id);
+  final scopedFix = fixMatches ? fix : null;
+  final scopedPermission = contextMatches ? permission : false;
+  final scopedFailure = contextMatches ? locationFailure : null;
 
   // Another journey already under way. Starting is blocked until the traveller
   // resolves it — the app never ends someone's journey on its own.
@@ -341,27 +566,27 @@ final liveTripStateProvider = Provider.family<LiveTripState, TripItineraryModel>
       .validateStartTrip(
         trip: trip,
         currentUserId: userId,
-        userLat: fix?.lat,
-        userLng: fix?.lng,
-        gpsAccuracyMeters: fix?.accuracyMeters,
-        fixTimestamp: fix?.timestamp,
-        hasLocationPermission: permission,
-        locationFailure: locationFailure,
+        userLat: scopedFix?.lat,
+        userLng: scopedFix?.lng,
+        gpsAccuracyMeters: scopedFix?.accuracyMeters,
+        fixTimestamp: scopedFix?.timestamp,
+        hasLocationPermission: scopedPermission,
+        locationFailure: scopedFailure,
         hasOtherActiveTrip: conflict != null,
       );
 
   return LiveTripState(
     trip: trip,
     checkIns: ref.watch(liveTripControllerProvider(trip.id)),
-    fix: fix,
-    hasLocationPermission: permission,
+    fix: scopedFix,
+    hasLocationPermission: scopedPermission,
     startCheck: startCheck,
     conflictingTrip: conflict,
-    locationFailure: locationFailure,
-    isOffline: ref.watch(liveTripOfflineProvider),
-    lastUpdated: ref.watch(liveTripLastSyncProvider),
-    isResolvingLocation: commands.isResolvingLocation,
-    isStartingTrip: commands.isStartingTrip,
-    lastActionError: commands.error,
+    locationFailure: scopedFailure,
+    isOffline: contextMatches ? ref.watch(liveTripOfflineProvider) : false,
+    lastUpdated: contextMatches ? ref.watch(liveTripLastSyncProvider) : null,
+    isResolvingLocation: contextMatches ? commands.isResolvingLocation : false,
+    isStartingTrip: contextMatches ? commands.isStartingTrip : false,
+    lastActionError: contextMatches ? commands.error : null,
   );
 });

@@ -50,10 +50,16 @@ Widget _harness({
   List<BookingModel> bookings = const [],
   List<TripItineraryModel>? trips,
   TripItineraryModel? initialTrip,
+  StateProvider<TripItineraryModel?>? dynamicTripProvider,
 }) {
   return ProviderScope(
     overrides: [
-      activeTripProvider.overrideWithValue(trip),
+      if (dynamicTripProvider == null)
+        activeTripProvider.overrideWithValue(trip)
+      else
+        activeTripProvider.overrideWith(
+          (ref) => ref.watch(dynamicTripProvider),
+        ),
       userTripsStreamProvider.overrideWith(
         (ref) => Stream.value(
           trips ?? (trip == null ? <TripItineraryModel>[] : [trip]),
@@ -119,6 +125,30 @@ void main() {
       expect(find.textContaining('Jaipur'), findsWidgets);
       expect(find.textContaining('Udaipur'), findsNothing);
     });
+
+    testWidgets('rejects a foreign explicit journey extra', (tester) async {
+      final foreign = TripItineraryModel.fromMap('foreign-live-trip', {
+        'destId': 'jaipur',
+        'destName': 'Jaipur Private Journey',
+        'userId': 'someone-else',
+        'status': 'active',
+        'isActive': true,
+        'dayPlans': [
+          {
+            'day': 1,
+            'activities': [
+              {'title': 'Private stop'},
+            ],
+          },
+        ],
+      });
+
+      await tester.pumpWidget(_harness(trip: null, initialTrip: foreign));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Tracking Idle'), findsOneWidget);
+      expect(find.text('Jaipur Private Journey'), findsNothing);
+    });
   });
 
   group('LiveTrackingPage — start gate', () {
@@ -179,6 +209,257 @@ void main() {
   });
 
   group('LiveTrackingPage — in motion', () {
+    testWidgets('manual day selection uses actual nonsequential day numbers', (
+      tester,
+    ) async {
+      final trip = TripItineraryModel.fromMap('nonsequential-live', {
+        'destId': 'jaipur',
+        'destName': 'Jaipur Royal Tour',
+        'userId': 'pilot_1',
+        'status': 'active',
+        'isActive': true,
+        'form': {'startDate': _todayIso(), 'days': 2},
+        'dayPlans': [
+          {
+            'day': 4,
+            'activities': [
+              {'title': 'Amber Fort'},
+            ],
+          },
+          {
+            'day': 9,
+            'activities': [
+              {'title': 'City Palace'},
+            ],
+          },
+        ],
+      });
+
+      await tester.pumpWidget(_harness(trip: trip, fix: _jaipur()));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Day 4'), findsOneWidget);
+      expect(find.text('Day 9'), findsOneWidget);
+      expect(find.text('SELECT A DAY'), findsAtLeastNWidgets(1));
+      expect(find.text('NOW'), findsNothing);
+
+      await tester.tap(find.text('Day 9'));
+      await tester.pumpAndSettle();
+      expect(find.text('DAY 9'), findsOneWidget);
+      expect(find.text('City Palace'), findsWidgets);
+    });
+
+    testWidgets(
+      'a single day without a date still shows its supplied activities',
+      (tester) async {
+        final trip = TripItineraryModel.fromMap('no-date-live', {
+          'destId': 'jaipur',
+          'destName': 'Jaipur Royal Tour',
+          'userId': 'pilot_1',
+          'status': 'active',
+          'isActive': true,
+          'dayPlans': [
+            {
+              'day': 1,
+              'theme': 'Forts',
+              'activities': [
+                {'title': 'Amber Fort'},
+              ],
+            },
+          ],
+        });
+
+        await tester.pumpWidget(_harness(trip: trip, fix: _jaipur()));
+        await tester.pumpAndSettle();
+
+        expect(find.text('DAY 1'), findsAtLeastNWidgets(1));
+        expect(find.text('Amber Fort'), findsWidgets);
+        expect(find.text('SELECT A DAY'), findsNothing);
+      },
+    );
+
+    testWidgets('an empty itinerary refresh keeps the live page usable', (
+      tester,
+    ) async {
+      final trip = _trip(isActive: true, status: 'active');
+      final currentTrip = StateProvider<TripItineraryModel?>((ref) => trip);
+
+      await tester.pumpWidget(
+        _harness(trip: trip, fix: _jaipur(), dynamicTripProvider: currentTrip),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('DAY 1'));
+      await tester.pumpAndSettle();
+
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(LiveTrackingPage)),
+      );
+      container.read(currentTrip.notifier).state = trip.copyWith(
+        dayPlans: const [],
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('LIVE JOURNEY'), findsOneWidget);
+      expect(
+        find.text('Select a day to see its current activity and next step.'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('changing the active itinerary resets the selected day', (
+      tester,
+    ) async {
+      final firstTrip = TripItineraryModel.fromMap('first-live', {
+        'destId': 'jaipur',
+        'destName': 'Jaipur Royal Tour',
+        'userId': 'pilot_1',
+        'status': 'active',
+        'isActive': true,
+        'form': {'startDate': _todayIso(), 'days': 2},
+        'dayPlans': [
+          {
+            'day': 1,
+            'activities': [
+              {'title': 'First day stop'},
+            ],
+          },
+          {
+            'day': 2,
+            'activities': [
+              {'title': 'Second day stop'},
+            ],
+          },
+        ],
+      });
+      final secondTrip = _trip(
+        isActive: true,
+        status: 'active',
+      ).copyWith(id: 'second-live');
+      final currentTrip = StateProvider<TripItineraryModel?>(
+        (ref) => firstTrip,
+      );
+
+      await tester.pumpWidget(
+        _harness(
+          trip: firstTrip,
+          fix: _jaipur(),
+          dynamicTripProvider: currentTrip,
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Day 2'));
+      await tester.pumpAndSettle();
+      expect(find.text('Second day stop'), findsWidgets);
+
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(LiveTrackingPage)),
+      );
+      container.read(currentTrip.notifier).state = secondTrip;
+      await tester.pumpAndSettle();
+
+      expect(find.text('Day 2'), findsNothing);
+      expect(find.text('Amber Fort'), findsWidgets);
+    });
+
+    testWidgets('same itinerary refresh keeps the selected day by day number', (
+      tester,
+    ) async {
+      final trip = TripItineraryModel.fromMap('reordered-live', {
+        'destId': 'jaipur',
+        'destName': 'Jaipur Royal Tour',
+        'userId': 'pilot_1',
+        'status': 'active',
+        'isActive': true,
+        'form': {'startDate': _todayIso(), 'days': 2},
+        'dayPlans': [
+          {
+            'day': 4,
+            'activities': [
+              {'title': 'First day stop'},
+            ],
+          },
+          {
+            'day': 9,
+            'activities': [
+              {'title': 'Second day stop'},
+            ],
+          },
+        ],
+      });
+      final currentTrip = StateProvider<TripItineraryModel?>((ref) => trip);
+
+      await tester.pumpWidget(
+        _harness(trip: trip, fix: _jaipur(), dynamicTripProvider: currentTrip),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Day 9'));
+      await tester.pumpAndSettle();
+
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(LiveTrackingPage)),
+      );
+      container.read(currentTrip.notifier).state = trip.copyWith(
+        dayPlans: [trip.dayPlans[1], trip.dayPlans[0]],
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('DAY 9'), findsOneWidget);
+      expect(find.text('Second day stop'), findsWidgets);
+    });
+
+    testWidgets('activity map lists every coordinate-backed activity', (
+      tester,
+    ) async {
+      final trip = TripItineraryModel.fromMap('mapped-live', {
+        'destId': 'jaipur',
+        'destName': 'Jaipur Royal Tour',
+        'userId': 'pilot_1',
+        'status': 'active',
+        'isActive': true,
+        'form': {'startDate': _todayIso(), 'days': 1},
+        'dayPlans': [
+          {
+            'day': 1,
+            'date': 'October 13, 2026',
+            'areaFocus': 'Amer and the old city',
+            'activities': [
+              {'title': 'Amber Fort', 'lat': 26.9855, 'lng': 75.8513},
+              {'title': 'City Palace', 'lat': 26.9258, 'lng': 75.8237},
+            ],
+          },
+        ],
+      });
+
+      await tester.pumpWidget(_harness(trip: trip, fix: _jaipur()));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('OPEN ACTIVITY IN MAP'));
+      await tester.tap(find.text('OPEN ACTIVITY IN MAP'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('ACTIVITY LOCATIONS · DAY 1'), findsOneWidget);
+      expect(find.text('DATE · October 13, 2026'), findsOneWidget);
+      expect(find.text('AREA FOCUS · Amer and the old city'), findsOneWidget);
+      expect(find.text('Amber Fort'), findsWidgets);
+      expect(find.text('City Palace'), findsWidgets);
+      expect(find.text('OPEN IN MAP'), findsNWidgets(2));
+    });
+
+    testWidgets('shows the disabled replan boundary without a fake action', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _harness(
+          trip: _trip(isActive: true, status: 'active'),
+          fix: _jaipur(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('ADJUST REMAINING PLAN'), findsOneWidget);
+      expect(find.textContaining('replanning is unavailable'), findsOneWidget);
+      expect(find.text('ACCEPT PROPOSAL'), findsNothing);
+    });
+
     testWidgets('shows the NOW / NEXT / ROUTE hierarchy from real state', (
       tester,
     ) async {
@@ -198,7 +479,7 @@ void main() {
       // NOW is the first unlogged waypoint, NEXT the one after it.
       expect(find.text('Amber Fort'), findsWidgets);
       expect(find.text('City Palace'), findsWidgets);
-      expect(find.text('0 of 2 waypoints logged'), findsOneWidget);
+      expect(find.text('0 of 2 activities logged'), findsOneWidget);
 
       // Manual check-in is offered, and nothing is auto-completed.
       expect(find.text("I'M HERE"), findsOneWidget);
@@ -221,8 +502,8 @@ void main() {
       await tester.tap(find.text('COMPLETE'));
       await tester.pumpAndSettle();
 
-      expect(find.text('1 of 2 waypoints logged'), findsOneWidget);
-      expect(find.text('0 of 2 waypoints logged'), findsNothing);
+      expect(find.text('1 of 2 activities logged'), findsOneWidget);
+      expect(find.text('0 of 2 activities logged'), findsNothing);
     });
 
     testWidgets('SKIP is recorded as skipped, not as completed', (
@@ -240,7 +521,7 @@ void main() {
       await tester.tap(find.text('SKIP'));
       await tester.pumpAndSettle();
 
-      expect(find.text('1 of 2 waypoints logged'), findsOneWidget);
+      expect(find.text('1 of 2 activities logged'), findsOneWidget);
       expect(
         find.textContaining('logged as skipped, not completed'),
         findsOneWidget,

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:naviigo_app/core/location/location_adapter.dart';
@@ -70,6 +72,34 @@ class _FakeLocationAdapter implements LocationAdapter {
   Future<bool> openLocationSettings() async {
     settingsOpens++;
     return true;
+  }
+}
+
+class _GatedLocationAdapter implements LocationAdapter {
+  final started = Completer<void>();
+  final result = Completer<LocationResult>();
+
+  @override
+  Future<LocationResult> current({bool userInitiated = false}) async {
+    started.complete();
+    return result.future;
+  }
+
+  @override
+  Future<bool> openAppSettings() async => true;
+
+  @override
+  Future<bool> openLocationSettings() async => true;
+}
+
+class _FailingCheckInStore extends InMemoryCheckInStore {
+  @override
+  Future<void> writeForOwner(
+    String ownerUid,
+    String tripId,
+    Map<String, TripCheckIn> checkIns,
+  ) async {
+    throw StateError('local storage unavailable');
   }
 }
 
@@ -173,6 +203,80 @@ void main() {
       expect(state.nowWaypoint!.activity.title, 'City Palace');
     });
 
+    test(
+      'a failed check-in write is surfaced and does not remain optimistic',
+      () async {
+        final trip = _jaipurTrip(isActive: true, status: 'active');
+        final container = _container(store: _FailingCheckInStore());
+        final controller = container.read(
+          liveTripControllerProvider(trip.id).notifier,
+        );
+
+        await controller.logCheckIn(
+          LiveTripState.waypointKey(0, 0),
+          TripCheckIn.completed,
+        );
+
+        final state = container.read(liveTripStateProvider(trip));
+        expect(state.completedCount, 0);
+        expect(state.lastActionError, contains('save that check-in'));
+      },
+    );
+
+    test('day-scoped rail preserves actual day numbers and order', () {
+      final trip = TripItineraryModel.fromMap('trip_nonsequential_live', {
+        'destId': 'jaipur',
+        'destName': 'Jaipur Royal Tour',
+        'userId': 'pilot_1',
+        'status': 'active',
+        'isActive': true,
+        'form': {'startDate': _todayIso(), 'days': 2},
+        'dayPlans': [
+          {
+            'day': 4,
+            'activities': [
+              {'title': 'Amber Fort'},
+            ],
+          },
+          {
+            'day': 9,
+            'activities': [
+              {'title': 'City Palace'},
+              {'title': 'Johari Bazaar'},
+            ],
+          },
+        ],
+      });
+      final state = _container().read(liveTripStateProvider(trip));
+
+      expect(state.waypointsForDay(0).single.dayNumber, 4);
+      expect(state.waypointsForDay(1).map((w) => w.dayNumber), [9, 9]);
+      expect(state.nowWaypointForDay(1)!.activity.title, 'City Palace');
+      expect(state.nextWaypointForDay(1)!.activity.title, 'Johari Bazaar');
+      expect(state.totalWaypointsForDay(1), 2);
+    });
+
+    test('check-ins for one owner are not visible to another owner', () async {
+      final store = InMemoryCheckInStore();
+      final ownerATrip = _jaipurTrip(
+        userId: 'owner_a',
+        isActive: true,
+        status: 'active',
+      );
+      final ownerA = _container(store: store, userId: 'owner_a');
+      await ownerA
+          .read(liveTripControllerProvider(ownerATrip.id).notifier)
+          .logCheckIn(LiveTripState.waypointKey(0, 0), TripCheckIn.completed);
+
+      final ownerB = _container(store: store, userId: 'owner_b');
+      final ownerBTrip = _jaipurTrip(
+        userId: 'owner_b',
+        isActive: true,
+        status: 'active',
+      );
+      expect(ownerB.read(liveTripStateProvider(ownerBTrip)).completedCount, 0);
+    });
+
     test('clearing a check-in puts the waypoint back on the rail', () async {
       final trip = _jaipurTrip(isActive: true, status: 'active');
       final container = _container();
@@ -213,6 +317,91 @@ void main() {
         ArrivalConfidence.inferred,
       );
     });
+
+    test(
+      'late location results are discarded after an account change',
+      () async {
+        var uid = 'pilot_1';
+        final adapter = _GatedLocationAdapter();
+        final trip = _jaipurTrip(userId: 'pilot_1');
+        final container = ProviderContainer(
+          overrides: [
+            currentUserIdProvider.overrideWith((ref) => uid),
+            checkInStoreProvider.overrideWithValue(InMemoryCheckInStore()),
+            locationAdapterProvider.overrideWithValue(adapter),
+            userTripsStreamProvider.overrideWith((ref) => Stream.value([trip])),
+          ],
+        );
+        addTearDown(container.dispose);
+
+        final refresh = container
+            .read(liveTripControllerProvider(trip.id).notifier)
+            .refreshLocation();
+        await adapter.started.future;
+        uid = 'pilot_2';
+        container.invalidate(currentUserIdProvider);
+        adapter.result.complete(
+          LocationResult(
+            fix: LiveFix(lat: 26.915, lng: 75.79, timestamp: DateTime.now()),
+            permissionGranted: true,
+          ),
+        );
+        await refresh;
+
+        expect(container.read(liveTripFixProvider), isNull);
+      },
+    );
+
+    test('a failed refresh clears a previously valid fix', () async {
+      final adapter = _FakeLocationAdapter(
+        LocationResult(
+          fix: LiveFix(lat: 26.915, lng: 75.79, timestamp: DateTime.now()),
+          permissionGranted: true,
+        ),
+      );
+      final trip = _jaipurTrip();
+      final container = _container(location: adapter);
+      final controller = container.read(
+        liveTripControllerProvider(trip.id).notifier,
+      );
+
+      await controller.refreshLocation();
+      expect(container.read(liveTripFixProvider), isNotNull);
+
+      adapter.respondWith(
+        const LocationResult(
+          failure: LocationFailure.unavailable,
+          permissionGranted: true,
+        ),
+      );
+      await controller.refreshLocation();
+
+      expect(container.read(liveTripFixProvider), isNull);
+      expect(
+        container.read(liveTripStateProvider(trip)).startCheck!.status,
+        StartTripStatus.missingCoordinates,
+      );
+    });
+
+    test(
+      'a selected day check-in remains confirmed when earlier days are pending',
+      () async {
+        final trip = _jaipurTrip(isActive: true, status: 'active');
+        final container = _container();
+        final controller = container.read(
+          liveTripControllerProvider(trip.id).notifier,
+        );
+
+        await controller.logCheckIn(
+          LiveTripState.waypointKey(1, 0),
+          TripCheckIn.arrived,
+        );
+
+        final state = container.read(liveTripStateProvider(trip));
+        expect(state.arrivalConfidence, ArrivalConfidence.unknown);
+        expect(state.arrivalConfidenceForDay(1), ArrivalConfidence.confirmed);
+      },
+    );
 
     test('phase follows the lifecycle, not the clock alone', () {
       // A scheduled trip with no fix is pre-trip, not silently active.

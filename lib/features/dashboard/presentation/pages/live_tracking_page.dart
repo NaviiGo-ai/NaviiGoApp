@@ -15,6 +15,7 @@ import '../../../trips/presentation/providers/live_trip_provider.dart';
 import '../../../trips/domain/models/trip_itinerary_model.dart';
 import '../../../trips/domain/models/live_trip_state.dart';
 import '../../../trips/domain/services/trip_validation_service.dart';
+import '../../../places/domain/models/place_model.dart';
 
 /// ─────────────────────────────────────────────────────────────────────────────
 /// LIVE JOURNEY
@@ -37,20 +38,70 @@ class LiveTrackingPage extends ConsumerStatefulWidget {
 
 class _LiveTrackingPageState extends ConsumerState<LiveTrackingPage> {
   bool _isSosHolding = false;
+  int? _selectedDayNumber;
+  String? _selectedTripId;
 
   /// Set by the "Pre-Trip Mode" recovery action — the traveller is not going to
   /// start today, so the screen stops offering to begin the journey.
   bool _isPreTripMode = false;
 
   @override
+  void didUpdateWidget(covariant LiveTrackingPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialTrip?.id != widget.initialTrip?.id) {
+      _selectedDayNumber = null;
+      _selectedTripId = null;
+      _isPreTripMode = false;
+    }
+  }
+
+  int? _reliableCurrentDayIndex(TripItineraryModel trip) {
+    final rawStart = trip.form['startDate'];
+    if (rawStart is! String || rawStart.trim().isEmpty) return null;
+    final start = DateTime.tryParse(rawStart);
+    if (start == null || trip.dayPlans.isEmpty) return null;
+    final today = const TripValidationService().destinationLocalDate(null);
+    final startDay = DateTime(start.year, start.month, start.day);
+    final offset = today.difference(startDay).inDays;
+    if (offset < 0 || offset >= trip.dayPlans.length) return null;
+    final expectedDayNumber = offset + 1;
+    final index = trip.dayPlans.indexWhere(
+      (day) => day.dayNumber == expectedDayNumber,
+    );
+    return index < 0 ? null : index;
+  }
+
+  int _selectedDayFor(TripItineraryModel trip, {int? requestedDayNumber}) {
+    if (trip.dayPlans.isEmpty) return 0;
+    if (requestedDayNumber != null) {
+      final selected = trip.dayPlans.indexWhere(
+        (day) => day.dayNumber == requestedDayNumber,
+      );
+      if (selected >= 0) return selected;
+    }
+    return _reliableCurrentDayIndex(trip) ?? 0;
+  }
+
+  @override
   Widget build(BuildContext context) {
-    TripItineraryModel? trip = ref.watch(activeTripProvider);
-    trip ??= widget.initialTrip;
-    if (trip == null) {
+    final currentUid = ref.watch(currentUserIdProvider);
+    final requestedTrip = widget.initialTrip;
+    final hasExplicitTrip = requestedTrip != null;
+    final explicitTripIsUsable =
+        requestedTrip != null &&
+        currentUid != null &&
+        requestedTrip.userId == currentUid &&
+        !requestedTrip.isEphemeral;
+
+    TripItineraryModel? trip = hasExplicitTrip
+        ? (explicitTripIsUsable ? requestedTrip : null)
+        : ref.watch(activeTripProvider);
+    if (!hasExplicitTrip && trip == null) {
       final allTrips = ref.watch(userTripsStreamProvider).value ?? [];
-      if (allTrips.isNotEmpty) {
-        trip = allTrips.first;
-      }
+      trip = allTrips.cast<TripItineraryModel?>().firstWhere(
+        (candidate) => candidate!.tripStatus == TripStatus.active,
+        orElse: () => null,
+      );
     }
 
     if (trip == null) {
@@ -66,7 +117,31 @@ class _LiveTrackingPageState extends ConsumerState<LiveTrackingPage> {
       );
     }
 
+    // The active-trip stream can replace the resolved itinerary while this
+    // page stays mounted. Never carry a selected day or pre-trip mode across
+    // that boundary, even if a later refresh returns to the old trip id.
+    if (_selectedTripId != trip.id) {
+      _selectedTripId = trip.id;
+      _selectedDayNumber = null;
+      _isPreTripMode = false;
+    }
+    if (trip.dayPlans.isEmpty) _selectedDayNumber = null;
+
     final state = ref.watch(liveTripStateProvider(trip));
+    final selectedDayIndex = _selectedDayFor(
+      trip,
+      requestedDayNumber: _selectedTripId == trip.id
+          ? _selectedDayNumber
+          : null,
+    );
+    final hasCurrentDayContext = _reliableCurrentDayIndex(trip) != null;
+    final hasSelectedDay =
+        _selectedTripId == trip.id &&
+        _selectedDayNumber != null &&
+        trip.dayPlans.any((day) => day.dayNumber == _selectedDayNumber);
+    final hasSelectedDayContext =
+        trip.dayPlans.isNotEmpty &&
+        (hasSelectedDay || hasCurrentDayContext || trip.dayPlans.length == 1);
     final controller = ref.read(liveTripControllerProvider(trip.id).notifier);
 
     return Scaffold(
@@ -107,25 +182,75 @@ class _LiveTrackingPageState extends ConsumerState<LiveTrackingPage> {
                 },
               )
             else if (state.phase == LiveTripPhase.inMotion) ...[
+              if (trip.dayPlans.length > 1)
+                _LiveDayRail(
+                  dayPlans: trip.dayPlans,
+                  selectedIndex: selectedDayIndex,
+                  hasReliableCurrentDay: hasCurrentDayContext,
+                  onSelect: (index) => setState(() {
+                    _selectedTripId = trip!.id;
+                    _selectedDayNumber = trip.dayPlans[index].dayNumber;
+                  }),
+                ),
+              if (trip.dayPlans.length > 1) const SizedBox(height: 16),
               // ── ROUTE ──────────────────────────────────────────────────
               if (state.isOffRoute) ...[
                 _RouteDeviationNotice(state: state),
                 const SizedBox(height: 16),
               ],
-              _RoutePreviewCard(trip: trip, state: state),
+              _JourneyContextCard(
+                trip: trip,
+                state: state,
+                dayIndex: selectedDayIndex,
+                hasReliableDayContext: hasCurrentDayContext,
+                hasSelectedDayContext: hasSelectedDayContext,
+                onRefreshLocation: controller.refreshLocation,
+              ),
+              const SizedBox(height: 16),
+              _RoutePreviewCard(
+                trip: trip,
+                state: state,
+                dayIndex: selectedDayIndex,
+                hasReliableDayContext: hasSelectedDayContext,
+                onExpand: () => _showRouteSheet(
+                  context,
+                  state,
+                  dayIndex: selectedDayIndex,
+                  hasReliableDayContext: hasSelectedDayContext,
+                ),
+                onOpenActivityMap: () =>
+                    _openActivityMap(context, trip!, state, selectedDayIndex),
+              ),
               const SizedBox(height: 20),
               // ── NOW ────────────────────────────────────────────────────
-              _NowCard(state: state, controller: controller),
+              _NowCard(
+                state: state,
+                controller: controller,
+                dayIndex: selectedDayIndex,
+                hasReliableDayContext: hasSelectedDayContext,
+                isCurrentDay: hasCurrentDayContext,
+              ),
               const SizedBox(height: 16),
               // ── NEXT ───────────────────────────────────────────────────
-              _NextCard(state: state),
+              _NextCard(
+                state: state,
+                dayIndex: selectedDayIndex,
+                hasReliableDayContext: hasSelectedDayContext,
+                isCurrentDay: hasCurrentDayContext,
+              ),
+              const SizedBox(height: 16),
+              const _ReplanUnavailableCard(),
             ] else
               _JourneyClosedCard(state: state),
 
             const SizedBox(height: 20),
 
             // ── ROUTE (full rail) ────────────────────────────────────────
-            _RouteRailCard(state: state),
+            _RouteRailCard(
+              state: state,
+              dayIndex: selectedDayIndex,
+              hasReliableDayContext: hasSelectedDayContext,
+            ),
             const SizedBox(height: 20),
 
             // ── BOOKINGS ─────────────────────────────────────────────────
@@ -152,6 +277,128 @@ class _LiveTrackingPageState extends ConsumerState<LiveTrackingPage> {
           ],
         ),
       ),
+    );
+  }
+
+  void _openActivityMap(
+    BuildContext context,
+    TripItineraryModel trip,
+    LiveTripState state,
+    int dayIndex,
+  ) {
+    if (dayIndex < 0 || dayIndex >= trip.dayPlans.length) return;
+    final places = <PlaceModel>[];
+    final day = trip.dayPlans[dayIndex];
+    for (var index = 0; index < day.activities.length; index++) {
+      final activity = day.activities[index];
+      if (!_hasCoordinates(activity.lat, activity.lng)) continue;
+      places.add(
+        PlaceModel(
+          id: activity.placeId ?? '${trip.id}-day-$dayIndex-activity-$index',
+          name: _displayActivityTitle(activity),
+          vicinity: _presentText(activity.location) ?? '',
+          lat: activity.lat,
+          lng: activity.lng,
+        ),
+      );
+    }
+    if (places.isEmpty) return;
+    _showActivityMapSheet(context, day, places);
+  }
+
+  void _showActivityMapSheet(
+    BuildContext context,
+    TripDayPlanModel day,
+    List<PlaceModel> places,
+  ) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return Container(
+          height: MediaQuery.sizeOf(sheetContext).height * 0.78,
+          decoration: const BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'ACTIVITY LOCATIONS · DAY ${day.dayNumber}',
+                      style: AppTypography.eyebrow(color: AppColors.primary),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Close activity locations',
+                    onPressed: () => Navigator.pop(sheetContext),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Coordinates provided by itinerary',
+                style: AppTypography.caption(color: AppColors.textSecondary),
+              ),
+              const SizedBox(height: 12),
+              Expanded(
+                child: ListView.separated(
+                  itemCount: places.length,
+                  separatorBuilder: (_, __) =>
+                      const Divider(color: AppColors.border, height: 16),
+                  itemBuilder: (_, index) {
+                    final place = places[index];
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                place.name,
+                                style: AppTypography.bodyMedium(
+                                  color: AppColors.textPrimary,
+                                ).copyWith(fontWeight: FontWeight.w600),
+                              ),
+                              if (_presentText(place.vicinity) != null)
+                                Text(
+                                  place.vicinity,
+                                  style: AppTypography.caption(
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                              Text(
+                                '${place.lat}, ${place.lng}',
+                                style: AppTypography.micro(
+                                  color: AppColors.textTertiary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            Navigator.pop(sheetContext);
+                            context.push('/map', extra: place);
+                          },
+                          child: const Text('OPEN IN MAP'),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -240,6 +487,232 @@ class _SectionLabel extends StatelessWidget {
         ],
         Text(label, style: AppTypography.eyebrow(color: tint)),
       ],
+    );
+  }
+}
+
+class _LiveDayRail extends StatelessWidget {
+  final List<TripDayPlanModel> dayPlans;
+  final int selectedIndex;
+  final bool hasReliableCurrentDay;
+  final ValueChanged<int> onSelect;
+
+  const _LiveDayRail({
+    required this.dayPlans,
+    required this.selectedIndex,
+    required this.hasReliableCurrentDay,
+    required this.onSelect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      container: true,
+      label: hasReliableCurrentDay
+          ? 'Choose a day for the live journey'
+          : 'Select a day. The current day is not known from the itinerary.',
+      child: SizedBox(
+        height: 58,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: dayPlans.length,
+          separatorBuilder: (_, __) => const SizedBox(width: 8),
+          itemBuilder: (context, index) {
+            final selected = index == selectedIndex;
+            final label = 'Day ${dayPlans[index].dayNumber}';
+            return Semantics(
+              button: true,
+              selected: selected,
+              label: '$label${selected ? ', selected' : ''}',
+              child: TextButton(
+                onPressed: () => onSelect(index),
+                style: TextButton.styleFrom(
+                  minimumSize: const Size(76, 48),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  backgroundColor: selected
+                      ? AppColors.teal
+                      : AppColors.surface,
+                  foregroundColor: selected
+                      ? Colors.white
+                      : AppColors.textPrimary,
+                  side: BorderSide(
+                    color: selected ? AppColors.teal : AppColors.border,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                ),
+                child: Text(label),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _JourneyContextCard extends StatelessWidget {
+  final TripItineraryModel trip;
+  final LiveTripState state;
+  final int dayIndex;
+  final bool hasReliableDayContext;
+  final bool hasSelectedDayContext;
+  final VoidCallback? onRefreshLocation;
+
+  const _JourneyContextCard({
+    required this.trip,
+    required this.state,
+    required this.dayIndex,
+    required this.hasReliableDayContext,
+    required this.hasSelectedDayContext,
+    this.onRefreshLocation,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final day = hasSelectedDayContext && dayIndex < trip.dayPlans.length
+        ? trip.dayPlans[dayIndex]
+        : null;
+    final theme = _presentText(day?.theme);
+    final date = _presentText(day?.dateFormatted);
+    final area = _presentText(day?.areaFocus);
+    final weather = _presentText(day?.weatherContext);
+    final locationText = state.isResolvingLocation
+        ? 'Checking location…'
+        : state.fix == null
+        ? 'Location not verified'
+        : state.fix!.accuracyMeters == null
+        ? 'Location fix available'
+        : 'Location fix ±${state.fix!.accuracyMeters!.round()} m';
+    final dayText = day == null
+        ? 'SELECT A DAY'
+        : '${hasReliableDayContext ? 'DAY' : 'SELECTED DAY'} ${day.dayNumber}';
+
+    return _SectionCard(
+      background: AppColors.surfaceWarm,
+      child: Semantics(
+        container: true,
+        liveRegion: state.isResolvingLocation,
+        label:
+            '$dayText. ${theme ?? ''} ${date == null ? '' : 'Date $date. '}'
+            '${area == null ? '' : 'Area focus $area. '}'
+            '$locationText. ${weather ?? 'Weather context unavailable.'}',
+        child: Wrap(
+          spacing: 12,
+          runSpacing: 10,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            _FactChip(
+              label: dayText,
+              icon: Icons.today_outlined,
+              color: hasReliableDayContext ? AppColors.teal : AppColors.brown,
+            ),
+            _FactChip(
+              label: locationText.toUpperCase(),
+              icon: state.fix == null
+                  ? Icons.location_searching_outlined
+                  : Icons.gps_fixed_rounded,
+              color: state.fix == null
+                  ? AppColors.textSecondary
+                  : AppColors.teal,
+            ),
+            _FactChip(
+              label: weather == null
+                  ? 'WEATHER CONTEXT UNAVAILABLE'
+                  : 'ITINERARY WEATHER · $weather',
+              icon: Icons.cloud_outlined,
+              color: weather == null
+                  ? AppColors.textSecondary
+                  : AppColors.brown,
+            ),
+            if (theme != null)
+              Text(
+                theme,
+                style: AppTypography.tripTitle(
+                  color: AppColors.brown,
+                ).copyWith(fontSize: 19, height: 1.2),
+              ),
+            if (date != null)
+              _FactChip(
+                label: 'DATE · $date',
+                icon: Icons.event_outlined,
+                color: AppColors.textSecondary,
+              ),
+            if (area != null)
+              _FactChip(
+                label: 'AREA FOCUS · $area',
+                icon: Icons.explore_outlined,
+                color: AppColors.textSecondary,
+              ),
+            if (trip.destName.trim().isNotEmpty)
+              Text(
+                trip.destName,
+                style: AppTypography.caption(color: AppColors.textSecondary),
+              ),
+            if (state.fix == null)
+              TextButton.icon(
+                onPressed: state.isResolvingLocation ? null : onRefreshLocation,
+                icon: const Icon(Icons.my_location_outlined, size: 16),
+                label: Text(
+                  state.isResolvingLocation
+                      ? 'CHECKING LOCATION'
+                      : 'TRY LOCATION AGAIN',
+                ),
+                style: TextButton.styleFrom(
+                  minimumSize: const Size(48, 48),
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ReplanUnavailableCard extends StatelessWidget {
+  const _ReplanUnavailableCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return _SectionCard(
+      background: AppColors.surfaceWarm,
+      child: Semantics(
+        container: true,
+        label:
+            'Adjust remaining plan. Contextual replanning is unavailable for this saved itinerary. The current plan remains unchanged.',
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(
+              Icons.tune_outlined,
+              color: AppColors.textTertiary,
+              size: 20,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const _SectionLabel(
+                    'ADJUST REMAINING PLAN',
+                    icon: Icons.tune_outlined,
+                    color: AppColors.textSecondary,
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Contextual replanning is unavailable for this saved itinerary. Your current plan remains unchanged.',
+                    style: AppTypography.caption(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -379,12 +852,13 @@ class _ActionNotice extends StatelessWidget {
               style: AppTypography.caption(color: AppColors.textPrimary),
             ),
           ),
-          GestureDetector(
-            onTap: onDismiss,
-            child: const Icon(
+          IconButton(
+            tooltip: 'Dismiss notice',
+            onPressed: onDismiss,
+            icon: const Icon(
               Icons.close_rounded,
-              size: 16,
-              color: AppColors.textTertiary,
+              size: 18,
+              color: AppColors.textSecondary,
             ),
           ),
         ],
@@ -489,6 +963,9 @@ class _StartGate extends StatelessWidget {
     final headline = switch (status) {
       StartTripStatus.valid => 'YOU ARE AT THE START',
       StartTripStatus.wrongCity => 'NOT AT THE START YET',
+      StartTripStatus.unauthenticated => 'SIGN IN TO START',
+      StartTripStatus.notOwner => 'JOURNEY OWNER UNVERIFIED',
+      StartTripStatus.missingCoordinates => 'LOCATION UNAVAILABLE',
       StartTripStatus.permissionDenied => 'LOCATION NOT VERIFIED',
       StartTripStatus.permissionPermanentlyDenied ||
       StartTripStatus.locationRestricted => 'LOCATION IS BLOCKED',
@@ -563,7 +1040,10 @@ class _StartGate extends StatelessWidget {
               isBusy: isAtStart
                   ? state.isStartingTrip
                   : state.isResolvingLocation,
-              onTap: state.isStartingTrip || state.isResolvingLocation
+              onTap:
+                  state.isStartingTrip ||
+                      state.isResolvingLocation ||
+                      _hasNoRecovery(status)
                   ? null
                   : () => _runPrimary(context, status, isAtStart),
             ),
@@ -607,6 +1087,19 @@ class _StartGate extends StatelessWidget {
   /// The reason, in Naviigo's voice. Permission gets its own rationale rather
   /// than a permission constant.
   static String _reasonFor(StartTripStatus? status, String? gateMessage) {
+    if (status == StartTripStatus.unauthenticated) {
+      return 'Sign in to verify ownership before starting this journey.';
+    }
+    if (status == StartTripStatus.notOwner) {
+      return 'This journey cannot be started because its owner is not verified.';
+    }
+    if (status == StartTripStatus.missingCoordinates) {
+      return 'A usable location or start region is not available, so proximity cannot be confirmed.';
+    }
+    if (status == StartTripStatus.dateMismatch) {
+      return gateMessage ??
+          'This journey is not inside its destination-local start window.';
+    }
     if (status == StartTripStatus.permissionDenied) {
       return 'Naviigo uses your location to make sure you are near the beginning '
           'of this journey before Live Trip starts.';
@@ -617,6 +1110,10 @@ class _StartGate extends StatelessWidget {
   static String _primaryLabel(StartTripStatus? status, bool isAtStart) {
     if (isAtStart) return 'START JOURNEY';
     return switch (status) {
+      StartTripStatus.unauthenticated ||
+      StartTripStatus.notOwner ||
+      StartTripStatus.dateMismatch => 'VIEW TRIP',
+      StartTripStatus.missingCoordinates => 'LOCATION UNAVAILABLE',
       StartTripStatus.servicesDisabled => 'OPEN LOCATION SETTINGS',
       StartTripStatus.permissionPermanentlyDenied ||
       StartTripStatus.locationRestricted => 'OPEN SETTINGS',
@@ -633,6 +1130,13 @@ class _StartGate extends StatelessWidget {
       StartTripStatus.locationRestricted => Icons.settings_outlined,
       _ => Icons.my_location_rounded,
     };
+  }
+
+  static bool _hasNoRecovery(StartTripStatus? status) {
+    return status == StartTripStatus.unauthenticated ||
+        status == StartTripStatus.notOwner ||
+        status == StartTripStatus.dateMismatch ||
+        status == StartTripStatus.missingCoordinates;
   }
 
   Future<void> _runPrimary(
@@ -836,7 +1340,7 @@ class _RecoveryRow extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10),
+        padding: const EdgeInsets.symmetric(vertical: 14),
         child: Row(
           children: [
             Icon(icon, size: 18, color: AppColors.primary),
@@ -878,32 +1382,34 @@ class _PrimaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 15),
-        decoration: BoxDecoration(
-          color: onTap == null ? color.withAlpha(120) : color,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (isBusy)
-              const SizedBox(
-                width: 15,
-                height: 15,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.white,
-                ),
-              )
-            else
-              Icon(icon, size: 17, color: Colors.white),
-            const SizedBox(width: 8),
-            Text(label, style: AppTypography.button(color: Colors.white)),
-          ],
-        ),
+    return ElevatedButton(
+      onPressed: isBusy ? null : onTap,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: color,
+        foregroundColor: Colors.white,
+        minimumSize: const Size(48, 48),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 15),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      ),
+      child: Wrap(
+        alignment: WrapAlignment.center,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 8,
+        runSpacing: 6,
+        children: [
+          if (isBusy)
+            const SizedBox(
+              width: 15,
+              height: 15,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Colors.white,
+              ),
+            )
+          else
+            Icon(icon, size: 17),
+          Text(label, textAlign: TextAlign.center),
+        ],
       ),
     );
   }
@@ -915,13 +1421,35 @@ class _PrimaryButton extends StatelessWidget {
 class _RoutePreviewCard extends StatelessWidget {
   final TripItineraryModel trip;
   final LiveTripState state;
+  final int dayIndex;
+  final bool hasReliableDayContext;
+  final VoidCallback? onExpand;
+  final VoidCallback? onOpenActivityMap;
 
-  const _RoutePreviewCard({required this.trip, required this.state});
+  const _RoutePreviewCard({
+    required this.trip,
+    required this.state,
+    required this.dayIndex,
+    required this.hasReliableDayContext,
+    this.onExpand,
+    this.onOpenActivityMap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final now = state.nowWaypoint;
-    final next = state.nextWaypoint;
+    final dayWaypoints = hasReliableDayContext
+        ? state.waypointsForDay(dayIndex)
+        : const <LiveWaypoint>[];
+    final now = hasReliableDayContext
+        ? state.nowWaypointForDay(dayIndex)
+        : null;
+    final next = hasReliableDayContext
+        ? state.nextWaypointForDay(dayIndex)
+        : null;
+    final hasCoordinates = dayWaypoints.any(
+      (waypoint) =>
+          _hasCoordinates(waypoint.activity.lat, waypoint.activity.lng),
+    );
 
     return _SectionCard(
       child: Column(
@@ -931,13 +1459,14 @@ class _RoutePreviewCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const _SectionLabel('ROUTE', icon: Icons.route_rounded),
-              GestureDetector(
-                onTap: () {
-                  NavHaptics.fire(NavHaptic.light);
-                  _showRouteSheet(context, state);
-                },
+              TextButton(
+                onPressed: onExpand,
+                style: TextButton.styleFrom(
+                  minimumSize: const Size(48, 48),
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                ),
                 child: Text(
-                  'EXPAND',
+                  'VIEW FULL ROUTE',
                   style: AppTypography.micro(
                     color: AppColors.primary,
                   ).copyWith(fontWeight: FontWeight.w800),
@@ -947,18 +1476,29 @@ class _RoutePreviewCard extends StatelessWidget {
           ),
           const SizedBox(height: 14),
 
+          if (!hasReliableDayContext)
+            Text(
+              'Select a day to see its current activity and next step.',
+              style: AppTypography.caption(color: AppColors.textSecondary),
+            )
+          else if (dayWaypoints.isEmpty)
+            Text(
+              'No activity details were provided for the selected day.',
+              style: AppTypography.caption(color: AppColors.textSecondary),
+            ),
+
           // Compact rail: the real sequence of waypoints, current one marked.
           Row(
             children: [
-              for (int i = 0; i < state.waypoints.length && i < 6; i++)
+              for (int i = 0; i < dayWaypoints.length && i < 6; i++)
                 Expanded(
                   child: Container(
                     height: 4,
                     margin: const EdgeInsets.only(right: 4),
                     decoration: BoxDecoration(
-                      color: state.waypoints[i].isLogged
+                      color: dayWaypoints[i].isLogged
                           ? AppColors.teal
-                          : (state.waypoints[i].key == now?.key
+                          : (dayWaypoints[i].key == now?.key
                                 ? AppColors.primary
                                 : AppColors.border),
                       borderRadius: BorderRadius.circular(2),
@@ -970,13 +1510,15 @@ class _RoutePreviewCard extends StatelessWidget {
           const SizedBox(height: 12),
 
           Text(
-            '${state.loggedCount} of ${state.totalWaypoints} waypoints logged',
+            hasReliableDayContext
+                ? '${state.loggedCountForDay(dayIndex)} of ${state.totalWaypointsForDay(dayIndex)} activities logged'
+                : 'Day progress unavailable until a day is selected',
             style: AppTypography.caption(color: AppColors.textSecondary),
           ),
           if (next != null) ...[
             const SizedBox(height: 4),
             Text(
-              'Next: ${next.activity.title}',
+              'Next: ${_displayActivityTitle(next.activity)}',
               style: AppTypography.caption(
                 color: AppColors.textPrimary,
               ).copyWith(fontWeight: FontWeight.w600),
@@ -986,13 +1528,12 @@ class _RoutePreviewCard extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: _PrimaryButton(
-              label: 'OPEN ROUTE IN MAPS',
+              label: hasCoordinates
+                  ? 'OPEN ACTIVITY IN MAP'
+                  : 'ACTIVITY MAP UNAVAILABLE',
               icon: Icons.map_outlined,
               color: AppColors.brown,
-              onTap: () {
-                NavHaptics.fire(NavHaptic.light);
-                _openDirections(context, trip);
-              },
+              onTap: hasCoordinates ? onOpenActivityMap : null,
             ),
           ),
         ],
@@ -1007,12 +1548,47 @@ class _RoutePreviewCard extends StatelessWidget {
 class _NowCard extends StatelessWidget {
   final LiveTripState state;
   final LiveTripController controller;
+  final int dayIndex;
+  final bool hasReliableDayContext;
+  final bool isCurrentDay;
 
-  const _NowCard({required this.state, required this.controller});
+  const _NowCard({
+    required this.state,
+    required this.controller,
+    required this.dayIndex,
+    required this.hasReliableDayContext,
+    required this.isCurrentDay,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final now = state.nowWaypoint;
+    final dayWaypoints = hasReliableDayContext
+        ? state.waypointsForDay(dayIndex)
+        : const <LiveWaypoint>[];
+    final now = hasReliableDayContext
+        ? state.nowWaypointForDay(dayIndex)
+        : null;
+
+    if (!hasReliableDayContext) {
+      return _SectionCard(
+        background: AppColors.surfaceWarm,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const _SectionLabel(
+              'SELECT A DAY',
+              icon: Icons.today_outlined,
+              color: AppColors.brown,
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'The itinerary does not provide enough date or timezone context to claim what is happening now.',
+              style: AppTypography.bodyMedium(color: AppColors.textPrimary),
+            ),
+          ],
+        ),
+      );
+    }
 
     if (now == null) {
       return _SectionCard(
@@ -1021,14 +1597,18 @@ class _NowCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const _SectionLabel(
-              'NOW',
-              icon: Icons.check_circle_outline_rounded,
-              color: AppColors.teal,
+            _SectionLabel(
+              dayWaypoints.isEmpty ? 'DAY DETAILS' : 'DAY COMPLETE',
+              icon: dayWaypoints.isEmpty
+                  ? Icons.event_note_outlined
+                  : Icons.check_circle_outline_rounded,
+              color: dayWaypoints.isEmpty ? AppColors.brown : AppColors.teal,
             ),
             const SizedBox(height: 10),
             Text(
-              'Every waypoint is logged. Nothing else is scheduled.',
+              dayWaypoints.isEmpty
+                  ? 'No activity details were provided for the selected day.'
+                  : 'Every activity on this day is logged. Nothing else is scheduled.',
               style: AppTypography.bodyMedium(color: AppColors.textPrimary),
             ),
           ],
@@ -1036,7 +1616,10 @@ class _NowCard extends StatelessWidget {
       );
     }
 
-    final confidence = state.arrivalConfidence;
+    final confidence = state.arrivalConfidenceForDay(
+      dayIndex,
+      inferFromLocation: isCurrentDay,
+    );
     final confidenceColor = confidence == ArrivalConfidence.confirmed
         ? AppColors.teal
         : confidence == ArrivalConfidence.inferred
@@ -1051,7 +1634,12 @@ class _NowCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const _SectionLabel('NOW', icon: Icons.my_location_rounded),
+              _SectionLabel(
+                isCurrentDay ? 'NOW' : 'DAY ${now.dayNumber}',
+                icon: isCurrentDay
+                    ? Icons.my_location_rounded
+                    : Icons.today_outlined,
+              ),
               _FactChip(
                 label: confidence.label.toUpperCase(),
                 icon: confidence == ArrivalConfidence.confirmed
@@ -1063,7 +1651,7 @@ class _NowCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            now.activity.title,
+            _displayActivityTitle(now.activity),
             style: AppTypography.tripTitle(color: AppColors.brown),
           ),
           const SizedBox(height: 6),
@@ -1170,23 +1758,22 @@ class _CheckInButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: isActive ? color : color.withAlpha(20),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withAlpha(isActive ? 255 : 70)),
-        ),
-        child: Center(
-          child: Text(
-            label,
-            style: AppTypography.micro(
-              color: isActive ? Colors.white : color,
-            ).copyWith(fontWeight: FontWeight.w800, letterSpacing: 0.5),
-          ),
-        ),
+    return TextButton(
+      onPressed: onTap,
+      style: TextButton.styleFrom(
+        minimumSize: const Size(48, 48),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+        backgroundColor: isActive ? color : color.withAlpha(20),
+        foregroundColor: isActive ? Colors.white : color,
+        side: BorderSide(color: color.withAlpha(isActive ? 255 : 70)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+      child: Text(
+        label,
+        textAlign: TextAlign.center,
+        style: AppTypography.micro(
+          color: isActive ? Colors.white : color,
+        ).copyWith(fontWeight: FontWeight.w800, letterSpacing: 0.5),
       ),
     );
   }
@@ -1197,32 +1784,44 @@ class _CheckInButton extends StatelessWidget {
 /// ─────────────────────────────────────────────────────────────────────────────
 class _NextCard extends StatelessWidget {
   final LiveTripState state;
+  final int dayIndex;
+  final bool hasReliableDayContext;
+  final bool isCurrentDay;
 
-  const _NextCard({required this.state});
+  const _NextCard({
+    required this.state,
+    required this.dayIndex,
+    required this.hasReliableDayContext,
+    required this.isCurrentDay,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final next = state.nextWaypoint;
+    final next = hasReliableDayContext
+        ? state.nextWaypointForDay(dayIndex)
+        : null;
 
     return _SectionCard(
       background: AppColors.surfaceWarm,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _SectionLabel(
-            'NEXT',
+          _SectionLabel(
+            isCurrentDay ? 'NEXT' : 'UP NEXT ON SELECTED DAY',
             icon: Icons.skip_next_rounded,
             color: AppColors.teal,
           ),
           const SizedBox(height: 10),
           if (next == null)
             Text(
-              'Nothing after this one.',
+              hasReliableDayContext
+                  ? 'Nothing after this one on the selected day.'
+                  : 'Select a day to browse the next activity.',
               style: AppTypography.caption(color: AppColors.textSecondary),
             )
           else ...[
             Text(
-              next.activity.title,
+              _displayActivityTitle(next.activity),
               style: AppTypography.bodyMedium(
                 color: AppColors.textPrimary,
               ).copyWith(fontWeight: FontWeight.bold),
@@ -1248,12 +1847,32 @@ class _NextCard extends StatelessWidget {
 /// ─────────────────────────────────────────────────────────────────────────────
 class _RouteRailCard extends StatelessWidget {
   final LiveTripState state;
+  final int? dayIndex;
+  final bool hasReliableDayContext;
 
-  const _RouteRailCard({required this.state});
+  const _RouteRailCard({
+    required this.state,
+    this.dayIndex,
+    this.hasReliableDayContext = true,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final waypoints = state.waypoints;
+    final waypoints = !hasReliableDayContext
+        ? const <LiveWaypoint>[]
+        : dayIndex == null
+        ? state.waypoints
+        : state.waypointsForDay(dayIndex!);
+    final logged = !hasReliableDayContext
+        ? 0
+        : dayIndex == null
+        ? state.loggedCount
+        : state.loggedCountForDay(dayIndex!);
+    final skipped = !hasReliableDayContext
+        ? 0
+        : dayIndex == null
+        ? state.skippedCount
+        : state.skippedCountForDay(dayIndex!);
 
     return _SectionCard(
       child: Column(
@@ -1264,15 +1883,20 @@ class _RouteRailCard extends StatelessWidget {
             children: [
               const _SectionLabel('ROUTE', icon: Icons.route_rounded),
               Text(
-                '${state.loggedCount}/${state.totalWaypoints}',
+                '$logged/${waypoints.length}',
                 style: AppTypography.micro(color: AppColors.textTertiary),
               ),
             ],
           ),
           const SizedBox(height: 14),
-          if (waypoints.isEmpty)
+          if (!hasReliableDayContext)
             Text(
-              'This journey has no waypoints yet.',
+              'Select a day to browse its activity rail.',
+              style: AppTypography.caption(color: AppColors.textSecondary),
+            )
+          else if (waypoints.isEmpty)
+            Text(
+              'This journey has no activity details for the selected day.',
               style: AppTypography.caption(color: AppColors.textSecondary),
             )
           else
@@ -1281,10 +1905,10 @@ class _RouteRailCard extends StatelessWidget {
                 waypoint: waypoints[i],
                 isLast: i == waypoints.length - 1,
               ),
-          if (state.skippedCount > 0) ...[
+          if (skipped > 0) ...[
             const SizedBox(height: 10),
             Text(
-              '${state.skippedCount} skipped — logged as skipped, not completed.',
+              '$skipped skipped — logged as skipped, not completed.',
               style: AppTypography.micro(color: AppColors.textTertiary),
             ),
           ],
@@ -1347,7 +1971,7 @@ class _RailRow extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    waypoint.activity.title,
+                    _displayActivityTitle(waypoint.activity),
                     style:
                         AppTypography.bodyMedium(
                           color: checkIn == TripCheckIn.skipped
@@ -1786,7 +2410,18 @@ Future<void> _searchNearby(
   }
 }
 
-void _showRouteSheet(BuildContext context, LiveTripState state) {
+void _showRouteSheet(
+  BuildContext context,
+  LiveTripState state, {
+  int? dayIndex,
+  bool hasReliableDayContext = true,
+}) {
+  final waypoints = dayIndex == null
+      ? state.waypoints
+      : state.waypointsForDay(dayIndex);
+  final logged = dayIndex == null
+      ? state.loggedCount
+      : state.loggedCountForDay(dayIndex);
   showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -1803,13 +2438,26 @@ void _showRouteSheet(BuildContext context, LiveTripState state) {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'FULL ROUTE',
-              style: AppTypography.eyebrow(color: AppColors.brown),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    hasReliableDayContext
+                        ? 'DAY ACTIVITIES'
+                        : 'SELECTED DAY PLAN',
+                    style: AppTypography.eyebrow(color: AppColors.brown),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Close day activities',
+                  onPressed: () => Navigator.pop(sheetContext),
+                  icon: const Icon(Icons.close_rounded),
+                ),
+              ],
             ),
             const SizedBox(height: 4),
             Text(
-              '${state.loggedCount} of ${state.totalWaypoints} waypoints logged',
+              '$logged of ${waypoints.length} activities logged',
               style: AppTypography.caption(color: AppColors.textSecondary),
             ),
             const SizedBox(height: 16),
@@ -1817,10 +2465,10 @@ void _showRouteSheet(BuildContext context, LiveTripState state) {
               child: ListView(
                 controller: scrollController,
                 children: [
-                  for (final waypoint in state.waypoints)
+                  for (final waypoint in waypoints)
                     _RailRow(
                       waypoint: waypoint,
-                      isLast: waypoint == state.waypoints.last,
+                      isLast: waypoint == waypoints.last,
                     ),
                 ],
               ),
@@ -1831,3 +2479,24 @@ void _showRouteSheet(BuildContext context, LiveTripState state) {
     ),
   );
 }
+
+String? _presentText(String? value) {
+  final text = value?.trim();
+  return text == null || text.isEmpty ? null : text;
+}
+
+String _displayActivityTitle(TripActivityModel activity) {
+  final title = _presentText(activity.title);
+  if (title == null || title.toLowerCase() == 'activity') {
+    return 'Activity details unavailable';
+  }
+  return title;
+}
+
+bool _hasCoordinates(double? lat, double? lng) =>
+    lat != null &&
+    lng != null &&
+    lat.isFinite &&
+    lng.isFinite &&
+    lat.abs() <= 90 &&
+    lng.abs() <= 180;

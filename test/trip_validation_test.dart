@@ -194,6 +194,46 @@ void main() {
       expect(result.isValid, isFalse);
     });
 
+    test('fails closed for malformed user coordinates', () {
+      for (final coordinates in [
+        (double.nan, 75.7873),
+        (26.9124, double.infinity),
+        (91.0, 75.7873),
+        (26.9124, -181.0),
+      ]) {
+        final result = service.validateStartTrip(
+          trip: jaipurTrip,
+          currentUserId: 'pilot_user_1',
+          userLat: coordinates.$1,
+          userLng: coordinates.$2,
+          gpsAccuracyMeters: 10,
+          hasLocationPermission: true,
+          referenceDate: DateTime(2026, 10, 15),
+        );
+        expect(result.status, StartTripStatus.missingCoordinates);
+        expect(result.isValid, isFalse);
+      }
+    });
+
+    test('fails closed for malformed itinerary start coordinates', () {
+      final malformedTrip = jaipurTrip.copyWith(
+        startLat: double.nan,
+        startLng: 75.7873,
+      );
+      final result = service.validateStartTrip(
+        trip: malformedTrip,
+        currentUserId: 'pilot_user_1',
+        userLat: 26.9124,
+        userLng: 75.7873,
+        gpsAccuracyMeters: 10,
+        hasLocationPermission: true,
+        referenceDate: DateTime(2026, 10, 15),
+      );
+
+      expect(result.status, StartTripStatus.missingCoordinates);
+      expect(result.isValid, isFalse);
+    });
+
     test(
       'fails validation with wrongCity when user is in Delhi but trip is in Jaipur',
       () {

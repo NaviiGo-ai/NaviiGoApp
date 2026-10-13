@@ -243,6 +243,62 @@ void main() {
       ]);
     });
 
+    test('round-trips an explicit activity identity without deriving one', () {
+      final trip = TripItineraryModel.fromMap('trip-activity-id', {
+        'destName': 'Varanasi',
+        'uuid': 'trip-activity-id',
+        'dayPlans': [
+          {
+            'day': 1,
+            'activities': [
+              {'id': 'backend-activity-42', 'title': 'Sunrise boat ride'},
+            ],
+          },
+        ],
+      });
+
+      final activity = trip.dayPlans.single.activities.single;
+      expect(activity.activityId, 'backend-activity-42');
+
+      final roundTripped = TripItineraryModel.fromMap(trip.id, trip.toMap());
+      expect(
+        roundTripped.dayPlans.single.activities.single.activityId,
+        'backend-activity-42',
+      );
+      final serializedDays = roundTripped.toMap()['dayPlans'] as List;
+      final serializedActivities =
+          (serializedDays.single as Map)['activities'] as List;
+      expect(
+        serializedActivities.single,
+        containsPair('activityId', 'backend-activity-42'),
+      );
+    });
+
+    test('keeps activity identity absent when the backend supplies none', () {
+      final trip = TripItineraryModel.fromMap('trip-without-activity-id', {
+        'destName': 'Varanasi',
+        'uuid': 'trip-without-activity-id',
+        'dayPlans': [
+          {
+            'day': 1,
+            'activities': [
+              {'title': 'Sunrise boat ride'},
+            ],
+          },
+        ],
+      });
+
+      final activity = trip.dayPlans.single.activities.single;
+      expect(activity.activityId, isNull);
+
+      final roundTripped = TripItineraryModel.fromMap(trip.id, trip.toMap());
+      expect(roundTripped.dayPlans.single.activities.single.activityId, isNull);
+      expect(
+        roundTripped.dayPlans.single.activities.single.toMap(),
+        isNot(contains('activityId')),
+      );
+    });
+
     testWidgets(
       'ItineraryStatsRow renders truthful 0 ACTIVITIES when itinerary has no activities',
       (tester) async {

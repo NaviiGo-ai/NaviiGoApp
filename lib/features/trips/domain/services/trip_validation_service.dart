@@ -116,6 +116,17 @@ class TripValidationService {
 
   const TripValidationService();
 
+  static bool hasValidCoordinates(double? lat, double? lng) {
+    return lat != null &&
+        lng != null &&
+        lat.isFinite &&
+        lng.isFinite &&
+        lat >= -90 &&
+        lat <= 90 &&
+        lng >= -180 &&
+        lng <= 180;
+  }
+
   /// Great-circle distance in kilometres (Haversine, mean Earth radius).
   double calculateDistanceKm({
     required double lat1,
@@ -243,19 +254,32 @@ class TripValidationService {
       );
     }
 
+    // Any other reported failure is still a failure. Do not let a stale fix or
+    // an inconsistent adapter result authorize a journey.
+    if (locationFailure != null) {
+      return fail(
+        StartTripStatus.missingCoordinates,
+        'Location could not be read. Get a fresh reading to continue.',
+      );
+    }
+
     // Gate 7 — a usable fix exists at both ends.
-    if (userLat == null || userLng == null) {
+    if (!hasValidCoordinates(userLat, userLng)) {
       return fail(
         StartTripStatus.missingCoordinates,
         'Waiting for a location fix.',
       );
     }
-    if (trip.startLat == null || trip.startLng == null) {
+    if (!hasValidCoordinates(trip.startLat, trip.startLng)) {
       return fail(
         StartTripStatus.missingCoordinates,
         'This journey has no start region on file.',
       );
     }
+    final currentLat = userLat;
+    final currentLng = userLng;
+    final startLat = trip.startLat;
+    final startLng = trip.startLng;
 
     // Gate 8 — the fix is fresh. A coordinate from hours ago says where someone
     // *was*, which is not evidence they are at the start now.
@@ -276,10 +300,10 @@ class TripValidationService {
     }
 
     final distanceKm = calculateDistanceKm(
-      lat1: userLat,
-      lng1: userLng,
-      lat2: trip.startLat!,
-      lng2: trip.startLng!,
+      lat1: currentLat!,
+      lng1: currentLng!,
+      lat2: startLat!,
+      lng2: startLng!,
     );
 
     // Gate 10 — proximity to the start region.
