@@ -262,11 +262,16 @@ class ApiClient {
     }
 
     final rawDetail = decoded is Map ? decoded['detail'] : null;
+    final rawError = decoded is Map ? decoded['error'] : null;
     final detailMap = rawDetail is Map
         ? Map<String, dynamic>.from(rawDetail)
         : null;
+    final errorMap = rawError is Map
+        ? Map<String, dynamic>.from(rawError)
+        : null;
+    final errorEnvelope = detailMap ?? errorMap;
     final errorMessage =
-        detailMap?['message']?.toString() ??
+        errorEnvelope?['message']?.toString() ??
         (rawDetail != null
             ? rawDetail.toString()
             : (decoded is Map && decoded['error'] != null)
@@ -281,14 +286,14 @@ class ApiClient {
         );
       case 409:
         final rawErrorCode =
-            detailMap?['code'] ??
-            detailMap?['errorCode'] ??
-            detailMap?['type'] ??
+            errorEnvelope?['code'] ??
+            errorEnvelope?['errorCode'] ??
+            errorEnvelope?['type'] ??
             (decoded is Map ? decoded['code'] : null) ??
             (decoded is Map ? decoded['errorCode'] : null) ??
             (rawDetail is String ? rawDetail : null);
         final details =
-            detailMap ??
+            errorEnvelope ??
             (decoded is Map<String, dynamic>
                 ? Map<String, dynamic>.from(decoded)
                 : null);

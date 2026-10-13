@@ -1,6 +1,6 @@
 # Phase 6 mobile handoff — 14 October 2026
 
-Branch: `astra/mobile-v2`. Companion Website branch: `codex/phase-6-contract-alignment`. Shared interface: [mobile contract packet](phase_6_contract_packet.md), with the canonical packet in `NaviiGo-Website/docs/phase_6_contract_packet.md`.
+Branch: `astra/mobile-v2`. Companion Website Phase 6 changes are merged into `main` through PRs #21 and #22. Shared interface: [mobile contract packet](phase_6_contract_packet.md), with the canonical packet in `NaviiGo-Website/docs/phase_6_contract_packet.md`.
 
 ## Delivered behavior
 
@@ -14,20 +14,24 @@ Branch: `astra/mobile-v2`. Companion Website branch: `codex/phase-6-contract-ali
 
 ## Verification
 
-Final checks: `dart format .` (151 files, no outstanding changes), `flutter analyze` (no issues), `flutter test` (**270 passed**) and `git diff --check` passed. Focused repository tests cover receipt history after a later revision, proposal-owner mismatch, missing acceptance identities and stale-account responses. Passport transaction tests cover duplicate awards, atomic failures, committed-response ambiguity and account switches.
+Final checks: formatting, `flutter analyze` (no issues), `flutter test` (**275 passed**) and `git diff --check` passed. Focused repository tests cover receipt history after a later revision, proposal-owner mismatch, missing acceptance identities and stale-account responses. Passport transaction tests cover duplicate awards, atomic failures, committed-response ambiguity and account switches. Five additional HTTP transport tests preserve canonical `{error: {code, message, details}}` errors and legacy FastAPI `detail` errors; native execution exposed the missing conflict-code parsing.
 
-The Website companion has 123 passing backend tests, 38 passing browser contract tests and 11 passing Firestore emulator tests, plus a clean type/lint/build gate. Companion rules are deployed to `naviigo-firebase/naviigo-db` and read-back verified against the checked-in file.
+The Website companion has 125 passing backend tests (including the hotel-provider follow-up), 38 passing browser contract tests and 11 passing Firestore emulator tests, plus a clean type/lint/build gate. Companion rules are deployed to `naviigo-firebase/naviigo-db` and read-back verified against the checked-in file. Website/backend deployment status and subsequent follow-ups are tracked in the separate release report.
 
 A pre-existing lifecycle test used a fixed 15 October 2026 departure date and failed as the real clock entered its start window. Its future fixture is now relative to the test date; production lifecycle/start-gate rules were not retuned.
 
 ## Remaining release validation
 
-Native-device/deployed-Firebase checks remain for platform token acquisition during account transitions, OS location permissions/accuracy, process termination and owner-scoped Hive persistence, deployed bearer attribution, transaction acknowledgment and repeated replan recovery across mobile and browser. No native/deployed environment was claimed verified.
+Four native Android emulator scenarios passed using the actual Geolocator and Firebase plugins: three real location/permission/start-gate checks and one combined account/owner/backend scenario. The latter exercised native token claims, A/B switching, named-database server reads and denial, actual deployed proposal creation/acceptance/replay, booked-activity preservation, typed 409 conflicts and bearer-derived cross-account denial. The token-switch race and 401 retry used an HTTP spy with real native Firebase tokens; they were not production 401 injections. The framework also reports its teardown as a fifth success.
+
+The final emulator run passed after an initial transient `cloud_firestore/unavailable` failure; no assertion was relaxed. All fresh synthetic identities and records were cleaned up after each run. Host-side live checks separately passed 11 deployed rules cases, seven backend cases, seven Website-proxy cases and four generated tired-proposal cases.
+
+Physical-device permission/accuracy behavior, process termination and owner-scoped offline Hive persistence remain unverified. Fresh itinerary generation currently fails closed with `DESTINATION_DATA_UNAVAILABLE`: Render lacks `GEOAPIFY_API_KEY`. The existing local key was verified without exposing it; specific approval to transfer it into Render is pending. This is a production release blocker, not a passed generation test.
 
 Passport/history displays existing durable completion records; this phase adds no automatic completion or verified-visit award endpoint. Website's older non-atomic completion award is explicitly unavailable. Public sharing is explicit/view-only; legacy ownerless or malformed projections fail closed, with no automatic migration.
 
-Independent release review identified and fixed retained Passport data during account switching, a stale journey-memory dialog writing under the next account, progress keys surviving removed activities, and historical receipt recovery without base validation. UID-family auto-disposed Passport streams, an owner check in the dialog, authoritative stable-ID progress reconciliation and exact receipt-base validation now cover those boundaries. Regression tests include delayed account streams and late local-write acknowledgments. These bounded reviews and mocked tests do not establish physical-device or deployed-Firebase behavior.
+Independent release review identified and fixed retained Passport data during account switching, a stale journey-memory dialog writing under the next account, progress keys surviving removed activities, and historical receipt recovery without base validation. UID-family auto-disposed Passport streams, an owner check in the dialog, authoritative stable-ID progress reconciliation and exact receipt-base validation now cover those boundaries. Regression tests include delayed account streams and late local-write acknowledgments. The additional error-envelope and native-test scheduling changes received a narrow independent review with no blocker found. Physical-device behavior remains outside this verification.
 
 Companion production Firestore rules deployment is verified. Website/backend merge and deployment status are tracked separately in the release report. No forced push, history rewrite, data wipe/bulk migration, credential revocation/rotation, billing change or later product phase was performed.
 
-Android native integration execution was attempted on a read-only local emulator. Debug builds failed before test execution because Gradle 8.12 could not move temporary transform workspaces into its cache, including with an isolated cache. The 270 Dart/widget tests passed; the native location tests and physical-device checks remain unverified.
+Windows Gradle 8.12 could not move temporary transform workspaces into its cache. An isolated WSL build using official Flutter 3.32.8, Java 17 and matching Android tools succeeded and ran on the read-only emulator. The three maintained location tests now wrap real plugin awaits in `tester.runAsync`, keeping their existing assertions outside the widget test's simulated clock. No SDK downgrade, endpoint-protection change, user AVD wipe or location-policy retuning was performed.
