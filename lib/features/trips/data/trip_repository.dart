@@ -7,6 +7,7 @@ import '../../../core/network/api_exceptions.dart';
 import '../../../core/network/firebase_client.dart';
 import '../../../core/constants/master_destinations.dart';
 import '../domain/models/trip_itinerary_model.dart';
+import '../domain/models/trip_operation_models.dart';
 
 class ItineraryGenerationResponseException implements Exception {
   final String message;
@@ -97,6 +98,143 @@ class TripRepository {
       final timeB = b.updatedAt ?? b.createdAt ?? DateTime(2000);
       return timeB.compareTo(timeA);
     });
+  }
+
+  DocumentReference<Map<String, dynamic>> _ownerItineraryRef(
+    String uid,
+    String itineraryId,
+  ) {
+    return _firestore
+        .collection('users')
+        .doc(uid)
+        .collection('itineraries')
+        .doc(itineraryId);
+  }
+
+  /// Reads only the canonical owner document.  This helper is deliberately
+  /// separate from [getTripById], whose legacy cache fallback is appropriate
+  /// for display but never for a Phase 6 mutation or receipt.
+  Future<TripItineraryModel> _readVerifiedOwnerTrip(
+    String uid,
+    String itineraryId, {
+    String? expectedRevisionId,
+    bool requireStableActivityIdentity = false,
+  }) async {
+    _requireCurrentUser(uid);
+    if (itineraryId.trim().isEmpty) {
+      throw const ValidationException('An itinerary ID is required.');
+    }
+    final doc = await _ownerItineraryRef(uid, itineraryId).get();
+    _requireCurrentUser(uid);
+    if (!doc.exists) {
+      throw const NotFoundException('The owner itinerary was not found.');
+    }
+
+    final parsed = _bindOwnedTrip(uid, TripItineraryModel.fromFirestore(doc));
+    if (parsed == null) {
+      throw const ForbiddenException(
+        'This itinerary is not owned by the signed-in account.',
+      );
+    }
+    if (parsed.id != itineraryId) {
+      throw const ItineraryGenerationResponseException(
+        'The owner itinerary identity could not be verified.',
+      );
+    }
+    if (expectedRevisionId != null && parsed.revisionId != expectedRevisionId) {
+      throw ConflictException(
+        'The itinerary changed before this operation could be applied.',
+        conflictCode: 'STALE_PROPOSAL',
+        details: {
+          'itineraryId': itineraryId,
+          'baseRevisionId': expectedRevisionId,
+          'currentRevisionId': parsed.revisionId,
+        },
+      );
+    }
+    if (requireStableActivityIdentity) {
+      parsed.requireStableActivityIdentity();
+      if (parsed.revisionId == null || parsed.revisionId!.isEmpty) {
+        throw const TripActivityIdentityException(
+          'A server revision is required before an itinerary can be replanned.',
+        );
+      }
+    }
+    return parsed;
+  }
+
+  Future<TripItineraryModel?> _tryReconcileOperation(
+    String uid,
+    String itineraryId, {
+    TripOperationReceipt? expectedReceipt,
+    bool requireStableActivityIdentity = true,
+  }) async {
+    try {
+      final doc = await _ownerItineraryRef(uid, itineraryId).get();
+      _requireCurrentUser(uid);
+      if (!doc.exists) return null;
+      final parsed = _bindOwnedTrip(uid, TripItineraryModel.fromFirestore(doc));
+      if (parsed == null) return null;
+      TripOperationReceipt? receipt;
+      for (final candidate in parsed.operationReceipts) {
+        if (expectedReceipt != null) {
+          if (candidate.status == expectedReceipt.status &&
+              candidate.matches(
+                ownerUid: expectedReceipt.ownerUid,
+                itineraryId: expectedReceipt.itineraryId,
+                operationId: expectedReceipt.operationId,
+                revisionId: expectedReceipt.revisionId,
+              )) {
+            receipt = candidate;
+            break;
+          }
+        } else if (candidate.status == 'committed' &&
+            candidate.matches(
+              ownerUid: uid,
+              itineraryId: itineraryId,
+              operationId: itineraryId,
+            )) {
+          receipt = candidate;
+          break;
+        }
+      }
+      // A historical receipt confirms an operation without rolling back the
+      // owner's newer accepted itinerary. Without a stored receipt, only an
+      // exact response/owner revision match is usable for compatibility.
+      if (parsed.id != itineraryId || parsed.revisionId == null) return null;
+      if (receipt == null &&
+          (expectedReceipt == null ||
+              parsed.revisionId != expectedReceipt.revisionId)) {
+        return null;
+      }
+      if (requireStableActivityIdentity) {
+        parsed.requireStableActivityIdentity();
+      }
+      return parsed.copyWith(operationReceipt: receipt ?? expectedReceipt);
+    } on AuthRequiredException {
+      rethrow;
+    } on TripActivityIdentityException {
+      return null;
+    } catch (_) {
+      // Reconciliation is best effort after an ambiguous network result.  The
+      // original request error remains the caller-visible failure when no
+      // verified owner document can be found.
+      return null;
+    }
+  }
+
+  Future<TripItineraryModel> _cacheVerifiedTrip(
+    String uid,
+    TripItineraryModel trip,
+  ) async {
+    if (trip.isEphemeral || trip.userId != uid) {
+      throw const ItineraryGenerationResponseException(
+        'Only a verified durable owner itinerary can be cached.',
+      );
+    }
+    await _cacheTrip(uid, trip);
+    _requireCurrentUser(uid);
+    return trip;
   }
 
   /// Stream user itineraries directly from users/{uid}/itineraries in
@@ -421,12 +559,22 @@ class TripRepository {
     String? originCity,
     List<Map<String, dynamic>>? mustDo,
     List<Map<String, dynamic>>? routeStops,
+
+    /// Optional for backwards compatibility with the Phase 4 direct-preview
+    /// caller.  Supplying it opts into the Phase 6 durable receipt contract.
+    String? operationId,
     required String expectedAuthUid,
   }) async {
     if (expectedAuthUid.trim().isEmpty ||
         _currentUserUid() != expectedAuthUid) {
       throw const AuthRequiredException(
         'Your account is no longer available for this request.',
+      );
+    }
+    final normalizedOperationId = operationId?.trim();
+    if (operationId != null && normalizedOperationId!.isEmpty) {
+      throw const ValidationException(
+        'A non-empty operation ID is required for durable generation.',
       );
     }
 
@@ -498,15 +646,30 @@ class TripRepository {
       if (originCity != null) 'originCity': originCity,
       if (mustDo != null) 'mustDo': mustDo,
       if (routeStops != null) 'routeStops': routeStops,
+      if (normalizedOperationId != null) 'operationId': normalizedOperationId,
     };
 
-    final response = await _apiClient.post(
-      '/api/itinerary/generate',
-      body: payload,
-      requiresAuth: true,
-      timeout: AppConfig.aiGenerationTimeout,
-      expectedAuthUid: expectedAuthUid,
-    );
+    dynamic response;
+    try {
+      response = await _apiClient.post(
+        '/api/itinerary/generate',
+        body: payload,
+        requiresAuth: true,
+        timeout: AppConfig.aiGenerationTimeout,
+        expectedAuthUid: expectedAuthUid,
+      );
+    } catch (error) {
+      if (normalizedOperationId != null && error is! AuthRequiredException) {
+        final reconciled = await _tryReconcileOperation(
+          expectedAuthUid,
+          normalizedOperationId,
+        );
+        if (reconciled != null) {
+          return await _cacheVerifiedTrip(expectedAuthUid, reconciled);
+        }
+      }
+      rethrow;
+    }
 
     if (_currentUserUid() != expectedAuthUid) {
       throw const AuthRequiredException(
@@ -535,7 +698,58 @@ class TripRepository {
     }
 
     final itinData = Map<String, dynamic>.from(itineraryRaw);
-    _validateGeneratedItinerary(itinData);
+    final receipt = TripOperationReceipt.tryFromMap(response['receipt']);
+    _validateGeneratedItinerary(
+      itinData,
+      // A preview without a receipt remains compatible with the legacy direct
+      // generation response.  Stable IDs become mandatory once the server
+      // claims that the operation was durably committed.
+      requireStableActivityIdentity:
+          normalizedOperationId != null && receipt != null,
+    );
+
+    if (normalizedOperationId != null && receipt != null) {
+      final responseItineraryId =
+          _nonEmptyString(itinData['id']) ?? _nonEmptyString(itinData['uuid']);
+      if (receipt.status != 'committed' ||
+          receipt.itineraryId != normalizedOperationId ||
+          !receipt.matches(
+            ownerUid: expectedAuthUid,
+            itineraryId: responseItineraryId ?? receipt.itineraryId,
+            operationId: normalizedOperationId,
+          )) {
+        throw const ItineraryGenerationResponseException(
+          'The generation receipt did not match the initiating operation.',
+        );
+      }
+      final reconciled = await _tryReconcileOperation(
+        expectedAuthUid,
+        receipt.itineraryId,
+        expectedReceipt: receipt,
+      );
+      if (reconciled == null) {
+        throw const ItineraryGenerationResponseException(
+          'Generation was acknowledged but its owner receipt could not be verified.',
+        );
+      }
+      return await _cacheVerifiedTrip(
+        expectedAuthUid,
+        reconciled.copyWith(operationReceipt: receipt),
+      );
+    }
+
+    // A response without a receipt is not durable.  An ambiguous response can
+    // still be reconciled by the operation ID, but only an owner document with
+    // its own matching receipt is allowed to clear the ephemeral boundary.
+    if (normalizedOperationId != null) {
+      final reconciled = await _tryReconcileOperation(
+        expectedAuthUid,
+        normalizedOperationId,
+      );
+      if (reconciled != null) {
+        return await _cacheVerifiedTrip(expectedAuthUid, reconciled);
+      }
+    }
 
     final responseId = _nonEmptyString(itinData['id']);
     final responseUuid = _nonEmptyString(itinData['uuid']);
@@ -567,7 +781,331 @@ class TripRepository {
       'isEphemeral': true,
       'createdAt': itinData['createdAt'] ?? now,
       'updatedAt': itinData['updatedAt'] ?? now,
+      if (receipt != null) 'receipt': receipt.toMap(),
     });
+  }
+
+  /// Requests a server-owned replan proposal.  The owner document is read
+  /// first so an old local revision or a legacy/name-only activity set can
+  /// never reach the mutation endpoint.
+  Future<ReplanProposal> requestReplan({
+    required String uid,
+    required String itineraryId,
+    required String operationId,
+    required String baseRevisionId,
+    required int currentDayNumber,
+    required String currentTime,
+    String reason = 'I_AM_TIRED',
+    List<String> completedActivityIds = const [],
+    List<String> skippedActivityIds = const [],
+    Object? location,
+    String destinationTimezone = 'UTC',
+  }) async {
+    final request = ReplanRequest(
+      itineraryId: itineraryId,
+      operationId: operationId,
+      baseRevisionId: baseRevisionId,
+      currentDayNumber: currentDayNumber,
+      currentTime: currentTime,
+      reason: reason,
+      completedActivityIds: completedActivityIds,
+      skippedActivityIds: skippedActivityIds,
+      location: _parseReplanLocation(location),
+      destinationTimezone: destinationTimezone,
+    );
+    return requestReplanForRequest(uid: uid, request: request);
+  }
+
+  /// Object-based variant keeps the domain request reusable by callers that
+  /// already validated the values at a boundary.
+  Future<ReplanProposal> requestReplanForRequest({
+    required String uid,
+    required ReplanRequest request,
+  }) async {
+    _requireCurrentUser(uid);
+    if (request.itineraryId.isEmpty || request.operationId.isEmpty) {
+      throw const ValidationException(
+        'Itinerary and replan operation IDs are required.',
+      );
+    }
+    final trip = await _readReplanBase(
+      uid: uid,
+      itineraryId: request.itineraryId,
+      baseRevisionId: request.baseRevisionId,
+    );
+    _validateProgressIds(trip, request);
+
+    final response = await _apiClient.post(
+      '/api/itinerary/replan',
+      body: request.toMap(),
+      requiresAuth: true,
+      expectedAuthUid: uid,
+    );
+    _requireCurrentUser(uid);
+    if (response is! Map || response['success'] != true) {
+      throw const ItineraryGenerationResponseException(
+        'The replan service returned an invalid proposal response.',
+      );
+    }
+    final rawProposal = response['proposal'];
+    if (rawProposal is! Map || rawProposal['ownerUid'] != uid) {
+      throw const ItineraryGenerationResponseException(
+        'The replan service returned no proposal.',
+      );
+    }
+    final proposal = ReplanProposal.fromMap(rawProposal);
+    if (proposal.itineraryId != request.itineraryId ||
+        proposal.baseRevisionId != request.baseRevisionId ||
+        proposal.operationId != request.operationId) {
+      throw const ItineraryGenerationResponseException(
+        'The replan proposal did not match the requested owner revision.',
+      );
+    }
+    if (proposal.reason != request.reason) {
+      throw const ItineraryGenerationResponseException(
+        'The replan proposal reason did not match the request.',
+      );
+    }
+    return proposal;
+  }
+
+  /// Accepts a server-owned proposal and returns the owner document after its
+  /// revision-bound receipt has been verified.  Client proposal data is never
+  /// sent and therefore cannot become mutation authority.
+  Future<ReplanAcceptanceResult> acceptReplan({
+    required String uid,
+    required String itineraryId,
+    required String proposalId,
+    required String operationId,
+    required String baseRevisionId,
+  }) async {
+    _requireCurrentUser(uid);
+    if (proposalId.trim().isEmpty || operationId.trim().isEmpty) {
+      throw const ValidationException(
+        'Proposal and acceptance operation IDs are required.',
+      );
+    }
+
+    // Reconcile first. A retried operation can already be accepted while the
+    // owner document has advanced to a newer revision; checking the submitted
+    // base revision before this lookup would incorrectly turn an idempotent
+    // replay into a stale-proposal failure.
+    final alreadyAccepted = await _tryReconcileAcceptedOperation(
+      uid: uid,
+      itineraryId: itineraryId,
+      proposalId: proposalId,
+      operationId: operationId,
+    );
+    if (alreadyAccepted != null) return alreadyAccepted;
+
+    await _readReplanBase(
+      uid: uid,
+      itineraryId: itineraryId,
+      baseRevisionId: baseRevisionId,
+    );
+
+    dynamic response;
+    try {
+      response = await _apiClient.post(
+        '/api/itinerary/replan/accept',
+        body: {
+          'itineraryId': itineraryId,
+          'proposalId': proposalId,
+          'baseRevisionId': baseRevisionId,
+          'operationId': operationId,
+        },
+        requiresAuth: true,
+        expectedAuthUid: uid,
+      );
+    } catch (error) {
+      if (error is! AuthRequiredException) {
+        final reconciled = await _tryReconcileAcceptedOperation(
+          uid: uid,
+          itineraryId: itineraryId,
+          proposalId: proposalId,
+          operationId: operationId,
+        );
+        if (reconciled != null) return reconciled;
+      }
+      rethrow;
+    }
+    _requireCurrentUser(uid);
+    if (response is! Map || response['success'] != true) {
+      throw const ItineraryGenerationResponseException(
+        'The replan acceptance response was invalid.',
+      );
+    }
+    final receipt = TripOperationReceipt.tryFromMap(response['receipt']);
+    if (receipt == null ||
+        receipt.status != 'accepted' ||
+        !receipt.matches(
+          ownerUid: uid,
+          itineraryId: itineraryId,
+          operationId: operationId,
+        ) ||
+        receipt.proposalId != proposalId ||
+        receipt.previousRevisionId != baseRevisionId) {
+      throw const ItineraryGenerationResponseException(
+        'The replan acceptance receipt could not be verified.',
+      );
+    }
+
+    // A first acceptance must return the revision it committed. On an
+    // idempotent replay, however, the owner document may have advanced after
+    // that historical receipt; the current owner snapshot is still the only
+    // itinerary safe to render.
+    final authoritative = await _readVerifiedOwnerTrip(
+      uid,
+      itineraryId,
+      requireStableActivityIdentity: true,
+    );
+    var verifiedReplay = receipt.idempotent;
+    if (authoritative.revisionId != receipt.revisionId) {
+      final historicalReceipt = _receiptForAcceptedOperation(
+        authoritative,
+        uid: uid,
+        itineraryId: itineraryId,
+        proposalId: proposalId,
+        operationId: operationId,
+      );
+      if (historicalReceipt == null ||
+          historicalReceipt.revisionId != receipt.revisionId ||
+          historicalReceipt.previousRevisionId != receipt.previousRevisionId) {
+        throw const ItineraryGenerationResponseException(
+          'The accepted replan receipt did not match the current owner revision.',
+        );
+      }
+      verifiedReplay = true;
+    }
+    final verified = await _cacheVerifiedTrip(
+      uid,
+      authoritative.copyWith(operationReceipt: receipt),
+    );
+    return ReplanAcceptanceResult(
+      receipt: receipt,
+      itinerary: verified,
+      idempotent: verifiedReplay,
+    );
+  }
+
+  Future<ReplanAcceptanceResult?> _tryReconcileAcceptedOperation({
+    required String uid,
+    required String itineraryId,
+    required String proposalId,
+    required String operationId,
+  }) async {
+    try {
+      final doc = await _ownerItineraryRef(uid, itineraryId).get();
+      _requireCurrentUser(uid);
+      if (!doc.exists) return null;
+      final trip = _bindOwnedTrip(uid, TripItineraryModel.fromFirestore(doc));
+      final receipt = trip == null
+          ? null
+          : _receiptForAcceptedOperation(
+              trip,
+              uid: uid,
+              itineraryId: itineraryId,
+              proposalId: proposalId,
+              operationId: operationId,
+            );
+      if (trip == null ||
+          receipt == null ||
+          receipt.status != 'accepted' ||
+          trip.id != itineraryId ||
+          trip.userId != uid ||
+          trip.revisionId == null ||
+          trip.revisionId!.isEmpty) {
+        return null;
+      }
+      trip.requireStableActivityIdentity();
+      final verified = await _cacheVerifiedTrip(uid, trip);
+      return ReplanAcceptanceResult(
+        receipt: receipt,
+        itinerary: verified,
+        // This path is reached by a retry/reconciliation, regardless of
+        // whether the original receipt explicitly carried an idempotent bit.
+        idempotent: true,
+      );
+    } on AuthRequiredException {
+      rethrow;
+    } on TripActivityIdentityException {
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static TripOperationReceipt? _receiptForAcceptedOperation(
+    TripItineraryModel trip, {
+    required String uid,
+    required String itineraryId,
+    required String proposalId,
+    required String operationId,
+  }) {
+    for (final receipt in [
+      if (trip.operationReceipt != null) trip.operationReceipt!,
+      ...trip.operationReceipts,
+    ]) {
+      if (receipt.status == 'accepted' &&
+          receipt.matches(
+            ownerUid: uid,
+            itineraryId: itineraryId,
+            operationId: operationId,
+          ) &&
+          receipt.proposalId == proposalId) {
+        return receipt;
+      }
+    }
+    return null;
+  }
+
+  static ReplanLocation? _parseReplanLocation(Object? location) {
+    if (location == null) return null;
+    if (location is ReplanLocation) return location;
+    if (location is Map) return ReplanLocation.fromMap(location);
+    throw const ValidationException(
+      'Replan location must be a coordinate map.',
+    );
+  }
+
+  Future<TripItineraryModel> _readReplanBase({
+    required String uid,
+    required String itineraryId,
+    required String baseRevisionId,
+  }) async {
+    try {
+      return await _readVerifiedOwnerTrip(
+        uid,
+        itineraryId,
+        expectedRevisionId: baseRevisionId,
+        requireStableActivityIdentity: true,
+      );
+    } on TripActivityIdentityException catch (error) {
+      throw ConflictException(
+        error.message,
+        conflictCode: 'ACTIVITY_IDENTITY_AMBIGUOUS',
+        details: {'itineraryId': itineraryId, 'baseRevisionId': baseRevisionId},
+      );
+    }
+  }
+
+  static void _validateProgressIds(
+    TripItineraryModel trip,
+    ReplanRequest request,
+  ) {
+    final ids = trip.stableActivityIds.toSet();
+    for (final id in [
+      ...request.completedActivityIds,
+      ...request.skippedActivityIds,
+    ]) {
+      if (!ids.contains(id)) {
+        throw ConflictException(
+          'Manual progress references an activity absent from the authoritative itinerary.',
+          conflictCode: 'ACTIVITY_IDENTITY_AMBIGUOUS',
+          details: {'activityId': id},
+        );
+      }
+    }
   }
 
   static String? _nonEmptyString(dynamic value) {
@@ -583,7 +1121,10 @@ class TripRepository {
     return null;
   }
 
-  static void _validateGeneratedItinerary(Map<String, dynamic> itinerary) {
+  static void _validateGeneratedItinerary(
+    Map<String, dynamic> itinerary, {
+    bool requireStableActivityIdentity = false,
+  }) {
     if (itinerary.isEmpty) {
       throw const ItineraryGenerationResponseException(
         'The itinerary service returned an empty itinerary.',
@@ -637,7 +1178,36 @@ class TripRepository {
             'The itinerary service returned an activity without a name.',
           );
         }
+        if (requireStableActivityIdentity) {
+          final activityId = activity['activityId'] ?? activity['id'];
+          if (activityId is! String || activityId.trim().isEmpty) {
+            throw const ItineraryGenerationResponseException(
+              'The durable itinerary returned an activity without a stable activityId.',
+            );
+          }
+        }
         hasActivity = true;
+      }
+    }
+
+    if (requireStableActivityIdentity) {
+      final ids = <String>{};
+      for (final rawPlan in rawPlans) {
+        final plan = Map<String, dynamic>.from(rawPlan as Map);
+        final rawActivities =
+            _firstPresent(plan, const ['activities', 'items', 'schedule'])
+                as List;
+        for (final rawActivity in rawActivities) {
+          final activity = Map<String, dynamic>.from(rawActivity as Map);
+          final id = (activity['activityId'] ?? activity['id'])
+              .toString()
+              .trim();
+          if (!ids.add(id)) {
+            throw const ItineraryGenerationResponseException(
+              'The durable itinerary returned duplicate activity identities.',
+            );
+          }
+        }
       }
     }
 

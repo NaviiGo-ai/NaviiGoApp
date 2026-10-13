@@ -42,7 +42,7 @@ class PastTripsPage extends ConsumerWidget {
             return _buildEmptyState(context);
           }
 
-          final stats = passportStatsAsync.value;
+          final stats = passportStatsAsync.valueOrNull;
           final statesCount = stats?.statesVisited.length ?? 0;
           final stampsCount = stats?.totalStamps ?? 0;
 
@@ -68,12 +68,25 @@ class PastTripsPage extends ConsumerWidget {
                     children: [
                       _buildStatItem('${pastTrips.length}', 'Past Journeys'),
                       Container(width: 1, height: 40, color: Colors.white24),
-                      _buildStatItem('$statesCount', 'States Visited'),
+                      _buildStatItem(
+                        passportStatsAsync.hasError ? '—' : '$statesCount',
+                        'States Visited',
+                      ),
                       Container(width: 1, height: 40, color: Colors.white24),
-                      _buildStatItem('$stampsCount', 'Stamps Earned'),
+                      _buildStatItem(
+                        passportStatsAsync.hasError ? '—' : '$stampsCount',
+                        'Stamps Earned',
+                      ),
                     ],
                   ),
                 ),
+                if (passportStatsAsync.hasError) ...[
+                  const SizedBox(height: 10),
+                  const Text(
+                    'Passport stats are unavailable right now; journey history is still shown from lifecycle records.',
+                    style: TextStyle(color: Colors.black54, fontSize: 12),
+                  ),
+                ],
                 const SizedBox(height: 24),
 
                 const Text(
@@ -125,7 +138,7 @@ class PastTripsPage extends ConsumerWidget {
             ),
             const SizedBox(height: 24),
             ElevatedButton(
-              onPressed: () => context.go('/explore'),
+              onPressed: () => context.go('/trip-planner'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFEC6426),
                 padding: const EdgeInsets.symmetric(
@@ -137,7 +150,7 @@ class PastTripsPage extends ConsumerWidget {
                 ),
               ),
               child: const Text(
-                'Discover Destinations',
+                'Plan another trip',
                 style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,

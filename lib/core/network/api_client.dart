@@ -261,11 +261,17 @@ class ApiClient {
       return decoded;
     }
 
-    final errorMessage = (decoded is Map && decoded['detail'] != null)
-        ? decoded['detail'].toString()
-        : (decoded is Map && decoded['error'] != null)
-        ? decoded['error'].toString()
-        : 'Request failed with status $code';
+    final rawDetail = decoded is Map ? decoded['detail'] : null;
+    final detailMap = rawDetail is Map
+        ? Map<String, dynamic>.from(rawDetail)
+        : null;
+    final errorMessage =
+        detailMap?['message']?.toString() ??
+        (rawDetail != null
+            ? rawDetail.toString()
+            : (decoded is Map && decoded['error'] != null)
+            ? decoded['error'].toString()
+            : 'Request failed with status $code');
 
     switch (code) {
       case 400:
@@ -273,12 +279,35 @@ class ApiClient {
           errorMessage,
           decoded is Map<String, dynamic> ? decoded : null,
         );
+      case 409:
+        final rawErrorCode =
+            detailMap?['code'] ??
+            detailMap?['errorCode'] ??
+            detailMap?['type'] ??
+            (decoded is Map ? decoded['code'] : null) ??
+            (decoded is Map ? decoded['errorCode'] : null) ??
+            (rawDetail is String ? rawDetail : null);
+        final details =
+            detailMap ??
+            (decoded is Map<String, dynamic>
+                ? Map<String, dynamic>.from(decoded)
+                : null);
+        throw ConflictException(
+          errorMessage,
+          conflictCode: rawErrorCode?.toString(),
+          details: details,
+        );
       case 401:
         throw AuthRequiredException(errorMessage);
       case 403:
         throw ForbiddenException(errorMessage);
       case 404:
         throw NotFoundException(errorMessage);
+      case 422:
+        throw UnprocessableEntityException(
+          errorMessage,
+          decoded is Map<String, dynamic> ? decoded : detailMap,
+        );
       case 429:
         throw RateLimitException(errorMessage);
       case 500:

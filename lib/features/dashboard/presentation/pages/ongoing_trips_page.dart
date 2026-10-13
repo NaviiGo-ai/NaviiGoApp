@@ -6,6 +6,7 @@ import '../../../../core/theme/app_typography.dart';
 import '../../../trips/presentation/providers/trip_provider.dart';
 import '../../../trips/domain/models/trip_itinerary_model.dart';
 import '../../../bookings/presentation/providers/passport_provider.dart';
+import '../../../bookings/data/passport_repository.dart';
 import '../../../bookings/domain/models/passport_model.dart';
 import '../../../places/presentation/providers/places_provider.dart';
 import '../../../../core/auth/auth_provider.dart';
@@ -66,13 +67,28 @@ class _OngoingTripsPageState extends ConsumerState<OngoingTripsPage>
 
   @override
   Widget build(BuildContext context) {
-    TripItineraryModel? activeTrip = ref.watch(activeTripProvider);
+    final tripsAsync = ref.watch(userTripsStreamProvider);
+    final activeTrip = ref.watch(activeTripProvider);
 
-    if (activeTrip == null) {
-      final allTrips = ref.watch(userTripsStreamProvider).value ?? [];
-      if (allTrips.isNotEmpty) {
-        activeTrip = allTrips.first;
-      }
+    // Loading is not evidence of a live journey. Keep the distinction from an
+    // authoritative empty result so this page cannot briefly render another
+    // trip while the owner stream is reconnecting.
+    if (tripsAsync.isLoading && !tripsAsync.hasValue) {
+      return _buildStateScaffold(
+        context,
+        title: 'Live Companion',
+        child: const Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
+        ),
+      );
+    }
+
+    if (tripsAsync.hasError && !tripsAsync.hasValue) {
+      return _buildStateScaffold(
+        context,
+        title: 'Live Companion',
+        child: _buildUnavailableState(context),
+      );
     }
 
     // No trip means no companion — never invent a journey to fill the screen.
@@ -148,6 +164,64 @@ class _OngoingTripsPageState extends ConsumerState<OngoingTripsPage>
         ],
       ),
       body: _buildLiveCompanionContent(context, activeTrip),
+    );
+  }
+
+  Widget _buildStateScaffold(
+    BuildContext context, {
+    required String title,
+    required Widget child,
+  }) {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        backgroundColor: AppColors.background,
+        elevation: 0,
+        leading: const NavHubLeading(),
+        title: Text(
+          title,
+          style: AppTypography.tripTitle(
+            color: AppColors.brown,
+          ).copyWith(fontSize: 18),
+        ),
+        centerTitle: true,
+      ),
+      body: child,
+    );
+  }
+
+  Widget _buildUnavailableState(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.cloud_off_rounded,
+              size: 48,
+              color: AppColors.textTertiary,
+            ),
+            const SizedBox(height: 14),
+            Text(
+              'Live journey unavailable',
+              style: AppTypography.sectionTitle(color: AppColors.textPrimary),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Your saved journey status could not be confirmed. Nothing is shown as live until the owner record is available.',
+              style: AppTypography.caption(color: AppColors.textSecondary),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 18),
+            OutlinedButton(
+              onPressed: () => ref.invalidate(userTripsStreamProvider),
+              child: const Text('TRY AGAIN'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -923,25 +997,72 @@ class _OngoingTripsPageState extends ConsumerState<OngoingTripsPage>
           ),
           ElevatedButton(
             onPressed: () async {
-              if (noteController.text.trim().isNotEmpty) {
-                final uid = ref.read(currentUserProvider)?.uid ?? 'guest';
-                final stamp = PassportStampModel(
-                  id: 'stamp_${DateTime.now().millisecondsSinceEpoch}',
-                  name: 'Live Moment at ${trip.destName}',
-                  location: trip.destName,
-                  state: 'India',
-                  activities: [noteController.text.trim()],
-                  visitedDate: DateTime.now(),
-                );
-                await ref
-                    .read(passportRepositoryProvider)
-                    .addPassportStamp(uid, stamp);
+              final note = noteController.text.trim();
+              if (note.isEmpty) return;
+
+              final uid = ref.read(currentUserProvider)?.uid;
+              if (uid == null || uid.isEmpty) {
                 if (ctx.mounted) Navigator.pop(ctx);
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('Moment stamped to your Digital Passport!'),
+                      content: Text('Sign in again before saving a moment.'),
+                      backgroundColor: AppColors.error,
+                    ),
+                  );
+                }
+                return;
+              }
+
+              // A repeated tap/retry for the same trip and note resolves to
+              // the same owner-scoped document. Do not use a timestamp as an
+              // award identity: ambiguous writes must be safely retryable.
+              final awardKey = PassportRepository.deterministicAwardKey(
+                trip.uuid,
+                note,
+              );
+              final stamp = PassportStampModel(
+                id: awardKey,
+                awardKey: awardKey,
+                name: 'Live Moment at ${trip.destName}',
+                location: trip.destName,
+                state: 'India',
+                activities: [note],
+                verificationMethod: 'traveller_note',
+                visitedDate: DateTime.now(),
+              );
+
+              try {
+                final result = await ref
+                    .read(passportRepositoryProvider)
+                    .addPassportStamp(uid, stamp);
+                // A late response from another account must never be shown in
+                // the current session. The owner write is still guarded by
+                // Firestore rules and the repository's UID check.
+                if (ref.read(currentUserProvider)?.uid != uid) {
+                  if (ctx.mounted) Navigator.pop(ctx);
+                  return;
+                }
+                if (ctx.mounted) Navigator.pop(ctx);
+                if (context.mounted) {
+                  final message = result == PassportAwardResult.alreadyAwarded
+                      ? 'This moment is already in your Digital Passport.'
+                      : 'Moment saved to your Digital Passport.';
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(message),
                       backgroundColor: AppColors.teal,
+                    ),
+                  );
+                }
+              } catch (_) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Moment could not be saved. Nothing was added to your Passport.',
+                      ),
+                      backgroundColor: AppColors.error,
                     ),
                   );
                 }

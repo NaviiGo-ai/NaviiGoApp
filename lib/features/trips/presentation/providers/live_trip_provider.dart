@@ -1,5 +1,4 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../core/auth/auth_provider.dart';
 import '../../../../core/cache/hive_service.dart';
 import '../../../../core/location/geolocator_location_adapter.dart';
 import '../../../../core/location/location_adapter.dart';
@@ -7,6 +6,11 @@ import '../../domain/models/live_trip_state.dart';
 import '../../domain/models/trip_itinerary_model.dart';
 import '../../domain/services/trip_validation_service.dart';
 import 'trip_provider.dart';
+
+// Keep the historical live-provider import surface available to callers while
+// the owner identity seam lives with the trip streams. This is a re-export,
+// not a second provider, so all owner gates continue to share one value.
+export 'trip_provider.dart' show currentUserIdProvider;
 
 /// ─────────────────────────────────────────────────────────────────────────────
 /// CHECK-IN PERSISTENCE
@@ -108,13 +112,6 @@ class HiveCheckInStore implements CheckInStore, OwnerScopedCheckInStore {
 /// ─────────────────────────────────────────────────────────────────────────────
 final checkInStoreProvider = Provider<CheckInStore>(
   (ref) => HiveCheckInStore(),
-);
-
-/// The signed-in traveller's id, or null. Split out from `currentUserProvider`
-/// so start-trip validation can be exercised without constructing a Firebase
-/// user.
-final currentUserIdProvider = Provider<String?>(
-  (ref) => ref.watch(currentUserProvider)?.uid,
 );
 
 /// Persists the start of a journey. Indirection so the start flow can be tested

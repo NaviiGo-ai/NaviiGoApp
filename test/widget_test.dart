@@ -397,6 +397,7 @@ void main() {
           'destId': 'jaipur',
           'destName': 'Royal Jaipur Heritage',
           'uuid': 'trip_1',
+          'userId': 'test-user',
           'form': {'startDate': '2026-11-20', 'days': 3},
           'generatedData': {
             'title': 'Royal Jaipur Heritage',
@@ -439,6 +440,7 @@ void main() {
             userTripsStreamProvider.overrideWith(
               (ref) => Stream.value(mockTrips),
             ),
+            currentUserIdProvider.overrideWithValue('test-user'),
             safeSavedPlacesProvider.overrideWithValue(mockSavedPlaces),
           ],
         ),
@@ -449,7 +451,7 @@ void main() {
       // Verify Passport Banner & Stats
       expect(find.text('NAVIIGO TRAVEL ARCHIVE'), findsOneWidget);
       expect(find.text('Your Living Journey Record'), findsOneWidget);
-      expect(find.text('JOURNEYS'), findsOneWidget);
+      expect(find.text('COMPLETED JOURNEYS'), findsOneWidget);
       expect(find.text('MOMENTS'), findsOneWidget);
       expect(find.text('SAVED PLACES'), findsNWidgets(2));
 

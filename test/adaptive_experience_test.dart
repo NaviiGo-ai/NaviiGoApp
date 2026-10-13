@@ -232,6 +232,7 @@ void main() {
       uuid: 'historical',
       destId: 'jaipur',
       destName: 'Jaipur',
+      userId: 'test-user',
       status: TripStatus.completed,
       form: {'startDate': '2000-01-01', 'days': 2},
     );
@@ -240,6 +241,7 @@ void main() {
       uuid: 'upcoming',
       destId: 'jaipur',
       destName: 'Jaipur',
+      userId: 'test-user',
       status: TripStatus.upcoming,
       form: {
         'startDate': DateTime.now()
@@ -253,6 +255,7 @@ void main() {
       uuid: 'active',
       destId: 'jaipur',
       destName: 'Jaipur',
+      userId: 'test-user',
       status: TripStatus.active,
       isActive: true,
     );
@@ -277,6 +280,7 @@ void main() {
       test(name, () async {
         final container = ProviderContainer(
           overrides: [
+            currentUserIdProvider.overrideWithValue('test-user'),
             userTripsStreamProvider.overrideWith((ref) => Stream.value(trips)),
           ],
         );

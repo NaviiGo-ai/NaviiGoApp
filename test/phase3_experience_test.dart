@@ -117,6 +117,7 @@ TripItineraryModel _trip({TripStatus? status, DateTime? start}) {
     uuid: 'trip',
     destId: 'jaipur',
     destName: 'Jaipur',
+    userId: 'A',
     status: status,
     form: {if (start != null) 'startDate': start.toIso8601String()},
     dayPlans: const [

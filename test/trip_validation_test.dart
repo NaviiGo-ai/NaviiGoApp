@@ -26,11 +26,15 @@ void main() {
     });
 
     test('TripItineraryModel copyWith and status resolution', () {
+      final futureDate = DateTime.now().add(const Duration(days: 30));
       final trip = TripItineraryModel.fromMap('trip_101', {
         'destId': 'jaipur',
         'destName': 'Jaipur Royalty',
         'userId': 'user_abc',
-        'form': {'startDate': '2026-10-15', 'days': 3},
+        'form': {
+          'startDate': futureDate.toIso8601String().split('T').first,
+          'days': 3,
+        },
       });
 
       expect(trip.userId, 'user_abc');

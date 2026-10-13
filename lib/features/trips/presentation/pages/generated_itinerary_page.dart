@@ -64,10 +64,6 @@ class _GeneratedItineraryPageState
       }
 
       activeTrip = ref.watch(activeTripProvider);
-      if (activeTrip == null) {
-        final allTrips = tripsAsync.value ?? const <TripItineraryModel>[];
-        if (allTrips.isNotEmpty) activeTrip = allTrips.first;
-      }
     }
 
     if (activeTrip == null) {
@@ -300,6 +296,8 @@ class _GeneratedItineraryPageState
                 ),
               ),
             ),
+          if (!trip.isEphemeral && trip.tripStatus != TripStatus.planned)
+            SliverToBoxAdapter(child: _buildLifecycleBanner(trip)),
           SliverToBoxAdapter(
             child: ItineraryViewSwitcher(
               selectedIndex: _viewMode,
@@ -814,6 +812,7 @@ class _GeneratedItineraryPageState
   }
 
   Widget _buildBottomActionBar(BuildContext context, TripItineraryModel trip) {
+    final isActive = trip.tripStatus == TripStatus.active;
     final liveButton = ElevatedButton.icon(
       onPressed: () {
         NavHaptics.fire(NavHaptic.strong);
@@ -822,7 +821,7 @@ class _GeneratedItineraryPageState
         context.push('/live-tracking', extra: trip);
       },
       icon: const Icon(Icons.navigation_rounded, size: 18, color: Colors.white),
-      label: const Text('START LIVE JOURNEY'),
+      label: Text(isActive ? 'OPEN LIVE JOURNEY' : 'START LIVE JOURNEY'),
       style: ElevatedButton.styleFrom(
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
@@ -848,6 +847,103 @@ class _GeneratedItineraryPageState
       child: SafeArea(
         top: false,
         child: SizedBox(width: double.infinity, child: liveButton),
+      ),
+    );
+  }
+
+  Widget _buildLifecycleBanner(TripItineraryModel trip) {
+    final status = trip.tripStatus;
+    final (
+      IconData icon,
+      Color color,
+      String title,
+      String message,
+    ) = switch (status) {
+      TripStatus.completed => (
+        Icons.check_circle_outline_rounded,
+        AppColors.teal,
+        'COMPLETED JOURNEY',
+        'This journey is archived from the owner record. It cannot be started again.',
+      ),
+      TripStatus.cancelled => (
+        Icons.block_outlined,
+        AppColors.error,
+        'CANCELLED JOURNEY',
+        'This journey is terminal and is not included in completed history or Passport claims.',
+      ),
+      TripStatus.active => (
+        Icons.navigation_rounded,
+        AppColors.teal,
+        'IN MOTION',
+        'The owner record confirms this journey is active. Open Live Journey for current actions.',
+      ),
+      TripStatus.eligibleToStart => (
+        Icons.near_me_outlined,
+        AppColors.primary,
+        'READY TO START',
+        'The journey is inside its start window, but it is not active until the start checks succeed.',
+      ),
+      TripStatus.upcoming => (
+        Icons.event_available_outlined,
+        AppColors.primary,
+        'UPCOMING JOURNEY',
+        'This journey is planned for a future date.',
+      ),
+      TripStatus.draft => (
+        Icons.edit_note_outlined,
+        AppColors.textSecondary,
+        'DRAFT JOURNEY',
+        'This journey is not ready to start yet.',
+      ),
+      TripStatus.planned => (
+        Icons.route_outlined,
+        AppColors.primary,
+        'PLANNED JOURNEY',
+        'This saved journey has not been started.',
+      ),
+    };
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 2),
+      child: Semantics(
+        container: true,
+        label: '$title. $message',
+        child: Container(
+          padding: const EdgeInsets.all(13),
+          decoration: BoxDecoration(
+            color: color.withAlpha(18),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: color.withAlpha(85)),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, color: color, size: 20),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: AppTypography.micro(color: color).copyWith(
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      message,
+                      style: AppTypography.caption(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

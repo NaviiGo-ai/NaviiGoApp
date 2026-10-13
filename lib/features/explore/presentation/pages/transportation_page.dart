@@ -59,7 +59,7 @@ class _TransportationPageState extends State<TransportationPage> {
                   ),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<MasterDestination>(
-                    initialValue: _selectedDestination,
+                    value: _selectedDestination,
                     decoration: InputDecoration(
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 12,

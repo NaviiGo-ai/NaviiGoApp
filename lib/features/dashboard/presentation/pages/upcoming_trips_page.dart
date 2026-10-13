@@ -133,7 +133,7 @@ class UpcomingTripsPage extends ConsumerWidget {
                 const SizedBox(height: 24),
 
                 const Text(
-                  'Coming Up Next',
+                  'Your Planned Journeys',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 16),
@@ -184,7 +184,7 @@ class UpcomingTripsPage extends ConsumerWidget {
               onPressed: () => context.go('/trip-planner'),
               icon: const Icon(Icons.add_rounded, color: Colors.white),
               label: const Text(
-                'Plan an Expedition',
+                'Plan another trip',
                 style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
@@ -276,6 +276,17 @@ class UpcomingTripsPage extends ConsumerWidget {
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    trip.tripStatus.label,
+                    style: TextStyle(
+                      color: trip.tripStatus == TripStatus.eligibleToStart
+                          ? const Color(0xFF00666A)
+                          : const Color(0xFFEC6426),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                   const SizedBox(height: 6),

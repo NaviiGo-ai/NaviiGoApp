@@ -23,12 +23,43 @@ class DigitalPassportPage extends ConsumerWidget {
     final userTripsAsync = ref.watch(userTripsStreamProvider);
     final savedPlaces = ref.watch(safeSavedPlacesProvider);
 
-    final stats = statsAsync.valueOrNull;
-    final stamps = stampsAsync.valueOrNull ?? [];
-    final allTrips = userTripsAsync.valueOrNull ?? [];
+    final hasInitialLoading =
+        (statsAsync.isLoading && !statsAsync.hasValue) ||
+        (stampsAsync.isLoading && !stampsAsync.hasValue) ||
+        (userTripsAsync.isLoading && !userTripsAsync.hasValue);
+    final hasLoadError =
+        statsAsync.hasError || stampsAsync.hasError || userTripsAsync.hasError;
 
-    final pastTrips = allTrips.where((t) => t.isPast).toList();
-    final upcomingTrips = allTrips.where((t) => !t.isPast).toList();
+    if (hasInitialLoading) {
+      return _buildStateScaffold(
+        context,
+        title: 'Passport',
+        child: const Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
+        ),
+      );
+    }
+
+    if (hasLoadError &&
+        !statsAsync.hasValue &&
+        !stampsAsync.hasValue &&
+        !userTripsAsync.hasValue) {
+      return _buildStateScaffold(
+        context,
+        title: 'Passport',
+        child: _buildUnavailableState(context, ref),
+      );
+    }
+
+    final stamps = stampsAsync.valueOrNull ?? [];
+    // Only authoritative lifecycle buckets are eligible for Passport. In
+    // particular, cancelled journeys and unconfirmed generation previews are
+    // not visits, even if their dates have elapsed or they are present in a
+    // retained provider value.
+    final pastTrips = ref.watch(pastTripsProvider);
+    final upcomingTrips = ref.watch(upcomingTripsProvider);
+    final passportJourneyCount = pastTrips.length;
+    final passportMomentCount = stamps.length;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -113,11 +144,11 @@ class DigitalPassportPage extends ConsumerWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
-                      _buildArchiveStat('${allTrips.length}', 'JOURNEYS'),
                       _buildArchiveStat(
-                        '${stamps.length + (stats?.totalStamps ?? 0)}',
-                        'MOMENTS',
+                        '$passportJourneyCount',
+                        'COMPLETED JOURNEYS',
                       ),
+                      _buildArchiveStat('$passportMomentCount', 'MOMENTS'),
                       _buildArchiveStat(
                         '${savedPlaces.length}',
                         'SAVED PLACES',
@@ -127,6 +158,10 @@ class DigitalPassportPage extends ConsumerWidget {
                 ],
               ),
             ),
+            if (hasLoadError) ...[
+              const SizedBox(height: 10),
+              _buildPartialErrorNotice(ref),
+            ],
             const SizedBox(height: 28),
 
             // UPCOMING JOURNEYS
@@ -366,6 +401,105 @@ class DigitalPassportPage extends ConsumerWidget {
     );
   }
 
+  Widget _buildStateScaffold(
+    BuildContext context, {
+    required String title,
+    required Widget child,
+  }) {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        backgroundColor: AppColors.background,
+        elevation: 0,
+        leading: const NavHubLeading(),
+        title: Text(
+          title,
+          style: AppTypography.editorialTitle(
+            color: AppColors.brown,
+          ).copyWith(fontSize: 20),
+        ),
+        centerTitle: true,
+      ),
+      body: child,
+    );
+  }
+
+  Widget _buildUnavailableState(BuildContext context, WidgetRef ref) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.cloud_off_rounded,
+              color: AppColors.textTertiary,
+              size: 48,
+            ),
+            const SizedBox(height: 14),
+            Text(
+              'Passport unavailable',
+              style: AppTypography.sectionTitle(color: AppColors.textPrimary),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Your Passport could not be verified right now. No counts or awards are assumed.',
+              style: AppTypography.caption(color: AppColors.textSecondary),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 18),
+            OutlinedButton(
+              onPressed: () {
+                ref.invalidate(passportStatsStreamProvider);
+                ref.invalidate(passportStampsStreamProvider);
+                ref.invalidate(userTripsStreamProvider);
+              },
+              child: const Text('TRY AGAIN'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPartialErrorNotice(WidgetRef ref) {
+    return Semantics(
+      container: true,
+      liveRegion: true,
+      label: 'Some Passport data is unavailable. Counts may be incomplete.',
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppColors.error.withAlpha(14),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.error.withAlpha(75)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.info_outline_rounded, color: AppColors.error),
+            const SizedBox(width: 9),
+            Expanded(
+              child: Text(
+                'Some Passport data is unavailable. Counts may be incomplete.',
+                style: AppTypography.caption(color: AppColors.textPrimary),
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                ref.invalidate(passportStatsStreamProvider);
+                ref.invalidate(passportStampsStreamProvider);
+                ref.invalidate(userTripsStreamProvider);
+              },
+              child: const Text('RETRY'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildArchiveStat(String value, String label) {
     return Column(
       children: [
@@ -540,6 +674,21 @@ class DigitalPassportPage extends ConsumerWidget {
                   '${stamp.name}, ${stamp.state}',
                   style: AppTypography.caption(
                     color: AppColors.textPrimary,
+                  ).copyWith(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  stamp.verificationFailure != null
+                      ? 'Verification unavailable · ${stamp.verificationFailure}'
+                      : stamp.isVerified
+                      ? 'Verified visit'
+                      : 'Memory · not verified',
+                  style: AppTypography.micro(
+                    color: stamp.verificationFailure != null
+                        ? AppColors.error
+                        : stamp.isVerified
+                        ? AppColors.teal
+                        : AppColors.textTertiary,
                   ).copyWith(fontWeight: FontWeight.w700),
                 ),
                 if (stamp.location.isNotEmpty) ...[

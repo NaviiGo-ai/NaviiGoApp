@@ -1,5 +1,19 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../../core/constants/master_destinations.dart';
+import 'trip_operation_models.dart';
+
+/// Raised when a server-owned operation requires stable activity identity but
+/// the itinerary is legacy, duplicated, or missing IDs.  Legacy reads remain
+/// tolerant; mutation callers use this exception to fail closed rather than
+/// guessing from a title or list position.
+class TripActivityIdentityException implements Exception {
+  final String message;
+
+  const TripActivityIdentityException(this.message);
+
+  @override
+  String toString() => message;
+}
 
 class TripActivityModel {
   final String title;
@@ -421,6 +435,18 @@ class TripItineraryModel {
   /// model is safe to render, but must not be presented as a saved/live trip.
   final bool isEphemeral;
 
+  /// Server-owned revision of the durable itinerary.  Missing revisions are
+  /// tolerated for legacy display reads but cannot authorize a replan.
+  final String? revisionId;
+
+  /// Receipt associated with a verified generation or accepted replan.
+  final TripOperationReceipt? operationReceipt;
+
+  /// Receipts retained by the owner document for idempotent replay. A replay
+  /// may return a historical acceptance receipt while the authoritative
+  /// itinerary has since advanced to a newer revision.
+  final List<TripOperationReceipt> operationReceipts;
+
   const TripItineraryModel({
     required this.id,
     required this.uuid,
@@ -441,6 +467,9 @@ class TripItineraryModel {
     this.startLng,
     this.status,
     this.isEphemeral = false,
+    this.revisionId,
+    this.operationReceipt,
+    this.operationReceipts = const [],
   });
 
   factory TripItineraryModel.fromFirestore(
@@ -511,6 +540,42 @@ class TripItineraryModel {
         genData?['metadata'];
     final warningsRaw = data['warnings'] ?? genData?['warnings'];
     final costSum = data['costSummary'] ?? genData?['costSummary'];
+    final revisionsRaw = data['revisions'];
+    String? revisionId = _parseString(
+      data['revisionId'] ??
+          data['currentRevisionId'] ??
+          data['latestRevisionId'] ??
+          genData?['revisionId'] ??
+          genData?['currentRevisionId'],
+    );
+    if (revisionId == null && revisionsRaw is List && revisionsRaw.isNotEmpty) {
+      final latest = revisionsRaw.last;
+      if (latest is Map) {
+        revisionId = _parseString(latest['revisionId']);
+      }
+    }
+    final operationReceipt = TripOperationReceipt.tryFromMap(
+      data['lastReceipt'] ??
+          data['receipt'] ??
+          data['operationReceipt'] ??
+          data['generationReceipt'] ??
+          genData?['receipt'] ??
+          genData?['operationReceipt'],
+    );
+    final operationReceipts = _mergeOperationReceipts(operationReceipt, [
+      ..._parseOperationReceipts(data['acceptanceReceipts']),
+      ..._parseOperationReceipts([
+        if (data['receipt'] != null) data['receipt'],
+        if (data['generationReceipt'] != null) data['generationReceipt'],
+      ]),
+      ..._parseOperationReceipts(
+        data['operationReceipts'] ??
+            data['receipts'] ??
+            data['receiptHistory'] ??
+            genData?['operationReceipts'] ??
+            genData?['receipts'],
+      ),
+    ]);
 
     return TripItineraryModel(
       id: docId,
@@ -560,6 +625,9 @@ class TripItineraryModel {
               (data['status'] ?? form['status']).toString(),
             ),
       isEphemeral: data['isEphemeral'] == true,
+      revisionId: revisionId,
+      operationReceipt: operationReceipt,
+      operationReceipts: operationReceipts,
     );
   }
 
@@ -591,6 +659,35 @@ class TripItineraryModel {
     if (value is String) return DateTime.tryParse(value);
     if (value is int) return DateTime.fromMillisecondsSinceEpoch(value);
     return null;
+  }
+
+  static List<TripOperationReceipt> _parseOperationReceipts(dynamic value) {
+    final rawValues = switch (value) {
+      List raw => raw,
+      Map raw => raw.values.toList(growable: false),
+      _ => const <dynamic>[],
+    };
+    final receipts = <TripOperationReceipt>[];
+    for (final raw in rawValues) {
+      final receipt = TripOperationReceipt.tryFromMap(raw);
+      if (receipt != null) receipts.add(receipt);
+    }
+    return receipts;
+  }
+
+  static List<TripOperationReceipt> _mergeOperationReceipts(
+    TripOperationReceipt? current,
+    List<TripOperationReceipt> historical,
+  ) {
+    final receipts = <TripOperationReceipt>[];
+    final seen = <String>{};
+    for (final receipt in [if (current != null) current, ...historical]) {
+      final key =
+          '${receipt.ownerUid}\u0000${receipt.itineraryId}\u0000'
+          '${receipt.operationId}\u0000${receipt.revisionId}';
+      if (seen.add(key)) receipts.add(receipt);
+    }
+    return List<TripOperationReceipt>.unmodifiable(receipts);
   }
 
   int get totalDays {
@@ -664,6 +761,64 @@ class TripItineraryModel {
     return false;
   }
 
+  /// IDs that were explicitly supplied by the server, in itinerary order.
+  /// This getter never creates IDs from titles, days, places, or positions.
+  List<String> get stableActivityIds => [
+    for (final day in dayPlans)
+      for (final activity in day.activities)
+        if (activity.activityId != null) activity.activityId!,
+  ];
+
+  /// True only when every activity has a unique, non-empty explicit ID.
+  /// An empty itinerary is not a valid replan identity set.
+  bool get hasStableActivityIdentity {
+    final activities = [for (final day in dayPlans) ...day.activities];
+    if (activities.isEmpty) return false;
+    final ids = <String>{};
+    for (final activity in activities) {
+      final id = activity.activityId?.trim();
+      if (id == null || id.isEmpty || !ids.add(id)) return false;
+    }
+    return true;
+  }
+
+  /// Alias used by operation/replan callers.
+  bool get canReplan => hasStableActivityIdentity && revisionId != null;
+
+  TripActivityModel? activityForStableId(String activityId) {
+    final requested = activityId.trim();
+    if (requested.isEmpty || !hasStableActivityIdentity) return null;
+    for (final day in dayPlans) {
+      for (final activity in day.activities) {
+        if (activity.activityId == requested) return activity;
+      }
+    }
+    return null;
+  }
+
+  /// Retains local manual progress only for IDs that are present in the new
+  /// authoritative itinerary. Positional legacy keys are intentionally
+  /// dropped; there is no safe conversion from `day:index` to a new activity.
+  Map<String, T> reconcileManualProgressByActivityId<T>(
+    Map<String, T> localProgress,
+  ) {
+    if (!hasStableActivityIdentity) return <String, T>{};
+    final validIds = stableActivityIds.toSet();
+    return <String, T>{
+      for (final entry in localProgress.entries)
+        if (validIds.contains(entry.key)) entry.key: entry.value,
+    };
+  }
+
+  /// Fails closed for any mutation that would need stable activity identity.
+  void requireStableActivityIdentity() {
+    if (!hasStableActivityIdentity) {
+      throw const TripActivityIdentityException(
+        'Activity identity is ambiguous; replan and progress reconciliation are unavailable.',
+      );
+    }
+  }
+
   /// Inside the start window: from the day before the scheduled departure
   /// through to the end of the journey, and not yet begun, finished, or
   /// abandoned. Late starts stay eligible — real journeys slip.
@@ -725,6 +880,9 @@ class TripItineraryModel {
     List<String>? warnings,
     Map<String, dynamic>? costSummary,
     bool? isEphemeral,
+    String? revisionId,
+    TripOperationReceipt? operationReceipt,
+    List<TripOperationReceipt>? operationReceipts,
   }) {
     return TripItineraryModel(
       id: id ?? this.id,
@@ -746,6 +904,9 @@ class TripItineraryModel {
       warnings: warnings ?? this.warnings,
       costSummary: costSummary ?? this.costSummary,
       isEphemeral: isEphemeral ?? this.isEphemeral,
+      revisionId: revisionId ?? this.revisionId,
+      operationReceipt: operationReceipt ?? this.operationReceipt,
+      operationReceipts: operationReceipts ?? this.operationReceipts,
     );
   }
 
@@ -773,6 +934,12 @@ class TripItineraryModel {
       if (startLng != null) 'startLng': startLng,
       if (status != null) 'status': status!.wireName,
       if (isEphemeral) 'isEphemeral': true,
+      if (revisionId != null) 'revisionId': revisionId,
+      if (operationReceipt != null) 'receipt': operationReceipt!.toMap(),
+      if (operationReceipts.length > 1)
+        'operationReceipts': operationReceipts
+            .map((receipt) => receipt.toMap())
+            .toList(),
     };
   }
 

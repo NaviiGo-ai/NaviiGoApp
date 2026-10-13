@@ -195,6 +195,17 @@ class LiveTripState {
   static String waypointKey(int dayIndex, int activityIndex) =>
       '$dayIndex:$activityIndex';
 
+  static String waypointKeyForActivity(
+    int dayIndex,
+    int activityIndex,
+    TripActivityModel activity,
+  ) {
+    final stableId = activity.activityId?.trim();
+    return stableId == null || stableId.isEmpty
+        ? waypointKey(dayIndex, activityIndex)
+        : stableId;
+  }
+
   LiveTripState copyWith({
     TripItineraryModel? trip,
     Map<String, TripCheckIn>? checkIns,
@@ -238,8 +249,8 @@ class LiveTripState {
     for (int d = 0; d < journey.dayPlans.length; d++) {
       final day = journey.dayPlans[d];
       for (int a = 0; a < day.activities.length; a++) {
-        final key = waypointKey(d, a);
         final activity = day.activities[a];
+        final key = waypointKeyForActivity(d, a, activity);
         result.add(
           LiveWaypoint(
             key: key,

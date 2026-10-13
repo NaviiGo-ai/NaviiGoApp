@@ -61,6 +61,7 @@ class _BlockingTripRepository extends TripRepository {
     String? originCity,
     List<Map<String, dynamic>>? mustDo,
     List<Map<String, dynamic>>? routeStops,
+    String? operationId,
     required String expectedAuthUid,
   }) async {
     calls++;
@@ -176,7 +177,7 @@ void main() {
 
     for (final message in [malformedMessage, serverMessage, networkMessage]) {
       expect(message, contains('server may still finish or save'));
-      expect(message, contains('retrying can create another trip'));
+      expect(message, contains('retry the same operation to reconcile'));
     }
     expect(serverMessage, isNot(contains('backend unavailable')));
     expect(networkMessage, isNot(contains('connection lost')));

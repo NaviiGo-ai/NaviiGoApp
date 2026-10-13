@@ -4,6 +4,13 @@ import '../../../../core/network/api_provider.dart';
 import '../../data/trip_repository.dart';
 import '../../domain/models/trip_itinerary_model.dart';
 
+/// The signed-in traveller's id, or null. Keeping this primitive seam in the
+/// trip provider lets owner-scoped derived streams be tested without creating a
+/// Firebase User or touching the platform auth plugin.
+final currentUserIdProvider = Provider<String?>(
+  (ref) => ref.watch(currentUserProvider)?.uid,
+);
+
 final tripRepositoryProvider = Provider<TripRepository>((ref) {
   final apiClient = ref.watch(apiClientProvider);
   return TripRepository(apiClient: apiClient);
@@ -11,12 +18,12 @@ final tripRepositoryProvider = Provider<TripRepository>((ref) {
 
 /// Stream of all user trips from Firestore
 final userTripsStreamProvider = StreamProvider<List<TripItineraryModel>>((ref) {
-  final user = ref.watch(currentUserProvider);
-  if (user == null) {
+  final uid = ref.watch(currentUserIdProvider);
+  if (uid == null) {
     return Stream.value([]);
   }
   final repo = ref.watch(tripRepositoryProvider);
-  return repo.getUserTripsStream(user.uid);
+  return repo.getUserTripsStream(uid);
 });
 
 /// Journeys whose canonical lifecycle says they are under way.
@@ -25,9 +32,18 @@ final userTripsStreamProvider = StreamProvider<List<TripItineraryModel>>((ref) {
 /// ELIGIBLE_TO_START, but merely arriving on the calendar must never make one
 /// ACTIVE — that requires an explicit, validated transition.
 final activeTripsProvider = Provider<List<TripItineraryModel>>((ref) {
+  final uid = ref.watch(currentUserIdProvider);
+  if (uid == null) return const [];
   final trips = ref.watch(userTripsStreamProvider).value;
   if (trips == null) return const [];
-  return trips.where((t) => t.tripStatus == TripStatus.active).toList();
+  return trips
+      .where(
+        (t) =>
+            t.userId == uid &&
+            !t.isEphemeral &&
+            t.tripStatus == TripStatus.active,
+      )
+      .toList();
 });
 
 /// Currently active ongoing trip (if any)
@@ -38,9 +54,22 @@ final activeTripProvider = Provider<TripItineraryModel?>((ref) {
 
 /// Upcoming trips scheduled for future dates
 final upcomingTripsProvider = Provider<List<TripItineraryModel>>((ref) {
+  final uid = ref.watch(currentUserIdProvider);
+  if (uid == null) return const [];
   final tripsAsync = ref.watch(userTripsStreamProvider);
   return tripsAsync.when(
-    data: (trips) => trips.where((t) => t.isUpcoming).toList(),
+    data: (trips) => trips
+        .where(
+          (t) =>
+              t.userId == uid &&
+              !t.isEphemeral &&
+              const {
+                TripStatus.planned,
+                TripStatus.upcoming,
+                TripStatus.eligibleToStart,
+              }.contains(t.tripStatus),
+        )
+        .toList(),
     loading: () => [],
     error: (_, __) => [],
   );
@@ -48,9 +77,22 @@ final upcomingTripsProvider = Provider<List<TripItineraryModel>>((ref) {
 
 /// Past completed journeys
 final pastTripsProvider = Provider<List<TripItineraryModel>>((ref) {
+  final uid = ref.watch(currentUserIdProvider);
+  if (uid == null) return const [];
   final tripsAsync = ref.watch(userTripsStreamProvider);
   return tripsAsync.when(
-    data: (trips) => trips.where((t) => t.isPast).toList(),
+    // A cancelled journey is terminal, but it is not evidence that a visit
+    // happened. History and Passport claims therefore only accept the
+    // lifecycle's completed state; calendar dates are never a substitute for
+    // that authority here.
+    data: (trips) => trips
+        .where(
+          (t) =>
+              t.userId == uid &&
+              !t.isEphemeral &&
+              t.tripStatus == TripStatus.completed,
+        )
+        .toList(),
     loading: () => [],
     error: (_, __) => [],
   );

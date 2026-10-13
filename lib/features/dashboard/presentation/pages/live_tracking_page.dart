@@ -12,6 +12,7 @@ import '../../../bookings/presentation/providers/bookings_provider.dart';
 import '../../../bookings/domain/models/booking_model.dart';
 import '../../../trips/presentation/providers/trip_provider.dart';
 import '../../../trips/presentation/providers/live_trip_provider.dart';
+import '../../../trips/presentation/widgets/replan_card.dart';
 import '../../../trips/domain/models/trip_itinerary_model.dart';
 import '../../../trips/domain/models/live_trip_state.dart';
 import '../../../trips/domain/services/trip_validation_service.dart';
@@ -87,6 +88,20 @@ class _LiveTrackingPageState extends ConsumerState<LiveTrackingPage> {
     final currentUid = ref.watch(currentUserIdProvider);
     final requestedTrip = widget.initialTrip;
     final hasExplicitTrip = requestedTrip != null;
+    final explicitTrips = hasExplicitTrip
+        ? ref.watch(userTripsStreamProvider).value
+        : null;
+    TripItineraryModel? refreshedExplicitTrip;
+    if (requestedTrip != null && currentUid != null) {
+      for (final candidate in explicitTrips ?? const <TripItineraryModel>[]) {
+        if (candidate.id == requestedTrip.id &&
+            candidate.userId == currentUid &&
+            !candidate.isEphemeral) {
+          refreshedExplicitTrip = candidate;
+          break;
+        }
+      }
+    }
     final explicitTripIsUsable =
         requestedTrip != null &&
         currentUid != null &&
@@ -94,12 +109,17 @@ class _LiveTrackingPageState extends ConsumerState<LiveTrackingPage> {
         !requestedTrip.isEphemeral;
 
     TripItineraryModel? trip = hasExplicitTrip
-        ? (explicitTripIsUsable ? requestedTrip : null)
+        ? (explicitTripIsUsable
+              ? (refreshedExplicitTrip ?? requestedTrip)
+              : null)
         : ref.watch(activeTripProvider);
     if (!hasExplicitTrip && trip == null) {
       final allTrips = ref.watch(userTripsStreamProvider).value ?? [];
       trip = allTrips.cast<TripItineraryModel?>().firstWhere(
-        (candidate) => candidate!.tripStatus == TripStatus.active,
+        (candidate) =>
+            candidate!.userId == currentUid &&
+            !candidate.isEphemeral &&
+            candidate.tripStatus == TripStatus.active,
         orElse: () => null,
       );
     }
@@ -239,7 +259,11 @@ class _LiveTrackingPageState extends ConsumerState<LiveTrackingPage> {
                 isCurrentDay: hasCurrentDayContext,
               ),
               const SizedBox(height: 16),
-              const _ReplanUnavailableCard(),
+              ReplanCard(
+                trip: trip,
+                liveState: state,
+                dayIndex: selectedDayIndex,
+              ),
             ] else
               _JourneyClosedCard(state: state),
 
@@ -664,52 +688,6 @@ class _JourneyContextCard extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 10),
                 ),
               ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ReplanUnavailableCard extends StatelessWidget {
-  const _ReplanUnavailableCard();
-
-  @override
-  Widget build(BuildContext context) {
-    return _SectionCard(
-      background: AppColors.surfaceWarm,
-      child: Semantics(
-        container: true,
-        label:
-            'Adjust remaining plan. Contextual replanning is unavailable for this saved itinerary. The current plan remains unchanged.',
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Icon(
-              Icons.tune_outlined,
-              color: AppColors.textTertiary,
-              size: 20,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const _SectionLabel(
-                    'ADJUST REMAINING PLAN',
-                    icon: Icons.tune_outlined,
-                    color: AppColors.textSecondary,
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Contextual replanning is unavailable for this saved itinerary. Your current plan remains unchanged.',
-                    style: AppTypography.caption(
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
           ],
         ),
       ),

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
@@ -64,20 +65,20 @@ String friendlyTripGenerationError(Object error) {
   if (error is NetworkException) {
     final message = error.message.toLowerCase();
     if (message.contains('timed out')) {
-      return 'The request timed out. The server may still finish or save it; retrying can create another trip.';
+      return 'The request timed out. The server may still finish or save it; retry the same operation to reconcile it.';
     }
-    return 'The request outcome is unknown. The server may still finish or save it; retrying can create another trip. Check your connection before retrying.';
+    return 'The request outcome is unknown. The server may still finish or save it; retry the same operation to reconcile it. Check your connection before retrying.';
   }
   if (error is ValidationException) {
     return 'The itinerary request was rejected. Check the destination, dates, and journey details.';
   }
   if (error is ItineraryGenerationResponseException) {
-    return 'The itinerary response was incomplete. The server may still finish or save it; retrying can create another trip.';
+    return 'The itinerary response was incomplete. The server may still finish or save it; retry the same operation to reconcile it.';
   }
   if (error is ServerException || error is AppException) {
-    return 'The request outcome is unknown. The server may still finish or save it; retrying can create another trip.';
+    return 'The request outcome is unknown. The server may still finish or save it; retry the same operation to reconcile it.';
   }
-  return 'The request outcome is unknown. The server may still finish or save it; retrying can create another trip.';
+  return 'The request outcome is unknown. The server may still finish or save it; retry the same operation to reconcile it.';
 }
 
 class TripPlannerPage extends ConsumerStatefulWidget {
@@ -89,6 +90,7 @@ class TripPlannerPage extends ConsumerStatefulWidget {
 
 class _TripPlannerPageState extends ConsumerState<TripPlannerPage>
     with SingleTickerProviderStateMixin {
+  static const _uuid = Uuid();
   late final PageController _pageController;
   late final AnimationController _animController;
 
@@ -107,6 +109,10 @@ class _TripPlannerPageState extends ConsumerState<TripPlannerPage>
   String? _validationError;
   String? _generationError;
   String? _draftOwnerUid;
+  // Keep one idempotency key for the whole user-visible attempt. If the
+  // backend outcome is ambiguous, pressing Generate again must reconcile the
+  // same operation rather than create a second itinerary.
+  String? _generationOperationId;
   bool _hasObservedOwner = false;
   bool _accountObservationScheduled = false;
   int _requestGeneration = 0;
@@ -291,6 +297,7 @@ class _TripPlannerPageState extends ConsumerState<TripPlannerPage>
     if (_draftOwnerUid == uid) return;
 
     _draftOwnerUid = uid;
+    _generationOperationId = null;
     _requestGeneration++;
     if (!mounted) return;
     setState(() {
@@ -336,7 +343,7 @@ class _TripPlannerPageState extends ConsumerState<TripPlannerPage>
       builder: (dialogContext) => AlertDialog(
         title: const Text('Stop waiting?'),
         content: const Text(
-          'There is no cancellation endpoint. The server may continue and save this request. If it times out, retrying can create another trip.',
+          'There is no cancellation endpoint. The server may continue and save this request. If it times out, retry the same operation to reconcile it.',
         ),
         actions: [
           TextButton(
@@ -397,6 +404,7 @@ class _TripPlannerPageState extends ConsumerState<TripPlannerPage>
     }
 
     final initiatingUid = user.uid;
+    final operationId = _generationOperationId ??= _uuid.v4();
     final requestGeneration = ++_requestGeneration;
     FocusManager.instance.primaryFocus?.unfocus();
     setState(() {
@@ -417,6 +425,7 @@ class _TripPlannerPageState extends ConsumerState<TripPlannerPage>
         startDate: _startDate.toIso8601String().split('T')[0],
         travelerType: _pace,
         preferences: _generationPreferences(),
+        operationId: operationId,
         expectedAuthUid: initiatingUid,
       );
 
@@ -432,6 +441,7 @@ class _TripPlannerPageState extends ConsumerState<TripPlannerPage>
       }
 
       setState(() => _isGenerating = false);
+      _generationOperationId = null;
       context.push('/itinerary', extra: generatedTrip);
     } catch (e) {
       if (!mounted) return;

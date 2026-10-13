@@ -30,12 +30,23 @@ class PassportStatsModel {
       totalXP: (data['totalXP'] as num?)?.toInt() ?? 0,
       level: (data['level'] as num?)?.toInt() ?? 1,
       streak: (data['streak'] as num?)?.toInt() ?? 0,
-      statesVisited: List<String>.from(data['statesVisited'] ?? []),
-      citiesVisited: List<String>.from(data['citiesVisited'] ?? []),
+      statesVisited: _stringList(data['statesVisited']),
+      citiesVisited: _stringList(data['citiesVisited']),
       totalActivitiesCompleted:
           (data['totalActivitiesCompleted'] as num?)?.toInt() ?? 0,
-      updatedAt: (data['updatedAt'] as Timestamp?)?.toDate(),
+      updatedAt: _dateValue(data['updatedAt']),
     );
+  }
+
+  static List<String> _stringList(dynamic value) {
+    if (value is! Iterable) return const [];
+    return value.whereType<String>().toList(growable: false);
+  }
+
+  static DateTime? _dateValue(dynamic value) {
+    if (value is Timestamp) return value.toDate();
+    if (value is DateTime) return value;
+    return null;
   }
 }
 
@@ -51,6 +62,19 @@ class PassportStampModel {
   final List<String> activities;
   final String? verificationMethod;
 
+  /// A server-backed verification marker. A stamp without this marker remains
+  /// a traveller memory; it must not be presented as a verified visit.
+  final bool isVerified;
+
+  /// If verification was attempted but could not be completed, retain the
+  /// reason so the UI can report an honest unavailable state.
+  final String? verificationFailure;
+
+  /// Stable award identity. In normal operation this is the same value as
+  /// [id], but keeping it explicit lets callers persist a deterministic key
+  /// without deriving identity from a title, venue, or list position.
+  final String? awardKey;
+
   const PassportStampModel({
     required this.id,
     required this.name,
@@ -62,6 +86,9 @@ class PassportStampModel {
     this.visitedDate,
     this.activities = const [],
     this.verificationMethod,
+    this.isVerified = false,
+    this.verificationFailure,
+    this.awardKey,
   });
 
   factory PassportStampModel.fromFirestore(
@@ -77,10 +104,52 @@ class PassportStampModel {
       type: (data['type'] ?? 'Heritage').toString(),
       xpEarned: (data['xpEarned'] as num?)?.toInt() ?? 100,
       visitedDate:
-          (data['visitedDate'] as Timestamp?)?.toDate() ??
-          (data['createdAt'] as Timestamp?)?.toDate(),
-      activities: List<String>.from(data['activities'] ?? []),
+          _dateValue(data['visitedDate']) ?? _dateValue(data['createdAt']),
+      activities: _stringList(data['activities']),
       verificationMethod: data['verificationMethod'] as String?,
+      isVerified: data['isVerified'] == true,
+      verificationFailure: _optionalString(data['verificationFailure']),
+      awardKey: _optionalString(data['awardKey']) ?? doc.id,
     );
+  }
+
+  /// The Firestore payload used by [PassportRepository]. Keeping serialization
+  /// beside the model prevents the award writer and any future retry path from
+  /// drifting on optional verification fields.
+  Map<String, dynamic> toFirestore({bool serverTimestamp = false}) {
+    return {
+      'name': name,
+      'location': location,
+      'state': state,
+      'icon': icon,
+      'type': type,
+      'xpEarned': xpEarned,
+      'visitedDate': serverTimestamp
+          ? FieldValue.serverTimestamp()
+          : visitedDate,
+      'activities': List<String>.from(activities),
+      if (verificationMethod != null) 'verificationMethod': verificationMethod,
+      'isVerified': isVerified,
+      if (verificationFailure != null)
+        'verificationFailure': verificationFailure,
+      'awardKey': awardKey ?? id,
+    };
+  }
+
+  static List<String> _stringList(dynamic value) {
+    if (value is! Iterable) return const [];
+    return value.whereType<String>().toList(growable: false);
+  }
+
+  static DateTime? _dateValue(dynamic value) {
+    if (value is Timestamp) return value.toDate();
+    if (value is DateTime) return value;
+    return null;
+  }
+
+  static String? _optionalString(dynamic value) {
+    if (value is! String) return null;
+    final result = value.trim();
+    return result.isEmpty ? null : result;
   }
 }
