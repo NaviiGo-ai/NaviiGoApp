@@ -14,9 +14,9 @@ Branch: `astra/mobile-v2`. Companion Website branch: `codex/phase-6-contract-ali
 
 ## Verification
 
-Final checks: `dart format .` (150 files, no outstanding changes), `flutter analyze` (no issues), `flutter test` (**264 passed**) and `git diff --check` passed. Focused repository tests cover receipt history after a later revision, proposal-owner mismatch, missing acceptance identities and stale-account responses. Passport transaction tests cover duplicate awards, atomic failures, committed-response ambiguity and account switches.
+Final checks: `dart format .` (151 files, no outstanding changes), `flutter analyze` (no issues), `flutter test` (**270 passed**) and `git diff --check` passed. Focused repository tests cover receipt history after a later revision, proposal-owner mismatch, missing acceptance identities and stale-account responses. Passport transaction tests cover duplicate awards, atomic failures, committed-response ambiguity and account switches.
 
-The Website companion has 118 passing backend tests, 35 passing browser contract tests and 11 passing Firestore emulator tests, plus a clean type/lint/build gate. Emulator proposal-write restrictions require deploying the companion rules in the later rollout.
+The Website companion has 123 passing backend tests, 38 passing browser contract tests and 11 passing Firestore emulator tests, plus a clean type/lint/build gate. Companion rules are deployed to `naviigo-firebase/naviigo-db` and read-back verified against the checked-in file.
 
 A pre-existing lifecycle test used a fixed 15 October 2026 departure date and failed as the real clock entered its start window. Its future fixture is now relative to the test date; production lifecycle/start-gate rules were not retuned.
 
@@ -26,6 +26,8 @@ Native-device/deployed-Firebase checks remain for platform token acquisition dur
 
 Passport/history displays existing durable completion records; this phase adds no automatic completion or verified-visit award endpoint. Website's older non-atomic completion award is explicitly unavailable. Public sharing is explicit/view-only; legacy ownerless or malformed projections fail closed, with no automatic migration.
 
-A fresh independent post-fix agent review was not started in this takeover. The listed gates and direct contract/source review support implementation publication; production approval/deployment and an independent release review remain separate.
+Independent release review identified and fixed retained Passport data during account switching, a stale journey-memory dialog writing under the next account, progress keys surviving removed activities, and historical receipt recovery without base validation. UID-family auto-disposed Passport streams, an owner check in the dialog, authoritative stable-ID progress reconciliation and exact receipt-base validation now cover those boundaries. Regression tests include delayed account streams and late local-write acknowledgments. These bounded reviews and mocked tests do not establish physical-device or deployed-Firebase behavior.
 
-No production deployment, forced push, history rewrite, data wipe/bulk migration, credential rotation, billing change or later product phase was performed.
+Companion production Firestore rules deployment is verified. Website/backend merge and deployment status are tracked separately in the release report. No forced push, history rewrite, data wipe/bulk migration, credential revocation/rotation, billing change or later product phase was performed.
+
+Android native integration execution was attempted on a read-only local emulator. Debug builds failed before test execution because Gradle 8.12 could not move temporary transform workspaces into its cache, including with an isolated cache. The 270 Dart/widget tests passed; the native location tests and physical-device checks remain unverified.

@@ -431,12 +431,12 @@ void main() {
         _buildTestableWidget(
           child: const DigitalPassportPage(),
           overrides: [
-            passportStatsStreamProvider.overrideWith(
-              (ref) => Stream.value(mockStats),
-            ),
-            passportStampsStreamProvider.overrideWith(
-              (ref) => Stream.value(mockStamps),
-            ),
+            passportStatsStreamProvider(
+              'test-user',
+            ).overrideWith((ref) => Stream.value(mockStats)),
+            passportStampsStreamProvider(
+              'test-user',
+            ).overrideWith((ref) => Stream.value(mockStamps)),
             userTripsStreamProvider.overrideWith(
               (ref) => Stream.value(mockTrips),
             ),

@@ -13,7 +13,8 @@ class PastTripsPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final pastTrips = ref.watch(pastTripsProvider);
     final userTripsAsync = ref.watch(userTripsStreamProvider);
-    final passportStatsAsync = ref.watch(passportStatsStreamProvider);
+    final uid = ref.watch(currentUserIdProvider);
+    final passportStatsAsync = ref.watch(passportStatsStreamProvider(uid));
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),

@@ -1,5 +1,4 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../core/auth/auth_provider.dart';
 import '../../data/passport_repository.dart';
 import '../../domain/models/passport_model.dart';
 
@@ -7,18 +6,15 @@ final passportRepositoryProvider = Provider<PassportRepository>((ref) {
   return PassportRepository();
 });
 
-final passportStatsStreamProvider = StreamProvider<PassportStatsModel>((ref) {
-  final user = ref.watch(currentUserProvider);
-  if (user == null) return Stream.value(const PassportStatsModel());
-  final repo = ref.watch(passportRepositoryProvider);
-  return repo.getPassportStatsStream(user.uid);
-});
+// Owner-keyed streams keep previous account data out of a new account's load.
+final passportStatsStreamProvider = StreamProvider.autoDispose
+    .family<PassportStatsModel, String?>((ref, uid) {
+      if (uid == null) return Stream.value(const PassportStatsModel());
+      return ref.watch(passportRepositoryProvider).getPassportStatsStream(uid);
+    });
 
-final passportStampsStreamProvider = StreamProvider<List<PassportStampModel>>((
-  ref,
-) {
-  final user = ref.watch(currentUserProvider);
-  if (user == null) return Stream.value([]);
-  final repo = ref.watch(passportRepositoryProvider);
-  return repo.getPassportStampsStream(user.uid);
-});
+final passportStampsStreamProvider = StreamProvider.autoDispose
+    .family<List<PassportStampModel>, String?>((ref, uid) {
+      if (uid == null) return Stream.value([]);
+      return ref.watch(passportRepositoryProvider).getPassportStampsStream(uid);
+    });

@@ -895,6 +895,7 @@ class TripRepository {
       itineraryId: itineraryId,
       proposalId: proposalId,
       operationId: operationId,
+      baseRevisionId: baseRevisionId,
     );
     if (alreadyAccepted != null) return alreadyAccepted;
 
@@ -924,6 +925,7 @@ class TripRepository {
           itineraryId: itineraryId,
           proposalId: proposalId,
           operationId: operationId,
+          baseRevisionId: baseRevisionId,
         );
         if (reconciled != null) return reconciled;
       }
@@ -967,6 +969,7 @@ class TripRepository {
         itineraryId: itineraryId,
         proposalId: proposalId,
         operationId: operationId,
+        baseRevisionId: baseRevisionId,
       );
       if (historicalReceipt == null ||
           historicalReceipt.revisionId != receipt.revisionId ||
@@ -993,6 +996,7 @@ class TripRepository {
     required String itineraryId,
     required String proposalId,
     required String operationId,
+    required String baseRevisionId,
   }) async {
     try {
       final doc = await _ownerItineraryRef(uid, itineraryId).get();
@@ -1007,6 +1011,7 @@ class TripRepository {
               itineraryId: itineraryId,
               proposalId: proposalId,
               operationId: operationId,
+              baseRevisionId: baseRevisionId,
             );
       if (trip == null ||
           receipt == null ||
@@ -1030,6 +1035,8 @@ class TripRepository {
       rethrow;
     } on TripActivityIdentityException {
       return null;
+    } on ItineraryGenerationResponseException {
+      rethrow;
     } catch (_) {
       return null;
     }
@@ -1041,6 +1048,7 @@ class TripRepository {
     required String itineraryId,
     required String proposalId,
     required String operationId,
+    required String baseRevisionId,
   }) {
     for (final receipt in [
       if (trip.operationReceipt != null) trip.operationReceipt!,
@@ -1053,6 +1061,11 @@ class TripRepository {
             operationId: operationId,
           ) &&
           receipt.proposalId == proposalId) {
+        if (receipt.previousRevisionId != baseRevisionId) {
+          throw const ItineraryGenerationResponseException(
+            'The saved acceptance receipt did not match the previous revision.',
+          );
+        }
         return receipt;
       }
     }

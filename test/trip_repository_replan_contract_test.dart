@@ -99,6 +99,38 @@ Map<String, dynamic> _receipt() => {
 };
 void main() {
   test(
+    'historical acceptance rejects a missing or mismatched prior revision',
+    () async {
+      for (final prior in <String?>[null, 'another-base']) {
+        final store = _Firestore(), api = _Api();
+        final receipt = _receipt();
+        if (prior == null) {
+          receipt.remove('previousRevisionId');
+        } else {
+          receipt['previousRevisionId'] = prior;
+        }
+        store.data = _owner('rev_2', receipt: receipt);
+        final repo = TripRepository(
+          firestore: store,
+          apiClient: api,
+          currentUserUid: () => 'alice',
+        );
+        await expectLater(
+          repo.acceptReplan(
+            uid: 'alice',
+            itineraryId: 'trip',
+            proposalId: 'proposal',
+            operationId: 'accept-op',
+            baseRevisionId: 'rev_0',
+          ),
+          throwsA(isA<ItineraryGenerationResponseException>()),
+        );
+        expect(api.sent, isNull);
+      }
+    },
+  );
+
+  test(
     'generation replay confirms the saved historical receipt and retains later replans',
     () async {
       final store = _Firestore(), api = _Api();

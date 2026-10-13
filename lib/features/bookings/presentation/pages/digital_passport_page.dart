@@ -18,8 +18,9 @@ class DigitalPassportPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final statsAsync = ref.watch(passportStatsStreamProvider);
-    final stampsAsync = ref.watch(passportStampsStreamProvider);
+    final uid = ref.watch(currentUserIdProvider);
+    final statsAsync = ref.watch(passportStatsStreamProvider(uid));
+    final stampsAsync = ref.watch(passportStampsStreamProvider(uid));
     final userTripsAsync = ref.watch(userTripsStreamProvider);
     final savedPlaces = ref.watch(safeSavedPlacesProvider);
 

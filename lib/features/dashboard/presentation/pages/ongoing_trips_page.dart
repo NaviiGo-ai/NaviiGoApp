@@ -1001,7 +1001,10 @@ class _OngoingTripsPageState extends ConsumerState<OngoingTripsPage>
               if (note.isEmpty) return;
 
               final uid = ref.read(currentUserProvider)?.uid;
-              if (uid == null || uid.isEmpty) {
+              if (uid == null ||
+                  uid.isEmpty ||
+                  trip.userId != uid ||
+                  trip.isEphemeral) {
                 if (ctx.mounted) Navigator.pop(ctx);
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(

@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/foundation.dart';
 import '../../../../core/cache/hive_service.dart';
 import '../../../../core/location/geolocator_location_adapter.dart';
 import '../../../../core/location/location_adapter.dart';
@@ -213,6 +214,20 @@ class LiveTripController extends StateNotifier<Map<String, TripCheckIn>> {
   Future<void> _checkInWriteQueue = Future<void>.value();
   Map<String, TripCheckIn> _confirmedCheckIns = const {};
   int _pendingCheckInWrites = 0;
+  int _progressGeneration = 0;
+  TripItineraryModel? _latestAuthoritativeTrip;
+
+  Map<String, TripCheckIn> _confirmedProgressAfterWrite(
+    Map<String, TripCheckIn> checkIns,
+    int generation,
+  ) {
+    if (generation != _progressGeneration && _latestAuthoritativeTrip != null) {
+      return _latestAuthoritativeTrip!.reconcileManualProgressByActivityId(
+        checkIns,
+      );
+    }
+    return Map<String, TripCheckIn>.from(checkIns);
+  }
 
   static Map<String, TripCheckIn> _readOwnedCheckIns(
     CheckInStore store,
@@ -268,6 +283,7 @@ class LiveTripController extends StateNotifier<Map<String, TripCheckIn>> {
     final uid = ownerUid;
     if (uid == null || _ref.read(currentUserIdProvider) != uid) return;
     final generation = _beginOperation();
+    final progressGeneration = _progressGeneration;
     final next = Map<String, TripCheckIn>.from(state);
     if (checkIn == TripCheckIn.pending) {
       next.remove(waypointKey);
@@ -283,7 +299,10 @@ class LiveTripController extends StateNotifier<Map<String, TripCheckIn>> {
     final scopedStore = _store as OwnerScopedCheckInStore;
     try {
       await _enqueueCheckInWrite(scopedStore, uid, next);
-      _confirmedCheckIns = Map<String, TripCheckIn>.from(next);
+      _confirmedCheckIns = _confirmedProgressAfterWrite(
+        next,
+        progressGeneration,
+      );
       _pendingCheckInWrites--;
       if (_isCurrentOperation(generation)) {
         _ref.read(liveTripLastSyncProvider.notifier).state = DateTime.now();
@@ -298,6 +317,45 @@ class LiveTripController extends StateNotifier<Map<String, TripCheckIn>> {
           .read(liveTripCommandProvider.notifier)
           .state
           .copyWith(error: 'Could not save that check-in locally. Try again.');
+    }
+  }
+
+  /// Owner refreshes retain only surviving immutable activity IDs.
+  Future<void> reconcileAuthoritativeTrip(TripItineraryModel trip) async {
+    final uid = ownerUid;
+    if (uid == null ||
+        _ref.read(currentUserIdProvider) != uid ||
+        trip.userId != uid ||
+        trip.id != tripId ||
+        trip.isEphemeral) {
+      return;
+    }
+    _latestAuthoritativeTrip = trip;
+    final progressGeneration = ++_progressGeneration;
+    final next = trip.reconcileManualProgressByActivityId(state);
+    if (mapEquals(next, state)) return;
+    state = next;
+    // Never restore removed identities if a local persistence write fails.
+    _confirmedCheckIns = trip.reconcileManualProgressByActivityId(
+      _confirmedCheckIns,
+    );
+    if (_store is! OwnerScopedCheckInStore) return;
+    _pendingCheckInWrites++;
+    try {
+      await _enqueueCheckInWrite(_store as OwnerScopedCheckInStore, uid, next);
+      _confirmedCheckIns = _confirmedProgressAfterWrite(
+        next,
+        progressGeneration,
+      );
+    } catch (_) {
+      if (!mounted || _ref.read(currentUserIdProvider) != uid) return;
+      _ref.read(liveTripCommandProvider.notifier).state = _ref
+          .read(liveTripCommandProvider)
+          .copyWith(
+            error: 'Could not save refreshed check-ins locally. Try again.',
+          );
+    } finally {
+      _pendingCheckInWrites--;
     }
   }
 
@@ -519,6 +577,19 @@ final liveTripControllerProvider =
         tripId,
         ref.watch(checkInStoreProvider),
         ownerUid,
+      );
+      ref.listen<AsyncValue<List<TripItineraryModel>>>(
+        userTripsStreamProvider,
+        (_, next) {
+          if (next.isLoading || next.hasError) return;
+          for (final trip in next.value ?? const <TripItineraryModel>[]) {
+            if (trip.id == tripId && trip.userId == ownerUid) {
+              controller.reconcileAuthoritativeTrip(trip);
+              break;
+            }
+          }
+        },
+        fireImmediately: true,
       );
       ref.onDispose(controller.invalidateSession);
       return controller;
