@@ -1,6 +1,6 @@
 # Phase 6 mobile handoff — 14 October 2026
 
-Branch: `astra/mobile-v2`. Companion Website Phase 6 changes are merged into `main` through PRs #21 and #22. Shared interface: [mobile contract packet](phase_6_contract_packet.md), with the canonical packet in `NaviiGo-Website/docs/phase_6_contract_packet.md`.
+Branch: `astra/mobile-v2`. Companion Website Phase 6 source changes are merged into `main` through PRs #21–#24. Shared interface: [mobile contract packet](phase_6_contract_packet.md), with the canonical packet in `NaviiGo-Website/docs/phase_6_contract_packet.md`.
 
 ## Delivered behavior
 
@@ -16,7 +16,7 @@ Branch: `astra/mobile-v2`. Companion Website Phase 6 changes are merged into `ma
 
 Final checks: formatting, `flutter analyze` (no issues), `flutter test` (**275 passed**) and `git diff --check` passed. Focused repository tests cover receipt history after a later revision, proposal-owner mismatch, missing acceptance identities and stale-account responses. Passport transaction tests cover duplicate awards, atomic failures, committed-response ambiguity and account switches. Five additional HTTP transport tests preserve canonical `{error: {code, message, details}}` errors and legacy FastAPI `detail` errors; native execution exposed the missing conflict-code parsing.
 
-The Website companion has 125 passing backend tests (including the hotel-provider follow-up), 38 passing browser contract tests and 11 passing Firestore emulator tests, plus a clean type/lint/build gate. Companion rules are deployed to `naviigo-firebase/naviigo-db` and read-back verified against the checked-in file. Website/backend deployment status and subsequent follow-ups are tracked in the separate release report.
+The Website companion has 129 passing backend tests (including the hotel-category and nullable-rating follow-ups), 38 passing browser contract tests and 11 passing Firestore emulator tests, plus a clean type/lint/build gate. Companion rules are deployed to `naviigo-firebase/naviigo-db` and read-back verified against the checked-in file. Website/backend deployment status and subsequent follow-ups are tracked in the separate release report.
 
 A pre-existing lifecycle test used a fixed 15 October 2026 departure date and failed as the real clock entered its start window. Its future fixture is now relative to the test date; production lifecycle/start-gate rules were not retuned.
 
@@ -28,7 +28,9 @@ The final emulator run passed after an initial transient `cloud_firestore/unavai
 
 An additional native run verified actual Android Hive disk close/reopen and native Firebase A/B authentication with a controlled offline HTTP transport. A's retained events did not flush under B; B flushed only its own event, and A's later flush removed only A's remaining event. Local ownership metadata was absent from the outgoing event body. No analytics requests were sent to production for this controlled-transport check. The initial attempt overlapped backend deployment and received HTTP 502 before reaching the Hive assertions; the retry after Render reported Live passed without relaxed assertions.
 
-Physical-device permission/accuracy behavior and process termination during offline persistence/recovery remain unverified. Fresh itinerary generation currently fails closed with `DESTINATION_DATA_UNAVAILABLE`: Render lacks `GEOAPIFY_API_KEY`. The existing local key was verified without exposing it; specific approval to transfer it into Render is pending. This is a production release blocker, not a passed generation test.
+The user explicitly approved adding the existing Geoapify key to Render, and its masked configuration deployment was confirmed Live. Actual provider data then exposed null restaurant/hotel ratings being multiplied during generation; the independently reviewed backend correction preserves unknown source ratings and numeric weighting. Fresh authenticated generation and same-operation replay now pass against both the deployed backend and Website proxy: committed owner receipt, actual saved activities, private ownership with no public projection, and exactly one owner itinerary after replay. These add four live checks, for 33 in total; all synthetic fixtures were cleaned up.
+
+Physical-device permission/accuracy behavior and process termination during offline persistence/recovery remain unverified. No app-store publication or physical-phone validation is claimed.
 
 Passport/history displays existing durable completion records; this phase adds no automatic completion or verified-visit award endpoint. Website's older non-atomic completion award is explicitly unavailable. Public sharing is explicit/view-only; legacy ownerless or malformed projections fail closed, with no automatic migration.
 
