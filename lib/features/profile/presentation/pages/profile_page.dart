@@ -194,6 +194,12 @@ class ProfilePage extends ConsumerWidget {
 
             _buildSectionHeader('SECURITY & PREFERENCES'),
             _buildOptionTile(
+              icon: Icons.tune_rounded,
+              title: 'Travel preferences',
+              subtitle: 'Travel style, interests and home city',
+              onTap: () => context.push('/travel-preferences'),
+            ),
+            _buildOptionTile(
               icon: Icons.security_rounded,
               title: 'Safety & Trusted Contacts',
               subtitle: 'Emergency contacts & sharing settings',

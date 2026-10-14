@@ -706,6 +706,34 @@ class _TripPlannerPageState extends ConsumerState<TripPlannerPage>
             const SizedBox(height: 20),
 
             // Horizontal Destination Pills
+            Autocomplete<MasterDestination>(
+              displayStringForOption: (destination) => destination.name,
+              optionsBuilder: (value) {
+                final query = value.text.trim().toLowerCase();
+                final alias = findDestinationById(query);
+                return kMasterDestinations.where(
+                  (d) =>
+                      query.isEmpty ||
+                      d.id == alias?.id ||
+                      '${d.name} ${d.state}'.toLowerCase().contains(query),
+                );
+              },
+              onSelected: (destination) => setState(() {
+                _selectedDestination = destination;
+                _validationError = null;
+              }),
+              fieldViewBuilder: (context, controller, focus, onSubmitted) =>
+                  TextField(
+                    controller: controller,
+                    focusNode: focus,
+                    decoration: const InputDecoration(
+                      hintText: 'Search destinations (e.g. Dehradun)',
+                      prefixIcon: Icon(Icons.search_rounded),
+                    ),
+                    onSubmitted: (_) => onSubmitted(),
+                  ),
+            ),
+            const SizedBox(height: 16),
             SizedBox(
               height: 42,
               child: ListView.builder(

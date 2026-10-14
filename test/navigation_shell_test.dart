@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:naviigo_app/core/motion/nav_route_transition.dart';
 import 'package:naviigo_app/features/navigation/presentation/nav_hub_page.dart';
 
 /// ─────────────────────────────────────────────────────────────────────────────
@@ -52,6 +53,10 @@ GoRouter _router({String initial = '/home'}) {
           ),
           GoRoute(path: '/trips', builder: (_, __) => _probePage('TRIPS PAGE')),
           GoRoute(
+            path: '/transportation',
+            builder: (_, __) => _probePage('TRANSIT PAGE'),
+          ),
+          GoRoute(
             path: '/digital-passport',
             builder: (_, __) => _probePage('PASSPORT PAGE'),
           ),
@@ -92,6 +97,43 @@ Future<void> _openDrawer(WidgetTester tester) async {
 }
 
 void main() {
+  testWidgets('repeated profile pushes can pop and leave the profile', (
+    tester,
+  ) async {
+    final router = GoRouter(
+      initialLocation: '/profile',
+      routes: [
+        ShellRoute(
+          builder: (_, __, child) => NavHubPage(child: child),
+          routes: [
+            for (final path in ['/home', '/profile'])
+              GoRoute(
+                path: path,
+                pageBuilder: (_, state) => NavRouteTransition.page(
+                  state: state,
+                  child: _probePage(path),
+                ),
+              ),
+          ],
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+    await tester.pumpWidget(
+      ProviderScope(child: MaterialApp.router(routerConfig: router)),
+    );
+    await tester.pumpAndSettle();
+    router.push('/profile');
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    router.pop();
+    await tester.pumpAndSettle();
+    router.go('/home');
+    await tester.pumpAndSettle();
+    expect(find.text('/home'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   group('NavHubPage shell', () {
     testWidgets('renders the five bottom-nav roots and no drawer', (
       tester,
@@ -328,7 +370,7 @@ void main() {
 
   group('Shell accessibility and entry integration', () {
     testWidgets(
-      'five roots retain ordering and route correctly at 320px with large text',
+      'six roots retain ordering and route correctly at 320px with large text',
       (tester) async {
         tester.view.physicalSize = const Size(320, 700);
         tester.view.devicePixelRatio = 1;
@@ -354,6 +396,7 @@ void main() {
         for (final (label, path) in [
           ('Home', '/home'),
           ('Explore', '/explore-discover'),
+          ('Transit', '/transportation'),
           ('Trips', '/trips'),
           ('Passport', '/digital-passport'),
           ('Profile', '/profile'),

@@ -1,354 +1,314 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/constants/master_destinations.dart';
-import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/app_typography.dart';
+import '../../../../core/network/api_provider.dart';
 import '../../../navigation/presentation/nav_hub_page.dart';
 
-class TransportationPage extends StatefulWidget {
-  const TransportationPage({super.key});
-
-  @override
-  State<TransportationPage> createState() => _TransportationPageState();
+/// Planning ranges belong to NaviiGo; observed flight fares identify their source.
+({int low, int high}) estimatedRideFare(
+  double kilometres, {
+  bool auto = false,
+}) {
+  final base = auto ? 30 : 60;
+  final rate = auto ? 12 : 18;
+  final low = math.max(base, (kilometres * rate).round());
+  return (low: low, high: (low * 1.4).ceil());
 }
 
-class _TransportationPageState extends State<TransportationPage> {
-  int _selectedCategoryIndex =
-      0; // 0: Cabs & Rides, 1: Trains & Rail, 2: Flights
-  MasterDestination _selectedDestination = kMasterDestinations[1]; // Jaipur
+class TransportationPage extends ConsumerStatefulWidget {
+  const TransportationPage({super.key});
+  @override
+  ConsumerState<TransportationPage> createState() => _TransportationPageState();
+}
 
-  final List<String> _categories = [
-    'CABS & RIDES',
-    'TRAINS & RAIL',
-    'FLIGHTS & AIR',
-  ];
+class _TransportationPageState extends ConsumerState<TransportationPage> {
+  int _tab = 0;
+  MasterDestination _origin = findDestinationById('dehradun')!;
+  MasterDestination _destination = findDestinationById('jaipur')!;
+  DateTime _date = DateTime.now().add(const Duration(days: 7));
+  double _kilometres = 5;
+  Map<String, dynamic>? _flights;
+  bool _loading = false;
+  String? _error;
+  int _request = 0;
+
+  void _invalidate() {
+    _request++;
+    _flights = null;
+    _error = null;
+    _loading = false;
+  }
+
+  Future<void> _searchFlights() async {
+    final request = ++_request;
+    if (_origin.iata.isEmpty ||
+        _destination.iata.isEmpty ||
+        _origin.iata == _destination.iata) {
+      setState(() => _error = 'Choose two different airports.');
+      return;
+    }
+    setState(() {
+      _loading = true;
+      _error = null;
+      _flights = null;
+    });
+    try {
+      final result = await ref
+          .read(apiClientProvider)
+          .get(
+            '/api/transport/flights',
+            timeout: const Duration(seconds: 30),
+            requiresAuth: false,
+            queryParams: {
+              'origin': _origin.iata,
+              'destination': _destination.iata,
+              'date': _date.toIso8601String().split('T').first,
+            },
+          );
+      if (!mounted || request != _request) return;
+      if (result is! Map || result['results'] is! List) {
+        throw const FormatException();
+      }
+      setState(() => _flights = Map<String, dynamic>.from(result));
+    } catch (_) {
+      if (mounted && request == _request) {
+        setState(
+          () => _error =
+              'Flight prices are unavailable right now. Retry or check the airline.',
+        );
+      }
+    } finally {
+      if (mounted && request == _request) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _open(Uri uri) async {
+    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!opened && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not open this service. Please try again.'),
+        ),
+      );
+    }
+  }
+
+  Widget _cityPicker(
+    String label,
+    MasterDestination selected,
+    ValueChanged<MasterDestination> changed,
+  ) => DropdownButtonFormField<MasterDestination>(
+    value: selected,
+    isExpanded: true,
+    decoration: InputDecoration(labelText: label),
+    items: [
+      for (final d in kMasterDestinations)
+        DropdownMenuItem(
+          value: d,
+          child: Text(
+            '${d.name} (${_tab == 2 ? d.iata : d.station})',
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+    ],
+    onChanged: (value) {
+      if (value != null) {
+        setState(() {
+          changed(value);
+          _invalidate();
+        });
+      }
+    },
+  );
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.background,
-        elevation: 0,
-        leading: const NavHubLeading(),
-        title: Text(
-          'TRANSIT & MOBILITY',
-          style: AppTypography.eyebrow(color: AppColors.brown),
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(
+      leading: const NavHubLeading(),
+      title: const Text('Transit'),
+    ),
+    body: ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        const Text(
+          'Get there. Then get around.',
+          style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
         ),
-        centerTitle: true,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        const SizedBox(height: 16),
+        Wrap(
+          spacing: 8,
           children: [
-            // Target Destination Selector
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.border),
+            for (final (index, label) in [
+              (0, 'Rides'),
+              (1, 'Trains'),
+              (2, 'Flights'),
+            ])
+              ChoiceChip(
+                label: Text(label),
+                selected: _tab == index,
+                onSelected: (_) => setState(() => _tab = index),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'DESTINATION HUB',
-                    style: AppTypography.micro(color: AppColors.primary),
-                  ),
-                  const SizedBox(height: 8),
-                  DropdownButtonFormField<MasterDestination>(
-                    value: _selectedDestination,
-                    decoration: InputDecoration(
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: AppColors.border),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: AppColors.border),
-                      ),
-                    ),
-                    items: kMasterDestinations.map((dest) {
-                      return DropdownMenuItem(
-                        value: dest,
-                        child: Text(
-                          '${dest.name}, ${dest.state}',
-                          style: AppTypography.bodyMedium(
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: (val) {
-                      if (val != null) {
-                        setState(() => _selectedDestination = val);
-                      }
-                    },
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // Category Segmented Control
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: List.generate(_categories.length, (index) {
-                  final isSelected = _selectedCategoryIndex == index;
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: ChoiceChip(
-                      label: Text(
-                        _categories[index],
-                        style: AppTypography.eyebrow(
-                          color: isSelected
-                              ? Colors.white
-                              : AppColors.textSecondary,
-                        ),
-                      ),
-                      selected: isSelected,
-                      selectedColor: AppColors.primary,
-                      backgroundColor: Colors.white,
-                      side: BorderSide(
-                        color: isSelected
-                            ? AppColors.primary
-                            : AppColors.border,
-                      ),
-                      onSelected: (selected) {
-                        if (selected) {
-                          setState(() => _selectedCategoryIndex = index);
-                        }
-                      },
-                    ),
-                  );
-                }),
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // Dynamic Category Content
-            if (_selectedCategoryIndex == 0)
-              _buildCabsSection()
-            else if (_selectedCategoryIndex == 1)
-              _buildTrainsSection()
-            else
-              _buildFlightsSection(),
-
-            const SizedBox(height: 40),
           ],
         ),
+        const SizedBox(height: 20),
+        if (_tab != 0) ...[
+          _cityPicker('From', _origin, (value) => _origin = value),
+          const SizedBox(height: 12),
+        ],
+        _cityPicker('To', _destination, (value) => _destination = value),
+        const SizedBox(height: 20),
+        if (_tab == 0)
+          ..._rides()
+        else if (_tab == 1)
+          ..._trains()
+        else
+          ..._flightWidgets(),
+        const SizedBox(height: 24),
+      ],
+    ),
+  );
+
+  List<Widget> _rides() {
+    final cab = estimatedRideFare(_kilometres);
+    final auto = estimatedRideFare(_kilometres, auto: true);
+    return [
+      Text('Local ride distance: ${_kilometres.toStringAsFixed(1)} km'),
+      Slider(
+        value: _kilometres,
+        min: 1,
+        max: 50,
+        divisions: 98,
+        label: '${_kilometres.toStringAsFixed(1)} km',
+        onChanged: (value) => setState(() => _kilometres = value),
       ),
-    );
-  }
-
-  Widget _buildCabsSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'LOCAL RIDES & TAXIS',
-          style: AppTypography.sectionTitle(color: AppColors.textPrimary),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          'Connect directly with certified drivers or open verified ride apps to your destination.',
-          style: AppTypography.caption(color: AppColors.textSecondary),
-        ),
-        const SizedBox(height: 16),
-
-        _buildTransitProviderCard(
-          title: 'Uber India',
-          subtitle: 'City cabs, rentals & airport drops',
-          badge: 'APP LAUNCH',
-          icon: Icons.local_taxi_rounded,
-          onTap: () async {
-            final uri = Uri.parse(
-              'https://m.uber.com/ul/?action=setPickup&pickup=my_location&dropoff[formatted_address]=${Uri.encodeComponent(_selectedDestination.name)}',
-            );
-            await launchUrl(uri, mode: LaunchMode.externalApplication);
-          },
-        ),
-        const SizedBox(height: 12),
-        _buildTransitProviderCard(
-          title: 'Ola Cabs & Autos',
-          subtitle: 'Autos, Prime Sedans & Outstation',
-          badge: 'APP LAUNCH',
-          icon: Icons.electric_rickshaw,
-          onTap: () async {
-            final uri = Uri.parse(
-              'https://book.olacabs.com/?pickup_name=Current%20Location&drop_name=${Uri.encodeComponent(_selectedDestination.name)}',
-            );
-            await launchUrl(uri, mode: LaunchMode.externalApplication);
-          },
-        ),
-        const SizedBox(height: 12),
-        _buildTransitProviderCard(
-          title: 'Prepaid Local Taxi Stand',
-          subtitle: 'Official railway station & airport fixed counter',
-          badge: 'MAP LOCATOR',
-          icon: Icons.local_shipping_outlined,
-          onTap: () async {
-            final target = _selectedDestination.station.isNotEmpty
-                ? _selectedDestination.station
-                : _selectedDestination.name;
-            final uri = Uri.parse(
-              'https://www.google.com/maps/search/prepaid+taxi+stand+near+${Uri.encodeComponent(target)}',
-            );
-            await launchUrl(uri, mode: LaunchMode.externalApplication);
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTrainsSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'RAILWAY TRANSIT',
-          style: AppTypography.sectionTitle(color: AppColors.textPrimary),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          'Primary Station: ${_selectedDestination.station} (${_selectedDestination.name} Junction)',
-          style: AppTypography.caption(color: AppColors.textSecondary),
-        ),
-        const SizedBox(height: 16),
-
-        _buildTransitProviderCard(
-          title: 'IRCTC Rail Connect',
-          subtitle:
-              'Book Vande Bharat, Rajdhani & Express trains to ${_selectedDestination.station}',
-          badge: 'OFFICIAL PORTAL',
-          icon: Icons.train_rounded,
-          onTap: () async {
-            final uri = Uri.parse('https://www.irctc.co.in/nget/train-search');
-            await launchUrl(uri, mode: LaunchMode.externalApplication);
-          },
-        ),
-        const SizedBox(height: 12),
-        _buildTransitProviderCard(
-          title: 'Live Train Running Status',
-          subtitle:
-              'Track incoming trains to ${_selectedDestination.station} in real-time',
-          badge: 'LIVE STATUS',
-          icon: Icons.access_time_filled,
-          onTap: () async {
-            final target = _selectedDestination.station.isNotEmpty
-                ? _selectedDestination.station
-                : _selectedDestination.name;
-            final uri = Uri.parse(
-              'https://www.google.com/search?q=live+train+status+${Uri.encodeComponent(target)}',
-            );
-            await launchUrl(uri, mode: LaunchMode.externalApplication);
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _buildFlightsSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'FLIGHTS & AIR CONNECTIONS',
-          style: AppTypography.sectionTitle(color: AppColors.textPrimary),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          'Nearest Airport: ${_selectedDestination.iata} (${_selectedDestination.name})',
-          style: AppTypography.caption(color: AppColors.textSecondary),
-        ),
-        const SizedBox(height: 16),
-
-        _buildTransitProviderCard(
-          title: 'Compare Airfares to ${_selectedDestination.iata}',
-          subtitle:
-              'Direct & connecting flights across Indigo, Air India & Vistara',
-          badge: 'SEARCH & COMPARE',
-          icon: Icons.flight_takeoff_rounded,
-          onTap: () async {
-            final target = _selectedDestination.iata.isNotEmpty
-                ? _selectedDestination.iata
-                : _selectedDestination.name;
-            final uri = Uri.parse(
-              'https://www.google.com/travel/flights?q=flights+to+${Uri.encodeComponent(target)}',
-            );
-            await launchUrl(uri, mode: LaunchMode.externalApplication);
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTransitProviderCard({
-    required String title,
-    required String subtitle,
-    required String badge,
-    required IconData icon,
-    required VoidCallback onTap,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.all(16),
-        leading: Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            color: AppColors.cream,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Icon(icon, color: AppColors.primary, size: 24),
-        ),
-        title: Row(
-          children: [
-            Expanded(
-              child: Text(
-                title,
-                style: AppTypography.tripTitle(color: AppColors.textPrimary),
+      Card(
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'NaviiGo planning estimates',
+                style: TextStyle(fontWeight: FontWeight.bold),
               ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceWarm,
-                borderRadius: BorderRadius.circular(4),
+              const SizedBox(height: 12),
+              Text('Auto rickshaw: ₹${auto.low}–₹${auto.high}'),
+              Text('Cab: ₹${cab.low}–₹${cab.high}'),
+              const SizedBox(height: 12),
+              const Text(
+                'Based on an assumed ₹12/km auto rate (₹30 minimum) and ₹18/km cab rate '
+                '(₹60 minimum), with up to 40% variation. Not live Ola or Uber quotes. '
+                'Surge, tolls, waiting and local tariffs can change the fare.',
               ),
-              child: Text(
-                badge,
-                style: AppTypography.micro(color: AppColors.primary),
-              ),
-            ),
-          ],
-        ),
-        subtitle: Padding(
-          padding: const EdgeInsets.only(top: 6),
-          child: Text(
-            subtitle,
-            style: AppTypography.caption(color: AppColors.textSecondary),
+            ],
           ),
         ),
-        trailing: const Icon(
-          Icons.arrow_forward_ios,
-          size: 14,
-          color: AppColors.textSecondary,
-        ),
-        onTap: onTap,
       ),
-    );
+      const SizedBox(height: 12),
+      OutlinedButton(
+        onPressed: () => _open(Uri.https('m.uber.com', '/')),
+        child: const Text('Check Uber'),
+      ),
+      OutlinedButton(
+        onPressed: () => _open(Uri.https('book.olacabs.com', '/')),
+        child: const Text('Check Ola'),
+      ),
+    ];
   }
+
+  List<Widget> _trains() => [
+    Text(
+      '${_origin.station} → ${_destination.station}',
+      style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+    ),
+    const SizedBox(height: 12),
+    const Text(
+      'Live schedules, seat availability and fares are not connected yet. '
+      'NaviiGo needs an approved rail data provider before it can display verified results here.',
+    ),
+    const SizedBox(height: 16),
+    FilledButton(
+      onPressed: () =>
+          _open(Uri.parse('https://www.irctc.co.in/nget/train-search')),
+      child: const Text('Check trains on IRCTC'),
+    ),
+    OutlinedButton(
+      onPressed: () => _open(Uri.parse('https://enquiry.indianrail.gov.in/')),
+      child: const Text('Live train status on NTES'),
+    ),
+  ];
+
+  List<Widget> _flightWidgets() => [
+    ListTile(
+      contentPadding: EdgeInsets.zero,
+      title: const Text('Departure date'),
+      subtitle: Text(_date.toIso8601String().split('T').first),
+      trailing: const Icon(Icons.calendar_month),
+      onTap: () async {
+        final today = DateTime.now();
+        final date = await showDatePicker(
+          context: context,
+          initialDate: _date,
+          firstDate: DateTime(today.year, today.month, today.day),
+          lastDate: today.add(const Duration(days: 365)),
+        );
+        if (date != null && mounted) {
+          setState(() {
+            _date = date;
+            _invalidate();
+          });
+        }
+      },
+    ),
+    FilledButton.icon(
+      onPressed: _loading ? null : _searchFlights,
+      icon: const Icon(Icons.search),
+      label: Text(_loading ? 'Searching…' : 'Search flight prices'),
+    ),
+    if (_loading)
+      const Padding(
+        padding: EdgeInsets.all(16),
+        child: LinearProgressIndicator(),
+      ),
+    if (_error != null)
+      Padding(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: Text(_error!),
+      ),
+    if (_flights != null) ...[
+      const SizedBox(height: 16),
+      Text(_flights!['notice']?.toString() ?? ''),
+      Text(
+        'Source: ${_flights!['source']} · Checked ${_flights!['observedAt']}',
+      ),
+      if ((_flights!['results'] as List).isEmpty)
+        const Padding(
+          padding: EdgeInsets.all(16),
+          child: Text('No fares returned for this route and date.'),
+        ),
+      for (final item in (_flights!['results'] as List).whereType<Map>())
+        Card(
+          child: ListTile(
+            title: Text('${item['airline']} · ₹${item['price']}'),
+            subtitle: Text(
+              '${item['departure']} → ${item['arrival']}\n'
+              '${item['stops']} stops · ${item['durationMinutes']} min',
+            ),
+            isThreeLine: true,
+          ),
+        ),
+    ],
+    const SizedBox(height: 12),
+    OutlinedButton(
+      onPressed: () => _open(
+        Uri.https('www.google.com', '/travel/flights', {
+          'q':
+              'one way flights from ${_origin.iata} to ${_destination.iata} on ${_date.toIso8601String().split('T').first}',
+        }),
+      ),
+      child: const Text('Check availability and book'),
+    ),
+  ];
 }

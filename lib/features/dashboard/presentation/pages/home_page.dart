@@ -35,6 +35,22 @@ class HomePage extends ConsumerWidget {
           physics: const BouncingScrollPhysics(),
           slivers: [
             const SliverToBoxAdapter(child: HomeJournalHeader()),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+                child: SearchBar(
+                  hintText: 'Where do you want to go?',
+                  leading: const Icon(Icons.search_rounded),
+                  onTap: () => context.push('/explore-discover'),
+                  onSubmitted: (query) => context.push(
+                    Uri(
+                      path: '/explore-discover',
+                      queryParameters: {'q': query},
+                    ).toString(),
+                  ),
+                ),
+              ),
+            ),
             if (trips.isLoading && activeTrip == null && upcomingTrip == null)
               const SliverToBoxAdapter(child: _HomeLoading()),
             if (trips.hasError)
@@ -57,11 +73,37 @@ class HomePage extends ConsumerWidget {
                       'Browse grounded destinations, save places you can return to, and start a plan when the moment is right.',
                   actionLabel: 'Start exploring',
                   onAction: () => context.push('/explore'),
-                  image: null,
+                  image: 'assets/brand/india-cover-soft.png',
                 ),
               ),
             SliverToBoxAdapter(
               child: HomeDestinationRail(destinations: destinations),
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    ActionChip(
+                      label: const Text('Plan a trip'),
+                      avatar: const Icon(Icons.route_rounded),
+                      onPressed: () => context.push('/trip-planner'),
+                    ),
+                    ActionChip(
+                      label: const Text('Hidden gems'),
+                      avatar: const Icon(Icons.landscape_outlined),
+                      onPressed: () => context.push('/hidden-gems'),
+                    ),
+                    ActionChip(
+                      label: const Text('Transit'),
+                      avatar: const Icon(Icons.train_outlined),
+                      onPressed: () => context.go('/transportation'),
+                    ),
+                  ],
+                ),
+              ),
             ),
             if (savedPlaces.isNotEmpty)
               SliverToBoxAdapter(

@@ -13,6 +13,7 @@ import '../../../bookings/domain/models/booking_model.dart';
 import '../../../trips/presentation/providers/trip_provider.dart';
 import '../../../trips/presentation/providers/live_trip_provider.dart';
 import '../../../trips/presentation/widgets/replan_card.dart';
+import '../../../trips/presentation/widgets/recorded_route_card.dart';
 import '../../../trips/domain/models/trip_itinerary_model.dart';
 import '../../../trips/domain/models/live_trip_state.dart';
 import '../../../trips/domain/services/trip_validation_service.dart';
@@ -202,6 +203,10 @@ class _LiveTrackingPageState extends ConsumerState<LiveTrackingPage> {
                 },
               )
             else if (state.phase == LiveTripPhase.inMotion) ...[
+              RecordedRouteCard(
+                record: (ownerUid: currentUid!, tripId: trip.id),
+              ),
+              const SizedBox(height: 16),
               if (trip.dayPlans.length > 1)
                 _LiveDayRail(
                   dayPlans: trip.dayPlans,

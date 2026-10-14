@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import '../cache/hive_service.dart';
 import '../network/firebase_client.dart';
 
@@ -17,6 +18,25 @@ class AuthRepository {
   User? get currentUser => _auth.currentUser;
 
   Stream<User?> get authStateChanges => _auth.authStateChanges();
+
+  Future<UserCredential?> signInWithGoogle() async {
+    UserCredential credential;
+    if (kIsWeb) {
+      credential = await _auth.signInWithPopup(GoogleAuthProvider());
+    } else {
+      final account = await GoogleSignIn().signIn();
+      if (account == null) return null;
+      final tokens = await account.authentication;
+      credential = await _auth.signInWithCredential(
+        GoogleAuthProvider.credential(
+          accessToken: tokens.accessToken,
+          idToken: tokens.idToken,
+        ),
+      );
+    }
+    if (credential.user != null) unawaited(syncUserProfile(credential.user!));
+    return credential;
+  }
 
   /// Sign in with email and password
   Future<UserCredential> signInWithEmailAndPassword({
