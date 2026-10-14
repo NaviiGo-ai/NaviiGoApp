@@ -140,6 +140,7 @@ class HiddenGemsPage extends ConsumerStatefulWidget {
 }
 
 class _HiddenGemsPageState extends ConsumerState<HiddenGemsPage> {
+  String _query = '';
   String _selectedCategory = 'All';
   final List<String> _categories = [
     'All',
@@ -150,9 +151,12 @@ class _HiddenGemsPageState extends ConsumerState<HiddenGemsPage> {
   ];
 
   List<HiddenGemItem> get _filteredGems {
-    if (_selectedCategory == 'All') return kAuthenticHiddenGems;
     return kAuthenticHiddenGems
-        .where((g) => g.category == _selectedCategory)
+        .where(
+          (g) =>
+              (_selectedCategory == 'All' || g.category == _selectedCategory) &&
+              '${g.name} ${g.state} ${g.desc}'.toLowerCase().contains(_query),
+        )
         .toList();
   }
 
@@ -208,6 +212,15 @@ class _HiddenGemsPageState extends ConsumerState<HiddenGemsPage> {
                   const SizedBox(height: 16),
 
                   // Category Filter Chips
+                  TextField(
+                    decoration: const InputDecoration(
+                      hintText: 'Search gems, regions or experiences',
+                      prefixIcon: Icon(Icons.search_rounded),
+                    ),
+                    onChanged: (value) =>
+                        setState(() => _query = value.trim().toLowerCase()),
+                  ),
+                  const SizedBox(height: 16),
                   SizedBox(
                     height: 38,
                     child: ListView.builder(
@@ -252,6 +265,15 @@ class _HiddenGemsPageState extends ConsumerState<HiddenGemsPage> {
             ),
           ),
 
+          if (gems.isEmpty)
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: Text(
+                  'No hidden gems match. Try another search or category.',
+                ),
+              ),
+            ),
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
             sliver: SliverList(

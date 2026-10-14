@@ -227,7 +227,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             _buildLinkRow(
               'Personal Profile & Travel Style',
               Icons.person_outline_rounded,
-              () => context.push('/profile'),
+              () => context.push('/travel-preferences'),
             ),
             _buildDivider(),
             _buildLinkRow(

@@ -77,6 +77,19 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           ),
         ),
         const SizedBox(height: 24),
+        OutlinedButton.icon(
+          onPressed: loading
+              ? null
+              : () => ref
+                    .read(authControllerProvider.notifier)
+                    .signInWithGoogle(),
+          icon: const Icon(Icons.login_rounded),
+          label: const Text('Continue with Google'),
+        ),
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: 12),
+          child: Center(child: Text('or continue with email')),
+        ),
         AutofillGroup(
           child: Form(
             key: _form,

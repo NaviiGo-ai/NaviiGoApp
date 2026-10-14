@@ -20,11 +20,13 @@ import '../../features/explore/presentation/pages/trip_planner_page.dart';
 import '../../features/explore/presentation/pages/explore_discover_page.dart';
 import '../../features/explore/presentation/pages/map_page.dart';
 import '../../features/trips/presentation/pages/generated_itinerary_page.dart';
+import '../../features/trips/presentation/pages/trips_library_page.dart';
 import '../../features/trips/domain/models/trip_itinerary_model.dart';
 import '../../features/explore/presentation/pages/restaurants_page.dart';
 import '../../features/explore/presentation/pages/restaurant_details_page.dart';
 import '../../features/explore/presentation/pages/transportation_page.dart';
 import '../../features/profile/presentation/pages/profile_page.dart';
+import '../../features/profile/presentation/pages/travel_preferences_page.dart';
 import '../../features/bookings/presentation/pages/saved_places_page.dart';
 import '../../features/bookings/presentation/pages/payment_history_page.dart';
 import '../../features/bookings/presentation/pages/digital_passport_page.dart';
@@ -130,12 +132,11 @@ GoRouter createAppRouter(ValueNotifier<EntryStatus> entryState) => GoRouter(
           path: '/trips',
           pageBuilder: (context, state) => _page(
             state,
-            GeneratedItineraryPage(
-              trip: state.extra is TripItineraryModel
-                  ? state.extra as TripItineraryModel
-                  : null,
-              fallbackToStoredTrip: true,
-            ),
+            state.extra is TripItineraryModel
+                ? GeneratedItineraryPage(
+                    trip: state.extra as TripItineraryModel,
+                  )
+                : const TripsLibraryPage(),
             kind: NavRouteKind.tab,
           ),
         ),
@@ -148,6 +149,11 @@ GoRouter createAppRouter(ValueNotifier<EntryStatus> entryState) => GoRouter(
           path: '/profile',
           pageBuilder: (context, state) =>
               _page(state, const ProfilePage(), kind: NavRouteKind.tab),
+        ),
+        GoRoute(
+          path: '/travel-preferences',
+          pageBuilder: (_, state) =>
+              _page(state, const TravelPreferencesPage()),
         ),
 
         // ── JOURNEYS ───────────────────────────────────────────────────────

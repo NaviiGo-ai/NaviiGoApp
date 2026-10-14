@@ -70,9 +70,11 @@ final exploreSearchProvider = FutureProvider.autoDispose
       });
       await ready.future;
       if (disposed) return const ExploreSearchState.idle();
+      final alias = findDestinationById(query);
       final local = kMasterDestinations.where((destination) {
         final clean = query.toLowerCase();
-        return destination.name.toLowerCase().contains(clean) ||
+        return destination.id == alias?.id ||
+            destination.name.toLowerCase().contains(clean) ||
             destination.state.toLowerCase().contains(clean) ||
             destination.category.toLowerCase().contains(clean) ||
             destination.description.toLowerCase().contains(clean);

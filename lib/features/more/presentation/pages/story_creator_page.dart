@@ -1,17 +1,18 @@
-import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../../core/motion/nav_haptics.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
-import '../../../../core/constants/master_destinations.dart';
 import '../../../../core/widgets/no_journey_state.dart';
 import '../../../trips/presentation/providers/trip_provider.dart';
+import '../../../trips/presentation/providers/journey_recording_provider.dart';
+import '../../../trips/presentation/widgets/recorded_route_card.dart';
+import '../../../explore/presentation/widgets/discovery_widgets.dart';
 import '../../../trips/domain/models/trip_itinerary_model.dart';
 import '../../../navigation/presentation/nav_hub_page.dart';
 
@@ -26,12 +27,18 @@ class _StoryCreatorPageState extends ConsumerState<StoryCreatorPage> {
   int _step = 0; // 0: Select Journey, 1: Select Format, 2: 9:16 Preview
   TripItineraryModel? _selectedTrip;
   String _selectedFormat = 'JOURNEY RECAP';
-  String _caption =
-      'Walking the quiet sunrise corridors and ancient red-sandstone walls.';
+  String _caption = '';
+  final _captionController = TextEditingController();
 
   /// Wraps the story card so it can be rasterised to a real PNG on export.
   final GlobalKey _storyKey = GlobalKey();
   bool _isExporting = false;
+
+  @override
+  void dispose() {
+    _captionController.dispose();
+    super.dispose();
+  }
 
   final List<Map<String, String>> _storyFormats = [
     {
@@ -63,7 +70,16 @@ class _StoryCreatorPageState extends ConsumerState<StoryCreatorPage> {
 
   @override
   Widget build(BuildContext context) {
-    final allTrips = ref.watch(userTripsStreamProvider).valueOrNull ?? [];
+    final uid = ref.watch(currentUserIdProvider);
+    final allTrips = (ref.watch(userTripsStreamProvider).valueOrNull ?? [])
+        .where((trip) => uid != null && trip.userId == uid && !trip.isEphemeral)
+        .toList();
+    if (_selectedTrip != null && _selectedTrip!.userId != uid) {
+      _selectedTrip = null;
+      _caption = '';
+      _captionController.clear();
+      _step = 0;
+    }
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -129,7 +145,7 @@ class _StoryCreatorPageState extends ConsumerState<StoryCreatorPage> {
             ),
             const SizedBox(width: 8),
             Text(
-              'STEP 01 · NAVIIGO ALREADY KNOWS YOUR JOURNEY',
+              'STEP 01 · YOUR SAVED JOURNEYS',
               style: AppTypography.eyebrow(color: AppColors.primary),
             ),
           ],
@@ -141,7 +157,7 @@ class _StoryCreatorPageState extends ConsumerState<StoryCreatorPage> {
         ),
         const SizedBox(height: 6),
         Text(
-          'Choose from your logged trips or create a story for any destination in the Naviigo atlas.',
+          'Choose a saved journey. Add your recorded route or create a story about your travel plans.',
           style: AppTypography.bodyMedium(),
         ),
         const SizedBox(height: 20),
@@ -173,15 +189,16 @@ class _StoryCreatorPageState extends ConsumerState<StoryCreatorPage> {
                   children: [
                     ClipRRect(
                       borderRadius: BorderRadius.circular(10),
-                      child: Image.network(
-                        t.heroImage,
+                      child: SizedBox(
                         width: 56,
                         height: 56,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
-                          width: 56,
+                        child: DiscoveryImage(
+                          image: approvedDestinationImage(
+                            destinationId: t.destId,
+                            image: t.heroImage,
+                          ),
+                          label: t.destName,
                           height: 56,
-                          color: AppColors.surfaceWarm,
                         ),
                       ),
                     ),
@@ -211,45 +228,6 @@ class _StoryCreatorPageState extends ConsumerState<StoryCreatorPage> {
           }),
           const SizedBox(height: 20),
         ],
-
-        Text(
-          'ATLAS DESTINATIONS',
-          style: AppTypography.eyebrow(color: AppColors.textTertiary),
-        ),
-        const SizedBox(height: 10),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: kMasterDestinations.take(6).map((d) {
-            final isSelected = _selectedTrip?.destName == d.name;
-            return ChoiceChip(
-              label: Text(d.name),
-              selected: isSelected,
-              selectedColor: AppColors.primary,
-              labelStyle: AppTypography.caption(
-                color: isSelected ? Colors.white : AppColors.textPrimary,
-              ),
-              backgroundColor: AppColors.surface,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-                side: BorderSide(
-                  color: isSelected ? AppColors.primary : AppColors.border,
-                ),
-              ),
-              onSelected: (_) {
-                setState(() {
-                  _selectedTrip = TripItineraryModel(
-                    id: 'temp_${d.id}',
-                    uuid: 'temp_${d.id}',
-                    destId: d.id,
-                    destName: d.name,
-                    form: {'heroImage': d.image, 'days': 3},
-                  );
-                });
-              },
-            );
-          }).toList(),
-        ),
       ],
     );
   }
@@ -333,7 +311,7 @@ class _StoryCreatorPageState extends ConsumerState<StoryCreatorPage> {
         ),
         const SizedBox(height: 8),
         TextField(
-          controller: TextEditingController(text: _caption),
+          controller: _captionController,
           onChanged: (val) => _caption = val,
           maxLines: 2,
           style: AppTypography.bodyMedium(),
@@ -366,6 +344,20 @@ class _StoryCreatorPageState extends ConsumerState<StoryCreatorPage> {
     final dest = trip.destName;
     final days = trip.totalDays;
     final placeCount = trip.dayPlans.expand((d) => d.activities).length;
+    final approved = approvedDestinationImage(
+      destinationId: trip.destId,
+      image: trip.heroImage,
+    );
+    final photo = approved == null
+        ? ref.watch(destinationPhotoProvider(dest)).valueOrNull
+        : null;
+    final cover =
+        approved ??
+        photo?['image'] as String? ??
+        'assets/brand/india-cover-soft.png';
+    final trace = ref.watch(
+      journeyRecordingProvider((ownerUid: trip.userId!, tripId: trip.id)),
+    );
 
     return Column(
       children: [
@@ -382,7 +374,7 @@ class _StoryCreatorPageState extends ConsumerState<StoryCreatorPage> {
                       borderRadius: BorderRadius.circular(24),
                       boxShadow: AppColors.floatingShadow,
                       image: DecorationImage(
-                        image: _storyImageProvider(trip),
+                        image: _storyImageProvider(cover),
                         fit: BoxFit.cover,
                       ),
                     ),
@@ -453,6 +445,20 @@ class _StoryCreatorPageState extends ConsumerState<StoryCreatorPage> {
                             ],
                           ),
                           const Spacer(),
+                          if (trace.points.length > 1) ...[
+                            RouteTraceDiagram(
+                              points: trace.points,
+                              color: Colors.white,
+                            ),
+                            Text(
+                              '${routeDistanceKm(trace.points).toStringAsFixed(2)} km · RECORDED GPS ROUTE',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                          ],
 
                           // Destination & Editorial Title
                           Text(
@@ -503,13 +509,30 @@ class _StoryCreatorPageState extends ConsumerState<StoryCreatorPage> {
                           const SizedBox(height: 12),
 
                           // Story Metadata Footer
+                          if (photo?['image'] != null)
+                            Text(
+                              '${photo?['credit']} · ${photo?['license']} · Wikimedia Commons',
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 8,
+                              ),
+                            ),
+                          if (photo?['image'] != null)
+                            Text(
+                              photo?['sourceUrl']?.toString() ?? '',
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 6,
+                              ),
+                              maxLines: 2,
+                            ),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(
                                 placeCount > 0
-                                    ? '$days DAYS · $placeCount PLACES'
-                                    : '$days DAYS',
+                                    ? '$days DAYS · $placeCount PLANNED STOPS'
+                                    : '$days DAYS PLANNED',
                                 style:
                                     AppTypography.micro(
                                       color: AppColors.cream,
@@ -519,7 +542,9 @@ class _StoryCreatorPageState extends ConsumerState<StoryCreatorPage> {
                                     ),
                               ),
                               Text(
-                                'Travelled with NaviiGo',
+                                trace.points.length > 1
+                                    ? 'Recorded with NaviiGo'
+                                    : 'Planned with NaviiGo',
                                 style: AppTypography.micro(
                                   color: Colors.white70,
                                 ),
@@ -590,8 +615,7 @@ class _StoryCreatorPageState extends ConsumerState<StoryCreatorPage> {
 
   /// Story cards may point at a remote hero URL or a bundled asset, so pick
   /// the matching ImageProvider instead of assuming network.
-  ImageProvider _storyImageProvider(TripItineraryModel trip) {
-    final hero = trip.heroImage;
+  ImageProvider _storyImageProvider(String hero) {
     if (hero.startsWith('http://') || hero.startsWith('https://')) {
       return NetworkImage(hero);
     }
@@ -601,6 +625,8 @@ class _StoryCreatorPageState extends ConsumerState<StoryCreatorPage> {
   /// Rasterises the on-screen card at 3x and hands the PNG to the OS share
   /// sheet. Success is only reported once a real file exists on disk.
   Future<void> _shareStory(String dest) async {
+    final owner = ref.read(currentUserIdProvider);
+    if (owner == null || _selectedTrip?.userId != owner) return;
     final messenger = ScaffoldMessenger.of(context);
     setState(() => _isExporting = true);
     try {
@@ -614,18 +640,24 @@ class _StoryCreatorPageState extends ConsumerState<StoryCreatorPage> {
       final ui.Image image = await boundary.toImage(pixelRatio: 3.0);
       final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       image.dispose();
+      if (!mounted || ref.read(currentUserIdProvider) != owner) return;
       if (byteData == null) {
         throw StateError('Could not encode the story image.');
       }
 
-      final dir = await getTemporaryDirectory();
       final safeName = dest.replaceAll(RegExp(r'[^A-Za-z0-9]+'), '_');
-      final file = File('${dir.path}/naviigo_story_$safeName.png');
-      await file.writeAsBytes(byteData.buffer.asUint8List(), flush: true);
-
-      await Share.shareXFiles([
-        XFile(file.path, mimeType: 'image/png'),
-      ], text: 'Travelled with NaviiGo');
+      final name = 'naviigo_story_$safeName.png';
+      final file = XFile.fromData(
+        byteData.buffer.asUint8List(),
+        mimeType: 'image/png',
+        name: name,
+      );
+      if (kIsWeb) {
+        // cross_file downloads a Blob in browsers; no filesystem plugin needed.
+        await file.saveTo(name);
+      } else {
+        await Share.shareXFiles([file], text: 'Travelled with NaviiGo');
+      }
     } catch (e) {
       debugPrint('[StoryCreator] Export failed: $e');
       messenger.showSnackBar(

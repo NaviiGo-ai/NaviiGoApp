@@ -35,6 +35,36 @@ class AuthController extends StateNotifier<AuthState> {
 
   AuthController(this._repo) : super(const AuthState());
 
+  Future<bool> signInWithGoogle() async {
+    state = const AuthState(status: AuthStatus.loading);
+    try {
+      final credential = await _repo.signInWithGoogle();
+      state = AuthState(
+        status: credential == null
+            ? AuthStatus.unauthenticated
+            : AuthStatus.authenticated,
+      );
+      return credential != null;
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'popup-closed-by-user' ||
+          e.code == 'cancelled-popup-request') {
+        state = const AuthState(status: AuthStatus.unauthenticated);
+      } else {
+        state = AuthState(
+          status: AuthStatus.error,
+          errorMessage: _formatAuthError(e),
+        );
+      }
+      return false;
+    } catch (_) {
+      state = const AuthState(
+        status: AuthStatus.error,
+        errorMessage: 'Could not sign in with Google. Please try again.',
+      );
+      return false;
+    }
+  }
+
   Future<bool> signIn(String email, String password) async {
     state = state.copyWith(status: AuthStatus.loading, errorMessage: null);
     try {
@@ -117,6 +147,12 @@ class AuthController extends StateNotifier<AuthState> {
         return 'Choose a stronger password with at least 6 characters.';
       case 'network-request-failed':
         return 'Check your connection and try again.';
+      case 'popup-blocked':
+        return 'Allow the Google sign-in popup, then try again.';
+      case 'operation-not-allowed':
+        return 'Google sign-in is not enabled yet. Use email sign-in for now.';
+      case 'unauthorized-domain':
+        return 'Google sign-in is unavailable on this address. Use email sign-in.';
       case 'too-many-requests':
         return 'Too many attempts. Please wait a little and try again.';
       case 'user-disabled':

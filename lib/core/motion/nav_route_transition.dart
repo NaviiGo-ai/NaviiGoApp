@@ -39,7 +39,9 @@ abstract final class NavRouteTransition {
     NavRouteKind kind = NavRouteKind.push,
   }) {
     return CustomTransitionPage<void>(
-      key: ValueKey('${state.uri}_${child.runtimeType}_${kind.name}'),
+      // GoRouter assigns a distinct identity to each push, including two
+      // visits to the same URL. A URL-derived key duplicates Navigator pages.
+      key: state.pageKey,
       child: child,
       transitionDuration: _durationFor(kind),
       reverseTransitionDuration: _reverseDurationFor(kind),

@@ -10,6 +10,7 @@ import '../../../../core/theme/app_typography.dart';
 import '../../../../core/widgets/no_journey_state.dart';
 import '../../../navigation/presentation/nav_hub_page.dart';
 import '../../../places/domain/models/place_model.dart';
+import '../../../explore/presentation/widgets/discovery_widgets.dart';
 import '../../domain/models/trip_itinerary_model.dart';
 import '../providers/trip_provider.dart';
 import '../widgets/itinerary_overview_widgets.dart';
@@ -181,9 +182,14 @@ class _GeneratedItineraryPageState
               background: Stack(
                 fit: StackFit.expand,
                 children: [
-                  SafeExpeditionImage(
-                    imagePath: trip.heroImage,
-                    fit: BoxFit.cover,
+                  DiscoveryImage(
+                    image: approvedDestinationImage(
+                      destinationId: trip.destId,
+                      image: trip.heroImage,
+                    ),
+                    label: trip.destName,
+                    height: 290,
+                    creditAtTop: true,
                   ),
                   Container(
                     decoration: BoxDecoration(
@@ -636,6 +642,8 @@ class _GeneratedItineraryPageState
                           : AppColors.textPrimary,
                     ).copyWith(fontSize: 16, height: 1.25),
                   ),
+                  if (title != null && activity.placeId != null)
+                    OptionalPlacePhoto(title: title),
                   if (_present(activity.description) != null) ...[
                     const SizedBox(height: 5),
                     Text(

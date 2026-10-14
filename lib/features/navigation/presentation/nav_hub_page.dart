@@ -22,7 +22,6 @@ final navChromeCollapseProvider = StateProvider<double>((ref) => 0.0);
 /// page nests its own [Scaffold] for its app bar — so `Scaffold.of(context)`
 /// from inside a page resolves to that inner Scaffold, which has no drawer.
 /// This key is how [NavHubLeading] reaches the real one.
-final GlobalKey<ScaffoldState> navHubScaffoldKey = GlobalKey<ScaffoldState>();
 
 class _NavDestination {
   final IconData icon;
@@ -50,6 +49,12 @@ const List<_NavDestination> _destinations = [
     activeIcon: Icons.explore_rounded,
     label: 'Explore',
     route: '/explore-discover',
+  ),
+  _NavDestination(
+    icon: Icons.directions_transit_outlined,
+    activeIcon: Icons.directions_transit_rounded,
+    label: 'Transit',
+    route: '/transportation',
   ),
   _NavDestination(
     icon: Icons.alt_route_outlined,
@@ -81,6 +86,9 @@ class NavHubPage extends ConsumerStatefulWidget {
 }
 
 class _NavHubPageState extends ConsumerState<NavHubPage> {
+  // Shells can coexist during route transitions. Each owns its drawer key.
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
+
   /// The last location the shell built for, so a route change can be told
   /// apart from a rebuild for any other reason.
   String? _lastPath;
@@ -88,11 +96,11 @@ class _NavHubPageState extends ConsumerState<NavHubPage> {
   /// Which bottom-nav root owns the current location.
   int _calculateSelectedIndex(BuildContext context) {
     final String location = GoRouterState.of(context).uri.path;
+    if (location.startsWith('/transportation')) return 2;
     if (location.startsWith('/explore') ||
         location.startsWith('/hidden-gems') ||
         location.startsWith('/restaurants') ||
         location.startsWith('/restaurant') ||
-        location.startsWith('/transportation') ||
         location.startsWith('/local-guides') ||
         location.startsWith('/map') ||
         location.startsWith('/ar-explore') ||
@@ -108,7 +116,7 @@ class _NavHubPageState extends ConsumerState<NavHubPage> {
         location.startsWith('/past-trips') ||
         location.startsWith('/live-tracking') ||
         location.startsWith('/trip-planner')) {
-      return 2;
+      return 3;
     }
     if (location.startsWith('/digital-passport') ||
         location.startsWith('/passport') ||
@@ -116,12 +124,13 @@ class _NavHubPageState extends ConsumerState<NavHubPage> {
         location.startsWith('/bookings') ||
         location.startsWith('/payment-history') ||
         location.startsWith('/story-creator')) {
-      return 3;
+      return 4;
     }
     if (location.startsWith('/profile') ||
+        location.startsWith('/travel-preferences') ||
         location.startsWith('/settings') ||
         location.startsWith('/help-support')) {
-      return 4;
+      return 5;
     }
     return 0;
   }
@@ -157,7 +166,7 @@ class _NavHubPageState extends ConsumerState<NavHubPage> {
     final double collapse = ref.watch(navChromeCollapseProvider);
 
     return Scaffold(
-      key: navHubScaffoldKey,
+      key: _scaffoldKey,
       backgroundColor: tokens.background,
       // One drawer for every in-shell route. Without this the app had no
       // reachable navigation beyond the five bottom-nav roots.
@@ -432,7 +441,10 @@ class NavHubLeading extends StatelessWidget {
       icon: Icon(Icons.menu_rounded, color: color),
       tooltip: 'Open navigation',
       onPressed: () {
-        final ScaffoldState? shell = navHubScaffoldKey.currentState;
+        final ScaffoldState? shell = context
+            .findAncestorStateOfType<_NavHubPageState>()
+            ?._scaffoldKey
+            .currentState;
         if (shell != null && shell.hasDrawer) {
           shell.openDrawer();
         } else {
@@ -550,7 +562,7 @@ class NavDrawer extends ConsumerWidget {
                   ),
                   _buildDrawerItem(
                     context,
-                    'Certified Local Guides',
+                    'Local Guides',
                     Icons.badge_outlined,
                     '/local-guides',
                     currentRoute,

@@ -301,10 +301,27 @@ const List<MasterDestination> kMasterDestinations = [
     description:
         'Sacred Seven Hills of Venkatadri. Venkateswara Temple pilgrimage paths, dawn chants, and prasadam offerings.',
   ),
+  MasterDestination(
+    id: 'dehradun',
+    name: 'Dehradun',
+    state: 'Uttarakhand',
+    iata: 'DED',
+    station: 'DDN',
+    lat: 30.3165,
+    lng: 78.0322,
+    image: '',
+    category: 'Mountains',
+    rating: 0,
+    bestTime: 'Mar - Jun, Sep - Nov',
+    description:
+        'Explore the Doon Valley, forest trails and the foothills of the Himalayas.',
+  ),
 ];
 
 MasterDestination? findDestinationById(String idOrName) {
-  final clean = idOrName.toLowerCase().trim();
+  final input = idOrName.toLowerCase().trim();
+  final clean =
+      const {'ddn': 'dehradun', 'dehra dun': 'dehradun'}[input] ?? input;
   for (final d in kMasterDestinations) {
     if (d.id == clean || d.name.toLowerCase() == clean) {
       return d;
