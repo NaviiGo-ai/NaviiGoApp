@@ -141,8 +141,9 @@ class JourneyRecorder extends StateNotifier<RecordingState>
       'journey_trace:${key.ownerUid.length}:${key.ownerUid}:${key.tripId}';
 
   Future<void> start() async {
-    if (_starting || state.recording || !_alive || !_foreground || !allowed())
+    if (_starting || state.recording || !_alive || !_foreground || !allowed()) {
       return;
+    }
     _starting = true;
     final generation = _startGeneration;
     try {
@@ -150,8 +151,9 @@ class JourneyRecorder extends StateNotifier<RecordingState>
       if (!_alive ||
           !_foreground ||
           generation != _startGeneration ||
-          !allowed())
+          !allowed()) {
         return;
+      }
       state = RecordingState(points: state.points, recording: true);
       _subscription = _positions().listen(
         addPosition,
