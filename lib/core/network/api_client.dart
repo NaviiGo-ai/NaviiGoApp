@@ -121,6 +121,17 @@ class ApiClient {
   }) async {
     final resolvedTimeout = timeout ?? AppConfig.standardTimeout;
     final uri = _buildUri(path, queryParams);
+    if (requiresAuth && kReleaseMode && uri.scheme != 'https') {
+      throw const NetworkException(
+        'Secure HTTPS is required for account requests.',
+      );
+    }
+    final boundUid = requiresAuth
+        ? expectedAuthUid ?? _currentUser()?.uid
+        : null;
+    if (requiresAuth && (boundUid == null || boundUid.isEmpty)) {
+      throw const AuthRequiredException();
+    }
 
     return _executeWithRetry(
       method: method,
@@ -129,7 +140,7 @@ class ApiClient {
       requiresAuth: requiresAuth,
       timeout: resolvedTimeout,
       extraHeaders: extraHeaders,
-      expectedAuthUid: expectedAuthUid,
+      expectedAuthUid: boundUid,
       isRetry: false,
     );
   }
@@ -143,6 +154,7 @@ class ApiClient {
     required Map<String, String>? extraHeaders,
     String? expectedAuthUid,
     required bool isRetry,
+    int redirectsRemaining = 3,
   }) async {
     final headers = await _buildHeaders(
       requiresAuth: requiresAuth,
@@ -150,6 +162,10 @@ class ApiClient {
       forceTokenRefresh: isRetry,
       expectedAuthUid: expectedAuthUid,
     );
+
+    if (requiresAuth && _currentUser()?.uid != expectedAuthUid) {
+      throw const AuthRequiredException();
+    }
 
     if (kDebugMode) {
       debugPrint(
@@ -160,35 +176,23 @@ class ApiClient {
     http.Response response;
     try {
       final encodedBody = body != null ? jsonEncode(body) : null;
-      switch (method.toUpperCase()) {
-        case 'GET':
-          response = await _httpClient
-              .get(uri, headers: headers)
-              .timeout(timeout);
-          break;
-        case 'POST':
-          response = await _httpClient
-              .post(uri, headers: headers, body: encodedBody)
-              .timeout(timeout);
-          break;
-        case 'PATCH':
-          response = await _httpClient
-              .patch(uri, headers: headers, body: encodedBody)
-              .timeout(timeout);
-          break;
-        case 'PUT':
-          response = await _httpClient
-              .put(uri, headers: headers, body: encodedBody)
-              .timeout(timeout);
-          break;
-        case 'DELETE':
-          response = await _httpClient
-              .delete(uri, headers: headers, body: encodedBody)
-              .timeout(timeout);
-          break;
-        default:
-          throw UnsupportedError('Unsupported HTTP method: $method');
+      if (!const {
+        'GET',
+        'POST',
+        'PATCH',
+        'PUT',
+        'DELETE',
+      }.contains(method.toUpperCase())) {
+        throw UnsupportedError('Unsupported HTTP method: $method');
       }
+      final request = http.Request(method.toUpperCase(), uri)
+        ..followRedirects = false
+        ..headers.addAll(headers);
+      if (encodedBody != null) request.body = encodedBody;
+      // Never forward an account token through an unexpected redirect.
+      response = await (() async => http.Response.fromStream(
+        await _httpClient.send(request),
+      ))().timeout(timeout);
     } on TimeoutException {
       debugPrint('[API] Timeout calling ${uri.path}');
       throw const NetworkException(
@@ -205,6 +209,37 @@ class ApiClient {
 
     if (kDebugMode) {
       debugPrint('[API] Response [${response.statusCode}] from ${uri.path}');
+    }
+
+    // Discard an old account's result before a provider or cache can consume it.
+    if (requiresAuth && _currentUser()?.uid != expectedAuthUid) {
+      throw const AuthRequiredException();
+    }
+
+    // FastAPI may canonicalize a missing trailing slash with 307/308. Follow
+    // only method-preserving redirects to this exact origin, with a hard cap.
+    if (response.statusCode == 307 || response.statusCode == 308) {
+      final location = response.headers['location'];
+      final target = location == null ? null : uri.resolve(location);
+      if (redirectsRemaining == 0 ||
+          target == null ||
+          target.userInfo.isNotEmpty ||
+          target.scheme != uri.scheme ||
+          target.host != uri.host ||
+          target.port != uri.port) {
+        throw const ServerException('Unexpected API redirect.');
+      }
+      return _executeWithRetry(
+        method: method,
+        uri: target,
+        body: body,
+        requiresAuth: requiresAuth,
+        timeout: timeout,
+        extraHeaders: extraHeaders,
+        expectedAuthUid: expectedAuthUid,
+        isRetry: isRetry,
+        redirectsRemaining: redirectsRemaining - 1,
+      );
     }
 
     // Handle token expiration & retry once
@@ -226,6 +261,7 @@ class ApiClient {
           extraHeaders: extraHeaders,
           expectedAuthUid: expectedAuthUid,
           isRetry: true,
+          redirectsRemaining: redirectsRemaining,
         );
       }
       throw const AuthRequiredException();
