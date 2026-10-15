@@ -126,7 +126,7 @@ class ProfilePage extends ConsumerWidget {
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: const Text(
-                            'NAVIIGO CLOUD SYNCED',
+                            'YOUR NAVIIGO ACCOUNT',
                             style: TextStyle(
                               color: Color(0xFFEC6426),
                               fontSize: 10,
@@ -164,7 +164,10 @@ class ProfilePage extends ConsumerWidget {
                   Container(width: 1, height: 36, color: Colors.grey[200]),
                   _buildMetric('$totalBookings', 'Bookings'),
                   Container(width: 1, height: 36, color: Colors.grey[200]),
-                  _buildMetric('Active', 'Cloud Sync'),
+                  _buildMetric(
+                    currentUser == null ? 'Signed out' : 'Signed in',
+                    'Account',
+                  ),
                 ],
               ),
             ),

@@ -79,6 +79,14 @@ final exploreSearchProvider = FutureProvider.autoDispose
             destination.category.toLowerCase().contains(clean) ||
             destination.description.toLowerCase().contains(clean);
       }).toList();
+      // Exact curated destinations are already known locally. A sleeping
+      // provider must not hold these results behind its network timeout.
+      if (alias != null && local.isNotEmpty) {
+        return ExploreSearchState(
+          status: ExploreSearchStatus.success,
+          destinations: local,
+        );
+      }
       AutocompleteSearchResult response;
       try {
         response = await ref

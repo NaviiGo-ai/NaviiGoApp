@@ -593,15 +593,15 @@ class DigitalPassportPage extends ConsumerWidget {
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: Image.network(
-                trip.heroImage,
+              child: SizedBox(
                 width: 76,
-                height: 76,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(
-                  width: 76,
+                child: DiscoveryImage(
+                  image: approvedDestinationImage(
+                    destinationId: trip.destId,
+                    image: trip.heroImage,
+                  ),
+                  label: trip.destName,
                   height: 76,
-                  color: AppColors.surfaceWarm,
                 ),
               ),
             ),
@@ -611,7 +611,7 @@ class DigitalPassportPage extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '${trip.totalDays} DAYS · ${trip.startDateFormatted.toUpperCase()}',
+                    '${trip.totalDays} ${trip.totalDays == 1 ? 'DAY' : 'DAYS'} · ${trip.startDateFormatted.toUpperCase()}',
                     style: AppTypography.micro(
                       color: AppColors.primary,
                     ).copyWith(fontWeight: FontWeight.w700),
@@ -625,7 +625,7 @@ class DigitalPassportPage extends ConsumerWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${trip.dayPlans.length} chapters crafted',
+                    '${trip.dayPlans.length} ${trip.dayPlans.length == 1 ? 'chapter' : 'chapters'} crafted',
                     style: AppTypography.micro(color: AppColors.textSecondary),
                   ),
                 ],

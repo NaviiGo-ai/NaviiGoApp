@@ -17,8 +17,6 @@ class SettingsPage extends ConsumerStatefulWidget {
 }
 
 class _SettingsPageState extends ConsumerState<SettingsPage> {
-  bool _notifications = true;
-  bool _location = true;
   bool _savingAppearance = false;
   bool? _requestedAppearance;
   String? _appearanceError;
@@ -199,24 +197,19 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 child: const Text('Retry preferences'),
               ),
             _buildDivider(),
-            _buildToggleRow(
-              'Push Notifications',
-              Icons.notifications_outlined,
-              _notifications,
-              (val) {
-                NavHaptics.fire(NavHaptic.light);
-                setState(() => _notifications = val);
-              },
+            const ListTile(
+              leading: Icon(Icons.notifications_outlined),
+              title: Text('Push notifications'),
+              subtitle: Text('Push notifications are not connected yet.'),
             ),
             _buildDivider(),
-            _buildToggleRow(
-              'Location Services',
-              Icons.location_on_outlined,
-              _location,
-              (val) {
-                NavHaptics.fire(NavHaptic.light);
-                setState(() => _location = val);
-              },
+            const ListTile(
+              leading: Icon(Icons.location_on_outlined),
+              title: Text('Location permissions'),
+              subtitle: Text(
+                'Managed by your browser or device. NaviiGo asks for location '
+                'when you choose to record a route.',
+              ),
             ),
           ]),
           const SizedBox(height: 28),
@@ -368,36 +361,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     return const Padding(
       padding: EdgeInsets.only(left: 52.0),
       child: Divider(color: AppColors.border, height: 1),
-    );
-  }
-
-  Widget _buildToggleRow(
-    String title,
-    IconData icon,
-    bool value,
-    ValueChanged<bool> onChanged,
-  ) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
-      child: Row(
-        children: [
-          Icon(icon, color: AppColors.brown, size: 22),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Text(
-              title,
-              style: AppTypography.bodyMedium(
-                color: AppColors.textPrimary,
-              ).copyWith(fontWeight: FontWeight.w600),
-            ),
-          ),
-          Switch(
-            value: value,
-            onChanged: onChanged,
-            activeColor: AppColors.primary,
-          ),
-        ],
-      ),
     );
   }
 

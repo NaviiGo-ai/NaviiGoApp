@@ -191,82 +191,83 @@ void main() {
       totalBookings: 2,
     );
 
-    testWidgets('Renders settings toggles, links, and log out dialog', (
-      tester,
-    ) async {
-      tester.view.physicalSize = const Size(800, 1600);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(() {
-        tester.view.resetPhysicalSize();
-        tester.view.resetDevicePixelRatio();
-      });
+    testWidgets(
+      'Renders honest settings availability, links, and log out dialog',
+      (tester) async {
+        tester.view.physicalSize = const Size(800, 1600);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
 
-      await tester.pumpWidget(
-        _buildTestableWidget(
-          child: const SettingsPage(),
-          overrides: [
-            userProfileStreamProvider.overrideWith(
-              (ref) => Stream.value(mockProfile),
-            ),
-            currentUserProvider.overrideWithValue(null),
-          ],
-        ),
-      );
+        await tester.pumpWidget(
+          _buildTestableWidget(
+            child: const SettingsPage(),
+            overrides: [
+              userProfileStreamProvider.overrideWith(
+                (ref) => Stream.value(mockProfile),
+              ),
+              currentUserProvider.overrideWithValue(null),
+            ],
+          ),
+        );
 
-      await tester.pumpAndSettle();
+        await tester.pumpAndSettle();
 
-      // Verify header and section titles
-      expect(find.text('SETTINGS'), findsOneWidget);
-      expect(find.text('PREFERENCES'), findsOneWidget);
-      expect(find.text('ACCOUNT & WALLET'), findsOneWidget);
-      expect(find.text('SUPPORT & LEGAL'), findsOneWidget);
+        // Verify header and section titles
+        expect(find.text('SETTINGS'), findsOneWidget);
+        expect(find.text('PREFERENCES'), findsOneWidget);
+        expect(find.text('ACCOUNT & WALLET'), findsOneWidget);
+        expect(find.text('SUPPORT & LEGAL'), findsOneWidget);
 
-      // Verify links
-      expect(find.text('Push Notifications'), findsOneWidget);
-      expect(find.text('Location Services'), findsOneWidget);
-      expect(find.text('Personal Profile & Travel Style'), findsOneWidget);
-      expect(find.text('Travel Wallet & Credits'), findsOneWidget);
-      expect(find.text('Bookings & Offline Vouchers'), findsOneWidget);
-      expect(find.text('Help & Support Concierge'), findsOneWidget);
-      expect(find.text('Privacy Policy'), findsOneWidget);
-      expect(find.text('Terms of Service'), findsOneWidget);
+        // Verify links
+        expect(find.text('Push notifications'), findsOneWidget);
+        expect(find.text('Location permissions'), findsOneWidget);
+        expect(
+          find.text('Push notifications are not connected yet.'),
+          findsOneWidget,
+        );
+        expect(find.text('Personal Profile & Travel Style'), findsOneWidget);
+        expect(find.text('Travel Wallet & Credits'), findsOneWidget);
+        expect(find.text('Bookings & Offline Vouchers'), findsOneWidget);
+        expect(find.text('Help & Support Concierge'), findsOneWidget);
+        expect(find.text('Privacy Policy'), findsOneWidget);
+        expect(find.text('Terms of Service'), findsOneWidget);
 
-      // Verify switch toggles
-      final switches = find.byType(Switch);
-      expect(switches, findsNWidgets(3));
-      expect(find.text('Adaptive Appearance'), findsOneWidget);
+        // Only the implemented appearance preference exposes a switch.
+        final switches = find.byType(Switch);
+        expect(switches, findsOneWidget);
+        expect(find.text('Adaptive Appearance'), findsOneWidget);
 
-      // Tap Push Notifications switch
-      await tester.tap(switches.at(1));
-      await tester.pumpAndSettle();
+        // Tap Log Out button to trigger confirmation dialog
+        final logOutButton = find.text('Log Out of Naviigo');
+        expect(logOutButton, findsOneWidget);
+        await tester.tap(logOutButton);
+        await tester.pumpAndSettle();
 
-      // Tap Location Services switch
-      await tester.tap(switches.last);
-      await tester.pumpAndSettle();
+        // Verify dialog appears
+        expect(find.text('Log Out'), findsWidgets);
+        expect(
+          find.text(
+            'Are you sure you want to log out of your Naviigo account?',
+          ),
+          findsOneWidget,
+        );
 
-      // Tap Log Out button to trigger confirmation dialog
-      final logOutButton = find.text('Log Out of Naviigo');
-      expect(logOutButton, findsOneWidget);
-      await tester.tap(logOutButton);
-      await tester.pumpAndSettle();
+        // Tap Cancel to dismiss dialog
+        await tester.tap(find.text('Cancel'));
+        await tester.pumpAndSettle();
 
-      // Verify dialog appears
-      expect(find.text('Log Out'), findsWidgets);
-      expect(
-        find.text('Are you sure you want to log out of your Naviigo account?'),
-        findsOneWidget,
-      );
-
-      // Tap Cancel to dismiss dialog
-      await tester.tap(find.text('Cancel'));
-      await tester.pumpAndSettle();
-
-      // Dialog should be dismissed
-      expect(
-        find.text('Are you sure you want to log out of your Naviigo account?'),
-        findsNothing,
-      );
-    });
+        // Dialog should be dismissed
+        expect(
+          find.text(
+            'Are you sure you want to log out of your Naviigo account?',
+          ),
+          findsNothing,
+        );
+      },
+    );
 
     testWidgets('Opens Privacy Policy and Terms dialogs', (tester) async {
       tester.view.physicalSize = const Size(800, 1600);
