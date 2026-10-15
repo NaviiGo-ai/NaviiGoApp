@@ -382,211 +382,212 @@ class ItineraryChapterCard extends StatelessWidget {
     final activities = dayPlan.activities;
     final dayLabel = 'Day ${dayPlan.dayNumber}';
 
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          SizedBox(
-            width: 48,
-            child: CustomPaint(
-              painter: VerticalJourneyTrackPainter(
-                isFirst: isFirst,
-                isLast: isLast,
-                trackColor: AppColors.primary.withAlpha(100),
-                nodeColor: AppColors.primary,
-              ),
-              child: Align(
-                alignment: const Alignment(0.0, -0.85),
-                child: Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: isAlternate ? AppColors.teal : AppColors.primary,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 2.5),
-                  ),
-                  child: Center(
-                    child: Text(
-                      '${dayPlan.dayNumber}',
-                      style: AppTypography.micro(
-                        color: Colors.white,
-                      ).copyWith(fontWeight: FontWeight.w900, fontSize: 11),
-                    ),
+    return Stack(
+      children: [
+        Positioned(
+          left: 0,
+          top: 0,
+          bottom: 0,
+          width: 48,
+          child: CustomPaint(
+            painter: VerticalJourneyTrackPainter(
+              isFirst: isFirst,
+              isLast: isLast,
+              trackColor: AppColors.primary.withAlpha(100),
+              nodeColor: AppColors.primary,
+            ),
+            child: Align(
+              alignment: const Alignment(0.0, -0.85),
+              child: Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: isAlternate ? AppColors.teal : AppColors.primary,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 2.5),
+                ),
+                child: Center(
+                  child: Text(
+                    '${dayPlan.dayNumber}',
+                    style: AppTypography.micro(
+                      color: Colors.white,
+                    ).copyWith(fontWeight: FontWeight.w900, fontSize: 11),
                   ),
                 ),
               ),
             ),
           ),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(left: 4, right: 20, bottom: 20),
-              child: Semantics(
-                button: true,
-                label: '$dayLabel, ${activities.length} activities',
-                hint: 'Explore this day in the itinerary',
-                child: InkWell(
-                  onTap: () {
-                    NavHaptics.fire(NavHaptic.medium);
-                    onExploreDay();
-                  },
-                  borderRadius: BorderRadius.circular(20),
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: AppColors.surface,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: isFirst
-                            ? AppColors.primary.withAlpha(120)
-                            : AppColors.border,
-                        width: isFirst ? 1.5 : 1.0,
-                      ),
-                      boxShadow: AppColors.cardShadow,
+        ),
+        Padding(
+          padding: const EdgeInsets.only(left: 48),
+          child: Padding(
+            padding: const EdgeInsets.only(left: 4, right: 20, bottom: 20),
+            child: Semantics(
+              button: true,
+              label: '$dayLabel, ${activities.length} activities',
+              hint: 'Explore this day in the itinerary',
+              child: InkWell(
+                onTap: () {
+                  NavHaptics.fire(NavHaptic.medium);
+                  onExploreDay();
+                },
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: isFirst
+                          ? AppColors.primary.withAlpha(120)
+                          : AppColors.border,
+                      width: isFirst ? 1.5 : 1.0,
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Wrap(
-                          alignment: WrapAlignment.spaceBetween,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          spacing: 8,
-                          runSpacing: 5,
-                          children: [
-                            _chapterBadge(
-                              dayLabel,
-                              '$dayLabel · ${activities.length} ACTIVITIES',
-                              isAlternate,
-                            ),
-                            if (date != null)
-                              Text(
-                                date,
-                                style: AppTypography.micro(
-                                  color: AppColors.textTertiary,
-                                ),
-                              ),
-                          ],
-                        ),
-                        if (theme != null) ...[
-                          const SizedBox(height: 8),
-                          Text(
-                            theme,
-                            style: AppTypography.tripTitle(
-                              color: AppColors.brown,
-                            ).copyWith(fontSize: 18, height: 1.25),
+                    boxShadow: AppColors.cardShadow,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Wrap(
+                        alignment: WrapAlignment.spaceBetween,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 8,
+                        runSpacing: 5,
+                        children: [
+                          _chapterBadge(
+                            dayLabel,
+                            '$dayLabel · ${activities.length} ACTIVITIES',
+                            isAlternate,
                           ),
+                          if (date != null)
+                            Text(
+                              date,
+                              style: AppTypography.micro(
+                                color: AppColors.textTertiary,
+                              ),
+                            ),
                         ],
-                        if (area != null) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            'Area focus · $area',
+                      ),
+                      if (theme != null) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          theme,
+                          style: AppTypography.tripTitle(
+                            color: AppColors.brown,
+                          ).copyWith(fontSize: 18, height: 1.25),
+                        ),
+                      ],
+                      if (area != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          'Area focus · $area',
+                          style: AppTypography.caption(
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                      if (theme == null && area == null && activities.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 10),
+                          child: Text(
+                            'No day details were provided.',
                             style: AppTypography.caption(
                               color: AppColors.textSecondary,
                             ),
                           ),
-                        ],
-                        if (theme == null && area == null && activities.isEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 10),
-                            child: Text(
-                              'No day details were provided.',
-                              style: AppTypography.caption(
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ),
-                        if (activities.isNotEmpty) ...[
-                          const SizedBox(height: 10),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: activities.take(3).map((activity) {
-                              final title = _activityTitle(activity);
-                              final time = _value(activity.time);
-                              if (title == null && time == null) {
-                                return const SizedBox.shrink();
-                              }
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 6),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Padding(
-                                      padding: const EdgeInsets.only(top: 6),
-                                      child: Container(
-                                        width: 5,
-                                        height: 5,
-                                        decoration: BoxDecoration(
-                                          color: isAlternate
-                                              ? AppColors.teal
-                                              : AppColors.primary,
-                                          shape: BoxShape.circle,
-                                        ),
+                        ),
+                      if (activities.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: activities.take(3).map((activity) {
+                            final title = _activityTitle(activity);
+                            final time = _value(activity.time);
+                            if (title == null && time == null) {
+                              return const SizedBox.shrink();
+                            }
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 6),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 6),
+                                    child: Container(
+                                      width: 5,
+                                      height: 5,
+                                      decoration: BoxDecoration(
+                                        color: isAlternate
+                                            ? AppColors.teal
+                                            : AppColors.primary,
+                                        shape: BoxShape.circle,
                                       ),
                                     ),
-                                    const SizedBox(width: 8),
-                                    if (title != null)
-                                      Expanded(
-                                        child: Text(
-                                          title,
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                          style:
-                                              AppTypography.caption(
-                                                color: AppColors.textPrimary,
-                                              ).copyWith(
-                                                fontWeight: FontWeight.w600,
-                                                fontSize: 13,
-                                              ),
-                                        ),
-                                      ),
-                                    if (time != null) ...[
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        time,
-                                        style: AppTypography.micro(
-                                          color: AppColors.textTertiary,
-                                        ).copyWith(fontSize: 10),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                              );
-                            }).toList(),
-                          ),
-                        ],
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 4,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          children: [
-                            Text(
-                              'VIEW DAY DETAILS',
-                              style:
-                                  AppTypography.micro(
-                                    color: isAlternate
-                                        ? AppColors.teal
-                                        : AppColors.primary,
-                                  ).copyWith(
-                                    fontWeight: FontWeight.w800,
-                                    letterSpacing: 0.5,
                                   ),
-                            ),
-                            const Icon(
-                              Icons.arrow_forward_rounded,
-                              size: 14,
-                              color: AppColors.brown,
-                            ),
-                          ],
+                                  const SizedBox(width: 8),
+                                  if (title != null)
+                                    Expanded(
+                                      child: Text(
+                                        title,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        style:
+                                            AppTypography.caption(
+                                              color: AppColors.textPrimary,
+                                            ).copyWith(
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 13,
+                                            ),
+                                      ),
+                                    ),
+                                  if (time != null) ...[
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      time,
+                                      style: AppTypography.micro(
+                                        color: AppColors.textTertiary,
+                                      ).copyWith(fontSize: 10),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            );
+                          }).toList(),
                         ),
                       ],
-                    ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          Text(
+                            'VIEW DAY DETAILS',
+                            style:
+                                AppTypography.micro(
+                                  color: isAlternate
+                                      ? AppColors.teal
+                                      : AppColors.primary,
+                                ).copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.5,
+                                ),
+                          ),
+                          const Icon(
+                            Icons.arrow_forward_rounded,
+                            size: 14,
+                            color: AppColors.brown,
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
               ),
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 

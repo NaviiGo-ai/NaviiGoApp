@@ -253,41 +253,15 @@ class _NavBottomBar extends StatelessWidget {
               height: h,
               child: LayoutBuilder(
                 builder: (context, constraints) {
-                  final double itemWidth =
-                      constraints.maxWidth / _destinations.length;
-
-                  return Stack(
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // Travelling selection indicator.
-                      AnimatedPositioned(
-                        duration: NavReduce.duration(
-                          context,
-                          NavMotion.standard,
+                      for (int i = 0; i < _destinations.length; i++)
+                        _NavItem(
+                          destination: _destinations[i],
+                          isSelected: i == currentIndex,
+                          collapse: safeCollapse,
                         ),
-                        curve: NavMotion.settle,
-                        left: (currentIndex * itemWidth) + (itemWidth - 48) / 2,
-                        top: 6,
-                        child: Container(
-                          width: 48,
-                          height: 28,
-                          decoration: BoxDecoration(
-                            color: tokens.surfaceWarm.withAlpha(150),
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                        ),
-                      ),
-                      Row(
-                        children: [
-                          for (int i = 0; i < _destinations.length; i++)
-                            _NavItem(
-                              destination: _destinations[i],
-                              isSelected: i == currentIndex,
-                              // Pass the already-clamped value so _NavItem
-                              // never receives values outside [0, 1].
-                              collapse: safeCollapse,
-                            ),
-                        ],
-                      ),
                     ],
                   );
                 },
@@ -351,18 +325,29 @@ class _NavItem extends StatelessWidget {
 
               return Column(
                 mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
+                mainAxisSize: MainAxisSize.max,
                 children: [
-                  AnimatedScale(
-                    scale: isSelected && !NavReduce.of(context)
-                        ? NavMotion.navIconScale
-                        : 1.0,
+                  AnimatedContainer(
                     duration: NavReduce.duration(context, NavMotion.fast),
-                    curve: NavMotion.response,
-                    child: Icon(
-                      isSelected ? destination.activeIcon : destination.icon,
-                      color: color,
-                      size: 22,
+                    width: 44,
+                    height: 30,
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? tokens.surfaceWarm
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    child: AnimatedScale(
+                      scale: isSelected && !NavReduce.of(context)
+                          ? NavMotion.navIconScale
+                          : 1.0,
+                      duration: NavReduce.duration(context, NavMotion.fast),
+                      curve: NavMotion.response,
+                      child: Icon(
+                        isSelected ? destination.activeIcon : destination.icon,
+                        color: color,
+                        size: 22,
+                      ),
                     ),
                   ),
                   // Label physically relinquishes layout height as nav collapses.

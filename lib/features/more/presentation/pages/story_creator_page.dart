@@ -144,9 +144,11 @@ class _StoryCreatorPageState extends ConsumerState<StoryCreatorPage> {
               ),
             ),
             const SizedBox(width: 8),
-            Text(
-              'STEP 01 · YOUR SAVED JOURNEYS',
-              style: AppTypography.eyebrow(color: AppColors.primary),
+            Expanded(
+              child: Text(
+                'STEP 01 · YOUR SAVED JOURNEYS',
+                style: AppTypography.eyebrow(color: AppColors.primary),
+              ),
             ),
           ],
         ),
@@ -349,7 +351,7 @@ class _StoryCreatorPageState extends ConsumerState<StoryCreatorPage> {
       image: trip.heroImage,
     );
     final photo = approved == null
-        ? ref.watch(destinationPhotoProvider(dest)).valueOrNull
+        ? ref.watch(reusableDestinationPhotoProvider(dest)).valueOrNull
         : null;
     final cover =
         approved ??
