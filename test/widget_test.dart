@@ -43,6 +43,57 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('PaymentHistoryPage Widget Tests', () {
+    test('Signed-out wallet does not invent reward points', () async {
+      final container = ProviderContainer(
+        overrides: [currentUserProvider.overrideWith((ref) => null)],
+      );
+      addTearDown(container.dispose);
+      final account = await container.read(walletAccountStreamProvider.future);
+      expect(account.rewardPoints, 0);
+    });
+
+    testWidgets(
+      'Wallet failure stays unknown and Retry loads real values at 320px',
+      (tester) async {
+        tester.view.physicalSize = const Size(320, 844);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        var attempts = 0;
+        await tester.pumpWidget(
+          _buildTestableWidget(
+            child: const PaymentHistoryPage(),
+            overrides: [
+              walletAccountStreamProvider.overrideWith((ref) {
+                attempts++;
+                return attempts == 1
+                    ? Stream.error(StateError('offline'))
+                    : Stream.value(
+                        const WalletAccountModel(availableMinor: 12345),
+                      );
+              }),
+              walletTransactionsStreamProvider.overrideWith(
+                (ref) => attempts == 1
+                    ? Stream.error(StateError('offline'))
+                    : Stream.value([]),
+              ),
+            ],
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('Unavailable'), findsOneWidget);
+        expect(find.text('Points unavailable'), findsOneWidget);
+        expect(find.text('₹ 0.00'), findsNothing);
+        expect(find.text('0 Points'), findsNothing);
+        expect(tester.takeException(), isNull);
+        await tester.tap(find.text('Retry'));
+        await tester.pumpAndSettle();
+        expect(find.text('₹123.45'), findsOneWidget);
+        expect(find.text('0 Points'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
     final mockAccount = const WalletAccountModel(
       availableMinor: 250000, // ₹2,500.00
       pendingMinor: 0,

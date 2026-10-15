@@ -53,8 +53,10 @@ class PaymentHistoryPage extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    Wrap(
+                      alignment: WrapAlignment.spaceBetween,
+                      spacing: 12,
+                      runSpacing: 8,
                       children: [
                         Text(
                           'NAVIIGO CREDIT',
@@ -92,7 +94,7 @@ class PaymentHistoryPage extends ConsumerWidget {
                                   ),
                                 ),
                                 error: (_, __) => const Text(
-                                  '0 Points',
+                                  'Points unavailable',
                                   style: TextStyle(
                                     color: Colors.white,
                                     fontSize: 10,
@@ -119,7 +121,7 @@ class PaymentHistoryPage extends ConsumerWidget {
                         ),
                       ),
                       error: (_, __) => const Text(
-                        '₹ 0.00',
+                        'Unavailable',
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 32,
@@ -129,7 +131,7 @@ class PaymentHistoryPage extends ConsumerWidget {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'Authoritative server ledger • Valid across all bookings',
+                      'Your NaviiGo credit and payment history',
                       style: AppTypography.micro(
                         color: AppColors.cream.withAlpha(180),
                       ),
@@ -144,7 +146,8 @@ class PaymentHistoryPage extends ConsumerWidget {
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-              child: Row(
+              child: Wrap(
+                runSpacing: 8,
                 children: ['All', 'Trip', 'Refund', 'Reward'].map((filter) {
                   final isSelected = selectedFilter == filter;
                   return Padding(
@@ -184,7 +187,21 @@ class PaymentHistoryPage extends ConsumerWidget {
               ),
             ),
             error: (err, _) => SliverFillRemaining(
-              child: Center(child: Text('Error loading transactions: $err')),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('Payment history is unavailable. Try again.'),
+                    TextButton(
+                      onPressed: () {
+                        ref.invalidate(walletAccountStreamProvider);
+                        ref.invalidate(walletTransactionsStreamProvider);
+                      },
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              ),
             ),
             data: (allTransactions) {
               final filtered = allTransactions.where((tx) {
