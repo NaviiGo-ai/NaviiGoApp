@@ -189,7 +189,7 @@ class ProfilePage extends ConsumerWidget {
             ),
             _buildOptionTile(
               icon: Icons.confirmation_number_outlined,
-              title: 'Bookings & Wallet',
+              title: 'Bookings & Vouchers',
               subtitle: 'Transport tickets & hotel references',
               onTap: () => context.push('/bookings'),
             ),
@@ -204,14 +204,14 @@ class ProfilePage extends ConsumerWidget {
             ),
             _buildOptionTile(
               icon: Icons.security_rounded,
-              title: 'Safety & Trusted Contacts',
-              subtitle: 'Emergency contacts & sharing settings',
+              title: 'Help & Support',
+              subtitle: 'Travel guidance and support FAQs',
               onTap: () => context.push('/help-support'),
             ),
             _buildOptionTile(
               icon: Icons.settings_outlined,
-              title: 'Settings & Cache',
-              subtitle: 'Offline data, notifications & preferences',
+              title: 'Settings',
+              subtitle: 'Appearance, permissions and account options',
               onTap: () => context.push('/settings'),
             ),
             const SizedBox(height: 32),
