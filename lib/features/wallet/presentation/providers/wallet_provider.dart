@@ -13,7 +13,7 @@ final walletRepositoryProvider = Provider<WalletRepository>((ref) {
 final walletAccountStreamProvider = StreamProvider<WalletAccountModel>((ref) {
   final user = ref.watch(currentUserProvider);
   if (user == null) {
-    return Stream.value(const WalletAccountModel(rewardPoints: 150));
+    return Stream.value(const WalletAccountModel());
   }
   final repo = ref.watch(walletRepositoryProvider);
   return repo.getWalletAccountStream(user.uid);
