@@ -179,12 +179,19 @@ class SavedPlacesPage extends ConsumerWidget {
             if (uid == null) {
               return;
             }
-            final success = await ref
-                .read(savedPlacesRepositoryProvider)
-                .toggleSavedPlace(uid, place);
+            var success = false;
+            try {
+              await ref
+                  .read(savedPlacesRepositoryProvider)
+                  .setSavedPlace(uid, place, false);
+              success = true;
+            } catch (_) {
+              // Keep the confirmed item visible if the server rejects removal.
+            }
             if (!context.mounted || ref.read(currentUserProvider)?.uid != uid) {
               return;
             }
+            if (success) ref.invalidate(savedPlacesStreamProvider);
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(

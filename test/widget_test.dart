@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -19,9 +21,36 @@ import 'package:naviigo_app/features/bookings/presentation/providers/saved_place
 import 'package:naviigo_app/features/trips/presentation/providers/trip_provider.dart';
 import 'package:naviigo_app/features/trips/domain/models/trip_itinerary_model.dart';
 import 'package:naviigo_app/features/bookings/domain/models/saved_place_model.dart';
+import 'package:naviigo_app/features/bookings/data/saved_places_repository.dart';
 import 'package:naviigo_app/core/auth/auth_provider.dart';
 import 'package:naviigo_app/features/profile/domain/models/user_profile_model.dart';
 import 'package:naviigo_app/features/profile/presentation/providers/user_provider.dart';
+
+class _SavedPlaceUser extends Fake implements User {
+  @override
+  String get uid => 'saved-place-owner';
+}
+
+class _SavedPlaceWriter extends Fake implements SavedPlacesRepository {
+  final completion = Completer<void>();
+  final desiredStates = <bool>[];
+
+  @override
+  Future<void> setSavedPlace(String uid, SavedPlaceModel place, bool saved) {
+    desiredStates.add(saved);
+    return completion.future;
+  }
+
+  @override
+  Future<bool> toggleSavedPlace(String uid, SavedPlaceModel place) async {
+    try {
+      await completion.future;
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+}
 
 Widget _buildTestableWidget({
   required Widget child,
@@ -620,6 +649,60 @@ void main() {
   });
 
   group('SavedPlacesPage Widget Tests', () {
+    for (final fails in [false, true]) {
+      testWidgets(
+        'Removal refreshes only after acknowledgement; fails=$fails',
+        (tester) async {
+          const place = SavedPlaceModel(
+            id: 'test-place',
+            name: 'Test destination',
+            type: 'destination',
+            sourceUserId: 'saved-place-owner',
+          );
+          var persisted = <SavedPlaceModel>[place];
+          final repository = _SavedPlaceWriter();
+          await tester.pumpWidget(
+            _buildTestableWidget(
+              child: const SavedPlacesPage(),
+              overrides: [
+                currentUserProvider.overrideWithValue(_SavedPlaceUser()),
+                savedPlacesRepositoryProvider.overrideWithValue(repository),
+                savedPlacesStreamProvider.overrideWith(
+                  (ref) => Stream.value(persisted),
+                ),
+              ],
+            ),
+          );
+          await tester.pumpAndSettle();
+          await tester.tap(find.byIcon(Icons.bookmark_remove_rounded));
+          await tester.pump();
+          expect(find.text('Test destination'), findsOneWidget);
+          expect(
+            find.text('Removed Test destination from saved places'),
+            findsNothing,
+          );
+          if (fails) {
+            repository.completion.completeError(StateError('offline'));
+          } else {
+            persisted = [];
+            repository.completion.complete();
+          }
+          await tester.pumpAndSettle();
+          expect(repository.desiredStates, [false]);
+          if (fails) {
+            expect(find.text('Test destination'), findsOneWidget);
+            expect(
+              find.text('Could not update saved places. Please retry.'),
+              findsOneWidget,
+            );
+          } else {
+            expect(find.text('No saved places yet'), findsOneWidget);
+            expect(find.text('Test destination'), findsNothing);
+          }
+        },
+      );
+    }
+
     final mockSavedPlaces = [
       const SavedPlaceModel(
         id: 'place_amer_fort',
