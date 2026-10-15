@@ -6,6 +6,7 @@ import 'package:naviigo_app/features/trips/presentation/widgets/itinerary_overvi
 void main() {
   group('TripItineraryModel Unit Tests', () {
     test('correctly parses Firestore map matching website contracts', () {
+      final futureYear = DateTime.now().year + 1;
       final firestoreData = {
         'destId': 'jaipur',
         'destName': 'Royal Jaipur Heritage',
@@ -13,7 +14,7 @@ void main() {
         'isActive': false,
         'form': {
           'destination': 'jaipur',
-          'startDate': '2026-10-15',
+          'startDate': '$futureYear-10-15',
           'days': 4,
           'purpose': 'Cultural exploration',
         },
@@ -66,7 +67,7 @@ void main() {
       expect(trip.dayPlans.first.theme, 'Forts and Palaces');
       expect(trip.dayPlans.first.activities.length, 2);
       expect(trip.dayPlans.first.activities.first.title, 'Amber Fort Tour');
-      expect(trip.startDateFormatted, contains('Oct 15, 2026'));
+      expect(trip.startDateFormatted, contains('Oct 15, $futureYear'));
       expect(trip.isUpcoming, isTrue);
       expect(trip.isCurrentlyActive, isFalse);
       expect(trip.isPast, isFalse);

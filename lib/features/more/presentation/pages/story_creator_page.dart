@@ -211,7 +211,7 @@ class _StoryCreatorPageState extends ConsumerState<StoryCreatorPage> {
                         children: [
                           Text(t.destName, style: AppTypography.tripTitle()),
                           Text(
-                            '${t.totalDays} Days · ${t.dayPlans.length} chapters',
+                            '${t.totalDays} ${t.totalDays == 1 ? 'day' : 'days'} · ${t.dayPlans.length} ${t.dayPlans.length == 1 ? 'chapter' : 'chapters'}',
                             style: AppTypography.micro(),
                           ),
                         ],
@@ -353,10 +353,7 @@ class _StoryCreatorPageState extends ConsumerState<StoryCreatorPage> {
     final photo = approved == null
         ? ref.watch(reusableDestinationPhotoProvider(dest)).valueOrNull
         : null;
-    final cover =
-        approved ??
-        photo?['image'] as String? ??
-        'assets/brand/india-cover-soft.png';
+    final cover = approved ?? photo?['image'] as String?;
     final trace = ref.watch(
       journeyRecordingProvider((ownerUid: trip.userId!, tripId: trip.id)),
     );
@@ -375,10 +372,13 @@ class _StoryCreatorPageState extends ConsumerState<StoryCreatorPage> {
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(24),
                       boxShadow: AppColors.floatingShadow,
-                      image: DecorationImage(
-                        image: _storyImageProvider(cover),
-                        fit: BoxFit.cover,
-                      ),
+                      color: AppColors.brown,
+                      image: cover == null
+                          ? null
+                          : DecorationImage(
+                              image: _storyImageProvider(cover),
+                              fit: BoxFit.cover,
+                            ),
                     ),
                     child: Container(
                       decoration: BoxDecoration(
@@ -400,10 +400,13 @@ class _StoryCreatorPageState extends ConsumerState<StoryCreatorPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           // Header: Small Naviigo Branding & Format
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          Wrap(
+                            alignment: WrapAlignment.spaceBetween,
+                            spacing: 8,
+                            runSpacing: 6,
                             children: [
                               Row(
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Image.asset(
                                     'assets/brand/naviigo-mark-knockout.png',
@@ -528,13 +531,15 @@ class _StoryCreatorPageState extends ConsumerState<StoryCreatorPage> {
                               ),
                               maxLines: 2,
                             ),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          Wrap(
+                            alignment: WrapAlignment.spaceBetween,
+                            spacing: 8,
+                            runSpacing: 4,
                             children: [
                               Text(
                                 placeCount > 0
-                                    ? '$days DAYS · $placeCount PLANNED STOPS'
-                                    : '$days DAYS PLANNED',
+                                    ? '$days ${days == 1 ? 'DAY' : 'DAYS'} · $placeCount PLANNED STOPS'
+                                    : '$days ${days == 1 ? 'DAY' : 'DAYS'} PLANNED',
                                 style:
                                     AppTypography.micro(
                                       color: AppColors.cream,
@@ -697,13 +702,18 @@ class _StoryCreatorPageState extends ConsumerState<StoryCreatorPage> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(
-                  _step == 0
-                      ? 'CONTINUE TO TEMPLATES'
-                      : 'GENERATE 9:16 PREVIEW',
-                  style: AppTypography.button(
-                    color: Colors.white,
-                  ).copyWith(letterSpacing: 0.8),
+                Flexible(
+                  child: Text(
+                    _step == 0
+                        ? 'CONTINUE TO TEMPLATES'
+                        : 'GENERATE 9:16 PREVIEW',
+                    maxLines: 2,
+                    textAlign: TextAlign.center,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTypography.button(
+                      color: Colors.white,
+                    ).copyWith(letterSpacing: 0.8),
+                  ),
                 ),
                 const SizedBox(width: 6),
                 const Icon(
