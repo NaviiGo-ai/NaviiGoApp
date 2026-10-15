@@ -22,6 +22,8 @@ import 'package:naviigo_app/features/trips/presentation/providers/trip_provider.
 import 'package:naviigo_app/features/trips/domain/models/trip_itinerary_model.dart';
 import 'package:naviigo_app/features/bookings/domain/models/saved_place_model.dart';
 import 'package:naviigo_app/features/bookings/data/saved_places_repository.dart';
+import 'package:naviigo_app/features/explore/presentation/widgets/discovery_widgets.dart';
+import 'package:naviigo_app/core/constants/master_destinations.dart';
 import 'package:naviigo_app/core/auth/auth_provider.dart';
 import 'package:naviigo_app/features/profile/domain/models/user_profile_model.dart';
 import 'package:naviigo_app/features/profile/presentation/providers/user_provider.dart';
@@ -649,6 +651,35 @@ void main() {
   });
 
   group('SavedPlacesPage Widget Tests', () {
+    testWidgets('Registry bookmark uses its correct bundled city image', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _buildTestableWidget(
+          child: const SavedPlacesPage(),
+          overrides: [
+            currentUserProvider.overrideWithValue(_SavedPlaceUser()),
+            savedPlacesStreamProvider.overrideWith(
+              (ref) => Stream.value([
+                const SavedPlaceModel(
+                  id: 'varanasi',
+                  name: 'Varanasi',
+                  type: 'destination',
+                  image: 'assets/stored-city-image.png',
+                  sourceUserId: 'saved-place-owner',
+                ),
+              ]),
+            ),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+      final photo = tester.widget<DiscoveryImage>(find.byType(DiscoveryImage));
+      expect(photo.image, findDestinationById('varanasi')!.image);
+      expect(photo.label, 'Varanasi');
+      expect(tester.takeException(), isNull);
+    });
+
     for (final fails in [false, true]) {
       testWidgets(
         'Removal refreshes only after acknowledgement; fails=$fails',

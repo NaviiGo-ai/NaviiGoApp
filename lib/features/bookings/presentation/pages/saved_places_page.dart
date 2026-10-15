@@ -7,6 +7,7 @@ import '../../domain/models/saved_place_model.dart';
 import '../../../navigation/presentation/nav_hub_page.dart';
 import '../../../places/domain/models/place_model.dart';
 import '../../../../core/constants/master_destinations.dart';
+import '../../../explore/presentation/widgets/discovery_widgets.dart';
 
 class SavedPlacesPage extends ConsumerWidget {
   const SavedPlacesPage({super.key});
@@ -123,8 +124,6 @@ class SavedPlacesPage extends ConsumerWidget {
     String? uid,
     SavedPlaceModel place,
   ) {
-    final hasImage = place.image != null && place.image!.isNotEmpty;
-
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
@@ -140,27 +139,20 @@ class SavedPlacesPage extends ConsumerWidget {
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.all(12),
-        leading: ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: hasImage
-              ? Image.network(
-                  place.image!,
-                  width: 60,
-                  height: 60,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Image.asset(
-                    'assets/brand/india-cover-soft.png',
-                    width: 60,
-                    height: 60,
-                    fit: BoxFit.cover,
-                  ),
-                )
-              : Image.asset(
-                  'assets/brand/india-cover-soft.png',
-                  width: 60,
-                  height: 60,
-                  fit: BoxFit.cover,
-                ),
+        leading: SizedBox(
+          width: 60,
+          height: 60,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: DiscoveryImage(
+              image: approvedDestinationImage(
+                destinationId: place.id,
+                image: place.image,
+              ),
+              label: place.name,
+              height: 60,
+            ),
+          ),
         ),
         title: Text(
           place.name,
