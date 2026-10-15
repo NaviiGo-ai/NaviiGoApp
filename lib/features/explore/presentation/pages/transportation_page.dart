@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -33,8 +34,17 @@ class _TransportationPageState extends ConsumerState<TransportationPage> {
   bool _loading = false;
   String? _error;
   int _request = 0;
+  Timer? _slowTimer;
+  bool _slow = false;
+  @override
+  void dispose() {
+    _slowTimer?.cancel();
+    super.dispose();
+  }
 
   void _invalidate() {
+    _slowTimer?.cancel();
+    _slow = false;
     _request++;
     _flights = null;
     _error = null;
@@ -54,12 +64,17 @@ class _TransportationPageState extends ConsumerState<TransportationPage> {
       _error = null;
       _flights = null;
     });
+    _slow = false;
+    _slowTimer?.cancel();
+    _slowTimer = Timer(const Duration(seconds: 8), () {
+      if (mounted && request == _request) setState(() => _slow = true);
+    });
     try {
       final result = await ref
           .read(apiClientProvider)
           .get(
             '/api/transport/flights',
-            timeout: const Duration(seconds: 30),
+            timeout: const Duration(seconds: 120),
             requiresAuth: false,
             queryParams: {
               'origin': _origin.iata,
@@ -80,7 +95,10 @@ class _TransportationPageState extends ConsumerState<TransportationPage> {
         );
       }
     } finally {
-      if (mounted && request == _request) setState(() => _loading = false);
+      if (mounted && request == _request) {
+        _slowTimer?.cancel();
+        setState(() => _loading = false);
+      }
     }
   }
 
@@ -272,6 +290,17 @@ class _TransportationPageState extends ConsumerState<TransportationPage> {
         padding: EdgeInsets.all(16),
         child: LinearProgressIndicator(),
       ),
+    if (_loading) ...[
+      Text(
+        _slow
+            ? 'Still searching. The travel service may be waking up; this can take up to two minutes.'
+            : 'Finding current fares…',
+      ),
+      TextButton(
+        onPressed: () => setState(_invalidate),
+        child: const Text('Cancel search'),
+      ),
+    ],
     if (_error != null)
       Padding(
         padding: const EdgeInsets.symmetric(vertical: 16),
