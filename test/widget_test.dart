@@ -25,6 +25,10 @@ import 'package:naviigo_app/features/bookings/data/saved_places_repository.dart'
 import 'package:naviigo_app/features/explore/presentation/widgets/discovery_widgets.dart';
 import 'package:naviigo_app/core/constants/master_destinations.dart';
 import 'package:naviigo_app/core/auth/auth_provider.dart';
+import 'package:naviigo_app/core/network/api_provider.dart';
+import 'package:naviigo_app/core/network/api_client.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:naviigo_app/features/profile/domain/models/user_profile_model.dart';
 import 'package:naviigo_app/features/profile/presentation/providers/user_provider.dart';
 
@@ -409,7 +413,22 @@ void main() {
       tester,
     ) async {
       await tester.pumpWidget(
-        _buildTestableWidget(child: const HelpSupportPage()),
+        _buildTestableWidget(
+          child: const HelpSupportPage(),
+          overrides: [
+            currentUserProvider.overrideWithValue(null),
+            apiClientProvider.overrideWithValue(
+              ApiClient(
+                httpClient: MockClient(
+                  (_) async => http.Response(
+                    '{"reply":"Confirm your booking with the provider."}',
+                    200,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       );
 
       await tester.pumpAndSettle();
@@ -425,7 +444,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(
         find.text(
-          'You can review and manage your reservations directly from the Bookings tab. Tap any booking card to view cancellation terms or copy your offline voucher.',
+          'Review any recorded booking references in Bookings & Vouchers. Confirm changes, cancellation terms and refunds directly with the provider that accepted your booking. A generated itinerary is not a reservation.',
         ),
         findsOneWidget,
       );
@@ -437,7 +456,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Verify AI chat sheet elements
-      expect(find.text('Online • Instant Responses'), findsOneWidget);
+      expect(find.text('AI guidance · not monitored support'), findsOneWidget);
       expect(find.text('Help with Itinerary'), findsOneWidget);
       expect(find.text('Booking assistance'), findsOneWidget);
       expect(find.text('Emergency contacts'), findsOneWidget);
