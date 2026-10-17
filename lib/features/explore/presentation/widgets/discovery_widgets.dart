@@ -43,7 +43,11 @@ Future<Map<String, dynamic>> _loadPhoto(
   bool reusable = false,
 }) async {
   final api = ref.read(apiClientProvider);
-  final query = label == 'Manali' ? 'Manali, Himachal Pradesh' : label;
+  final query = String.fromCharCodes(
+    (label == 'Manali' ? 'Manali, Himachal Pradesh' : label).trim().runes.take(
+      100,
+    ),
+  );
   final result = await api.get(
     '/api/places/destination-image',
     queryParams: {'query': query, if (reusable) 'reusable': 'true'},
@@ -57,7 +61,19 @@ Future<Map<String, dynamic>> _loadPhoto(
   if (image is String && image.startsWith('/')) {
     data['image'] = '${api.baseUrl}$image';
   }
+  if (data['image'] is! String) data.remove('image');
   return data;
+}
+
+bool _isDiscoveryPhotoSource(String value) {
+  final uri = Uri.tryParse(value);
+  if (uri == null || !uri.hasAuthority || uri.host.isEmpty) return false;
+  if (uri.scheme == 'https') return true;
+  final api = Uri.tryParse(AppConfig.apiBaseUrl);
+  return uri.scheme == 'http' &&
+      api?.scheme == 'http' &&
+      uri.origin == api?.origin &&
+      uri.path.startsWith('/api/places/');
 }
 
 class DiscoveryImage extends ConsumerWidget {
@@ -75,143 +91,276 @@ class DiscoveryImage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final tokens = AdaptiveThemeExtension.of(context);
-    Widget fallback() => Semantics(
-      label: 'Photo unavailable for $label',
-      child: Container(
-        height: height,
-        width: double.infinity,
-        color: tokens.surfaceWarm,
-        alignment: Alignment.center,
-        child: Icon(
-          Icons.landscape_outlined,
-          size: 44,
-          color: tokens.editorialBrown,
-        ),
-      ),
-    );
-    if (image == null || image!.isEmpty) {
-      final photo = ref.watch(destinationPhotoProvider(label));
-      final data = photo.valueOrNull;
-      final url = data?['image'] as String?;
-      if (url == null) {
-        return Stack(
-          alignment: Alignment.center,
-          children: [
-            fallback(),
-            if (photo.isLoading)
-              const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-            if (photo.hasError)
-              IconButton(
-                tooltip: 'Retry photo',
-                onPressed: () =>
-                    ref.invalidate(destinationPhotoProvider(label)),
-                icon: const Icon(Icons.refresh),
-              ),
-          ],
+    Widget placeholder({bool loading = false, VoidCallback? retry}) =>
+        _DiscoveryPhotoPlaceholder(
+          label: label,
+          loading: loading,
+          onRetry: retry,
         );
-      }
-      final resolved = url.startsWith('/')
-          ? '${AppConfig.apiBaseUrl}$url'
-          : url;
-      final credit = '${data?['credit'] ?? ''} · ${data?['source'] ?? ''}';
+    final explicit = image?.trim();
+    if (explicit != null && explicit.startsWith('assets/')) {
       return SizedBox(
         height: height,
-        child: Column(
-          verticalDirection: creditAtTop
-              ? VerticalDirection.up
-              : VerticalDirection.down,
-          children: [
-            Expanded(
-              child: Image.network(
-                resolved,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                semanticLabel: label,
-                errorBuilder: (_, __, ___) => fallback(),
-              ),
+        width: double.infinity,
+        child: Image.asset(
+          explicit,
+          fit: BoxFit.cover,
+          semanticLabel: label,
+          errorBuilder: (_, _, _) => placeholder(),
+        ),
+      );
+    }
+    if (explicit != null && _isDiscoveryPhotoSource(explicit)) {
+      return SizedBox(
+        height: height,
+        width: double.infinity,
+        child: _RemoteDiscoveryPhoto(url: explicit, label: label),
+      );
+    }
+    final photo = ref.watch(destinationPhotoProvider(label));
+    final data = photo.valueOrNull;
+    final candidate = data?['image'];
+    final url = candidate is String && candidate.startsWith('/')
+        ? '${AppConfig.apiBaseUrl}$candidate'
+        : candidate;
+    void retry() => ref.invalidate(destinationPhotoProvider(label));
+    if (url is! String || !_isDiscoveryPhotoSource(url)) {
+      return SizedBox(
+        height: height,
+        width: double.infinity,
+        child: placeholder(
+          loading: photo.isLoading,
+          retry: photo.isLoading ? null : retry,
+        ),
+      );
+    }
+    final credit = [
+      data?['credit'],
+      data?['source'],
+    ].whereType<String>().where((s) => s.trim().isNotEmpty).join(' · ');
+    final sourceValue = data?['sourceUrl'];
+    final source = sourceValue is String ? Uri.tryParse(sourceValue) : null;
+    final colors = AdaptiveThemeExtension.of(context);
+    return SizedBox(
+      height: height,
+      width: double.infinity,
+      child: Column(
+        verticalDirection: creditAtTop
+            ? VerticalDirection.up
+            : VerticalDirection.down,
+        children: [
+          Expanded(
+            child: _RemoteDiscoveryPhoto(
+              url: url,
+              label: label,
+              onRetryMetadata: retry,
             ),
-            Material(
-              color: tokens.surface,
-              child: InkWell(
-                onTap: () => showDialog<void>(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: const Text('Photo credits'),
-                    content: Text('$credit\n${data?['license'] ?? ''}'),
-                    actions: [
+          ),
+          Material(
+            color: colors.surface,
+            child: InkWell(
+              onTap: () => showDialog<void>(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('Photo credits'),
+                  content: Text(
+                    '${credit.isEmpty ? 'Photo source' : credit}\n${data?['license'] is String ? data!['license'] : ''}',
+                  ),
+                  actions: [
+                    if (source?.scheme == 'https')
                       TextButton(
                         onPressed: () => launchUrl(
-                          Uri.parse(data!['sourceUrl'] as String),
+                          source!,
                           mode: LaunchMode.externalApplication,
                         ),
                         child: const Text('View source'),
                       ),
-                      TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text('Close'),
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Close'),
+                    ),
+                  ],
+                ),
+              ),
+              child: SizedBox(
+                height: 20,
+                width: double.infinity,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.info_outline, size: 11),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          credit.isEmpty ? 'Photo credits' : credit,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: colors.textSecondary,
+                            fontSize: 9,
+                          ),
+                        ),
                       ),
                     ],
                   ),
                 ),
-                child: SizedBox(
-                  height: 20,
-                  width: double.infinity,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.info_outline, size: 10),
-                        const SizedBox(width: 3),
-                        Expanded(
-                          child: Text(
-                            credit,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: tokens.textSecondary,
-                              fontSize: 9,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
               ),
             ),
-          ],
-        ),
-      );
-    }
-
-    final uri = Uri.tryParse(image!);
-    if (uri?.scheme == 'https') {
-      return Image.network(
-        image!,
-        height: height,
-        width: double.infinity,
-        fit: BoxFit.cover,
-        semanticLabel: label,
-        errorBuilder: (_, __, ___) => fallback(),
-      );
-    }
-    if (image!.startsWith('assets/')) {
-      return Image.asset(
-        image!,
-        height: height,
-        width: double.infinity,
-        fit: BoxFit.cover,
-        semanticLabel: label,
-        errorBuilder: (_, __, ___) => fallback(),
-      );
-    }
-    return fallback();
+          ),
+        ],
+      ),
+    );
   }
+}
+
+class _DiscoveryPhotoPlaceholder extends StatelessWidget {
+  final String label;
+  final bool loading;
+  final VoidCallback? onRetry;
+  const _DiscoveryPhotoPlaceholder({
+    required this.label,
+    this.loading = false,
+    this.onRetry,
+  });
+  @override
+  Widget build(BuildContext context) {
+    final colors = AdaptiveThemeExtension.of(context);
+    return Semantics(
+      label: loading
+          ? 'Loading photo for $label'
+          : 'Photo unavailable for $label',
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [colors.surfaceWarm, colors.surface, colors.surfaceWarm],
+          ),
+        ),
+        child: LayoutBuilder(
+          builder: (context, constraints) => Stack(
+            fit: StackFit.expand,
+            children: [
+              Center(
+                child: Icon(
+                  loading
+                      ? Icons.wb_twilight_outlined
+                      : Icons.landscape_outlined,
+                  size: 34,
+                  color: colors.editorialBrown.withAlpha(100),
+                ),
+              ),
+              if (constraints.maxHeight >= 100)
+                Positioned(
+                  left: 14,
+                  right: 50,
+                  bottom: 12,
+                  child: Text(
+                    loading ? 'Finding a view…' : 'Photo unavailable',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTypography.caption(color: colors.textSecondary),
+                  ),
+                ),
+              if (onRetry != null)
+                Positioned(
+                  top: 4,
+                  right: 4,
+                  child: IconButton(
+                    onPressed: onRetry,
+                    tooltip: 'Retry photo',
+                    icon: const Icon(Icons.refresh_rounded),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RemoteDiscoveryPhoto extends StatefulWidget {
+  final String url;
+  final String label;
+  final VoidCallback? onRetryMetadata;
+  const _RemoteDiscoveryPhoto({
+    required this.url,
+    required this.label,
+    this.onRetryMetadata,
+  });
+  @override
+  State<_RemoteDiscoveryPhoto> createState() => _RemoteDiscoveryPhotoState();
+}
+
+class _RemoteDiscoveryPhotoState extends State<_RemoteDiscoveryPhoto> {
+  int _attempt = 0;
+  bool _retrying = false;
+  @override
+  void didUpdateWidget(covariant _RemoteDiscoveryPhoto oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.url != widget.url) _attempt = 0;
+  }
+
+  Future<void> _retry() async {
+    if (_retrying) return;
+    _retrying = true;
+    try {
+      await NetworkImage(widget.url).evict();
+      if (!mounted) return;
+      setState(() {
+        _attempt++;
+        _retrying = false;
+      });
+      widget.onRetryMetadata?.call();
+    } catch (_) {
+      if (mounted) setState(() => _retrying = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final logicalWidth = constraints.maxWidth.isFinite
+          ? constraints.maxWidth
+          : MediaQuery.sizeOf(context).width;
+      final decodeWidth =
+          (logicalWidth * MediaQuery.devicePixelRatioOf(context))
+              .clamp(120, 1600)
+              .round();
+      return Image.network(
+        widget.url,
+        key: ValueKey('${widget.url}:$_attempt'),
+        width: double.infinity,
+        height: double.infinity,
+        fit: BoxFit.cover,
+        cacheWidth: decodeWidth,
+        semanticLabel: widget.label,
+        filterQuality: FilterQuality.medium,
+        errorBuilder: (_, _, _) =>
+            _DiscoveryPhotoPlaceholder(label: widget.label, onRetry: _retry),
+        frameBuilder: (context, child, frame, synchronous) {
+          if (frame == null) {
+            return _DiscoveryPhotoPlaceholder(
+              label: widget.label,
+              loading: true,
+            );
+          }
+          if (synchronous || MediaQuery.disableAnimationsOf(context)) {
+            return child;
+          }
+          return TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0, end: 1),
+            duration: const Duration(milliseconds: 220),
+            builder: (_, opacity, child) =>
+                Opacity(opacity: opacity, child: child),
+            child: child,
+          );
+        },
+      );
+    },
+  );
 }
 
 class OptionalPlacePhoto extends ConsumerWidget {

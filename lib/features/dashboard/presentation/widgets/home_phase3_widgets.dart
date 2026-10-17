@@ -101,14 +101,46 @@ class HomeUpcomingCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            trip.destName,
-            style: AppTypography.editorialTitle(color: tokens.editorialBrown),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            trip.startDateFormatted,
-            style: AppTypography.bodyMedium(color: tokens.textSecondary),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      trip.destName,
+                      style: AppTypography.editorialTitle(
+                        color: tokens.editorialBrown,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      trip.startDateFormatted,
+                      style: AppTypography.bodyMedium(
+                        color: tokens.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              SizedBox(
+                width: 86,
+                height: 86,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: DiscoveryImage(
+                    image: approvedDestinationImage(
+                      destinationId: trip.destId,
+                      image: null,
+                    ),
+                    label: trip.destName,
+                    height: 86,
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 12),
           Row(
