@@ -67,12 +67,12 @@ class HomePage extends ConsumerWidget {
             else
               SliverToBoxAdapter(
                 child: HomeStateIntro(
-                  kicker: 'YOUR NEXT CHAPTER',
-                  title: 'Know what to do next.',
+                  kicker: 'PILGRIMAGE JOURNEYS',
+                  title: 'A journey needs more than a plan.',
                   body:
-                      'Browse grounded destinations, save places you can return to, and start a plan when the moment is right.',
-                  actionLabel: 'Start exploring',
-                  onAction: () => context.push('/explore'),
+                      'Prepare for five pilgrimage destinations, starting with our field focus in Ujjain. Keep your plans and practical next steps together.',
+                  actionLabel: 'Explore pilgrimage journeys',
+                  onAction: () => context.push('/pilgrimage-pilot'),
                   image: 'assets/brand/india-cover-soft.png',
                 ),
               ),
@@ -86,6 +86,11 @@ class HomePage extends ConsumerWidget {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
+                    ActionChip(
+                      label: const Text('Pilgrimage pilot'),
+                      avatar: const Icon(Icons.temple_hindu_outlined),
+                      onPressed: () => context.push('/pilgrimage-pilot'),
+                    ),
                     ActionChip(
                       label: const Text('Plan a trip'),
                       avatar: const Icon(Icons.route_rounded),

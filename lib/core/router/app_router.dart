@@ -39,6 +39,7 @@ import '../../features/places/domain/models/place_model.dart';
 import '../../core/constants/master_destinations.dart';
 import '../../features/places/presentation/pages/place_details_page.dart';
 import '../../features/explore/presentation/pages/local_guides_page.dart';
+import '../../features/pilgrimage/presentation/pilgrimage_page.dart';
 
 import '../../features/navigation/presentation/nav_hub_page.dart';
 
@@ -157,6 +158,23 @@ GoRouter createAppRouter(ValueNotifier<EntryStatus> entryState) => GoRouter(
         ),
 
         // ── JOURNEYS ───────────────────────────────────────────────────────
+        GoRoute(
+          path: '/pilgrimage-pilot',
+          pageBuilder: (_, state) => _page(state, const PilgrimagePage()),
+        ),
+        GoRoute(
+          path: '/pilgrimage-pilot/:destinationId',
+          pageBuilder: (_, state) => _page(
+            state,
+            PilgrimageDestinationPage(
+              destinationId: state.pathParameters['destinationId']!,
+            ),
+          ),
+        ),
+        GoRoute(
+          path: '/founder-travels',
+          pageBuilder: (_, state) => _page(state, const FounderTravelsPage()),
+        ),
         GoRoute(
           path: '/trip-planner',
           pageBuilder: (context, state) =>

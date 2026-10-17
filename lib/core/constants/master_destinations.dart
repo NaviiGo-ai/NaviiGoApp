@@ -1,5 +1,5 @@
 /// Master Destination Registry
-/// Single source of truth synchronized with Naviigo Website (Frontend/lib/constants/destinations.ts)
+/// Canonical destinations supported by the app's planner and discovery flows.
 class MasterDestination {
   final String id;
   final String name;
@@ -315,6 +315,68 @@ const List<MasterDestination> kMasterDestinations = [
     bestTime: 'Mar - Jun, Sep - Nov',
     description:
         'Explore the Doon Valley, forest trails and the foothills of the Himalayas.',
+  ),
+  // City centres, not venue entrances. Sources: docs/PILGRIMAGE_PILOT.md.
+  // Empty transport codes and seasons mean not confirmed; never invent them.
+  MasterDestination(
+    id: 'ujjain',
+    name: 'Ujjain',
+    state: 'Madhya Pradesh',
+    iata: '',
+    station: '',
+    lat: 23.18239,
+    lng: 75.77643,
+    image: '',
+    category: 'Spiritual',
+    rating: 0,
+    bestTime: '',
+    description:
+        'Prepare a pilgrimage around Mahakaleshwar, with time for rest and local travel.',
+  ),
+  MasterDestination(
+    id: 'mathura',
+    name: 'Mathura',
+    state: 'Uttar Pradesh',
+    iata: '',
+    station: '',
+    lat: 27.50350,
+    lng: 77.67215,
+    image: '',
+    category: 'Spiritual',
+    rating: 0,
+    bestTime: '',
+    description:
+        'Start in Mathura and prepare onward visits to Vrindavan separately.',
+  ),
+  MasterDestination(
+    id: 'dwarka',
+    name: 'Dwarka',
+    state: 'Gujarat',
+    iata: '',
+    station: '',
+    lat: 22.2394444,
+    lng: 68.9677778,
+    image: '',
+    category: 'Spiritual',
+    rating: 0,
+    bestTime: '',
+    description:
+        'A pilgrimage centred on Dwarka, with onward transfers and visiting arrangements to confirm.',
+  ),
+  MasterDestination(
+    id: 'puri',
+    name: 'Puri',
+    state: 'Odisha',
+    iata: '',
+    station: '',
+    lat: 19.798254,
+    lng: 85.824938,
+    image: '',
+    category: 'Spiritual',
+    rating: 0,
+    bestTime: '',
+    description:
+        'Prepare a Jagannath pilgrimage with current visiting guidance and a practical arrival plan.',
   ),
 ];
 

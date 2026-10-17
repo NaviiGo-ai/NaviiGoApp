@@ -36,6 +36,10 @@ class _TransportationPageState extends ConsumerState<TransportationPage> {
   int _request = 0;
   Timer? _slowTimer;
   bool _slow = false;
+  bool get _hasFlightRoute =>
+      _origin.iata.isNotEmpty &&
+      _destination.iata.isNotEmpty &&
+      _origin.iata != _destination.iata;
   @override
   void dispose() {
     _slowTimer?.cancel();
@@ -126,7 +130,9 @@ class _TransportationPageState extends ConsumerState<TransportationPage> {
         DropdownMenuItem(
           value: d,
           child: Text(
-            '${d.name} (${_tab == 2 ? d.iata : d.station})',
+            (_tab == 2 ? d.iata : d.station).isEmpty
+                ? d.name
+                : '${d.name} (${_tab == 2 ? d.iata : d.station})',
             overflow: TextOverflow.ellipsis,
           ),
         ),
@@ -238,7 +244,8 @@ class _TransportationPageState extends ConsumerState<TransportationPage> {
 
   List<Widget> _trains() => [
     Text(
-      '${_origin.station} → ${_destination.station}',
+      '${_origin.station.isEmpty ? _origin.name : _origin.station} → '
+      '${_destination.station.isEmpty ? _destination.name : _destination.station}',
       style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
     ),
     const SizedBox(height: 12),
@@ -281,10 +288,17 @@ class _TransportationPageState extends ConsumerState<TransportationPage> {
       },
     ),
     FilledButton.icon(
-      onPressed: _loading ? null : _searchFlights,
+      onPressed: _loading || !_hasFlightRoute ? null : _searchFlights,
       icon: const Icon(Icons.search),
       label: Text(_loading ? 'Searching…' : 'Search flight prices'),
     ),
+    if (!_hasFlightRoute)
+      const Padding(
+        padding: EdgeInsets.symmetric(vertical: 12),
+        child: Text(
+          'Choose two different cities with confirmed airports. For this pilgrimage, arrange the nearest-airport transfer separately.',
+        ),
+      ),
     if (_loading)
       const Padding(
         padding: EdgeInsets.all(16),
@@ -331,12 +345,14 @@ class _TransportationPageState extends ConsumerState<TransportationPage> {
     ],
     const SizedBox(height: 12),
     OutlinedButton(
-      onPressed: () => _open(
-        Uri.https('www.google.com', '/travel/flights', {
-          'q':
-              'one way flights from ${_origin.iata} to ${_destination.iata} on ${_date.toIso8601String().split('T').first}',
-        }),
-      ),
+      onPressed: !_hasFlightRoute
+          ? null
+          : () => _open(
+              Uri.https('www.google.com', '/travel/flights', {
+                'q':
+                    'one way flights from ${_origin.iata} to ${_destination.iata} on ${_date.toIso8601String().split('T').first}',
+              }),
+            ),
       child: const Text('Check availability and book'),
     ),
   ];

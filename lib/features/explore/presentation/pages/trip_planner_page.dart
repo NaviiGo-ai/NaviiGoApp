@@ -13,7 +13,16 @@ import '../../../../core/motion/nav_motion.dart';
 import '../../../../core/widgets/journey_line.dart';
 import '../../../trips/data/trip_repository.dart';
 import '../../../trips/presentation/providers/trip_provider.dart';
-import '../../../trips/presentation/widgets/itinerary_overview_widgets.dart';
+import '../../../pilgrimage/domain/pilgrimage_pilot.dart';
+import '../widgets/discovery_widgets.dart';
+
+/// Only explicit pilot handoffs change purpose; normal planner defaults remain.
+bool isPilgrimagePlannerHandoff(Object? extra) {
+  if (extra is! Map || extra['purpose'] != 'spiritual') return false;
+  final destination = resolveTripPlannerDestination(extra);
+  return destination != null &&
+      findPilgrimageDestination(destination.id) != null;
+}
 
 MasterDestination? resolveTripPlannerDestination(Object? extra) {
   final requestedDestination = extra is Map ? extra['destination'] : extra;
@@ -219,6 +228,7 @@ class _TripPlannerPageState extends ConsumerState<TripPlannerPage>
       if (found != null) {
         setState(() {
           _selectedDestination = found;
+          if (isPilgrimagePlannerHandoff(extra)) _purpose = 'spiritual';
           _validationError = null;
         });
       } else if (requestedDestination != null) {
@@ -680,8 +690,9 @@ class _TripPlannerPageState extends ConsumerState<TripPlannerPage>
   // SCENE 01: WHERE?
   // ─────────────────────────────────────────────────────────
   Widget _buildWhereScene() {
+    // Reserve space for provider attribution without squeezing large text.
     final destinationCardHeight =
-        MediaQuery.of(context).textScaler.scale(1) > 1.5 ? 620.0 : 360.0;
+        MediaQuery.of(context).textScaler.scale(1) > 1.5 ? 644.0 : 384.0;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 22.0),
       child: SingleChildScrollView(
@@ -831,64 +842,71 @@ class _TripPlannerPageState extends ConsumerState<TripPlannerPage>
                       child: Stack(
                         fit: StackFit.expand,
                         children: [
-                          SafeExpeditionImage(
-                            imagePath: _selectedDestination!.image,
-                            fit: BoxFit.cover,
+                          DiscoveryImage(
+                            image: destinationImage(_selectedDestination!),
+                            label:
+                                '${_selectedDestination!.name}, ${_selectedDestination!.state}',
+                            height: destinationCardHeight,
+                            creditAtTop: true,
                           ),
-                          Container(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                                stops: const [0.0, 0.45, 1.0],
-                                colors: [
-                                  Colors.transparent,
-                                  Colors.black.withAlpha(60),
-                                  AppColors.brown.withAlpha(220),
+                          IgnorePointer(
+                            child: Container(
+                              margin: const EdgeInsets.only(top: 24),
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  stops: const [0.0, 0.45, 1.0],
+                                  colors: [
+                                    Colors.transparent,
+                                    Colors.black.withAlpha(60),
+                                    AppColors.brown.withAlpha(220),
+                                  ],
+                                ),
+                              ),
+                              padding: const EdgeInsets.all(22),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.cream,
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      '${_selectedDestination!.state.toUpperCase()} · ${_selectedDestination!.category.toUpperCase()}',
+                                      style: AppTypography.micro(
+                                        color: AppColors.brown,
+                                      ).copyWith(fontWeight: FontWeight.w800),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    _selectedDestination!.name,
+                                    style: AppTypography.epilogue.copyWith(
+                                      fontSize: 26,
+                                      fontWeight: FontWeight.w800,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    _selectedDestination!.description,
+                                    style: AppTypography.plusJakartaSans
+                                        .copyWith(
+                                          fontSize: 12,
+                                          color: AppColors.cream,
+                                        ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ],
                               ),
-                            ),
-                            padding: const EdgeInsets.all(22),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.cream,
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(
-                                    '${_selectedDestination!.state.toUpperCase()} · ${_selectedDestination!.category.toUpperCase()}',
-                                    style: AppTypography.micro(
-                                      color: AppColors.brown,
-                                    ).copyWith(fontWeight: FontWeight.w800),
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  _selectedDestination!.name,
-                                  style: AppTypography.epilogue.copyWith(
-                                    fontSize: 26,
-                                    fontWeight: FontWeight.w800,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  _selectedDestination!.description,
-                                  style: AppTypography.plusJakartaSans.copyWith(
-                                    fontSize: 12,
-                                    color: AppColors.cream,
-                                  ),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ],
                             ),
                           ),
                         ],
