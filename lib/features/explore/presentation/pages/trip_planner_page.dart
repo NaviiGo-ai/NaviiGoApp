@@ -14,6 +14,15 @@ import '../../../../core/widgets/journey_line.dart';
 import '../../../trips/data/trip_repository.dart';
 import '../../../trips/presentation/providers/trip_provider.dart';
 import '../../../trips/presentation/widgets/itinerary_overview_widgets.dart';
+import '../../../pilgrimage/domain/pilgrimage_pilot.dart';
+
+/// Only explicit pilot handoffs change purpose; normal planner defaults remain.
+bool isPilgrimagePlannerHandoff(Object? extra) {
+  if (extra is! Map || extra['purpose'] != 'spiritual') return false;
+  final destination = resolveTripPlannerDestination(extra);
+  return destination != null &&
+      findPilgrimageDestination(destination.id) != null;
+}
 
 MasterDestination? resolveTripPlannerDestination(Object? extra) {
   final requestedDestination = extra is Map ? extra['destination'] : extra;
@@ -219,6 +228,7 @@ class _TripPlannerPageState extends ConsumerState<TripPlannerPage>
       if (found != null) {
         setState(() {
           _selectedDestination = found;
+          if (isPilgrimagePlannerHandoff(extra)) _purpose = 'spiritual';
           _validationError = null;
         });
       } else if (requestedDestination != null) {
