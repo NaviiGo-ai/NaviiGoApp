@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../../core/auth/auth_provider.dart';
+import '../../../../core/network/api_provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../navigation/presentation/nav_hub_page.dart';
@@ -61,7 +64,7 @@ class HelpSupportPage extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  '24/7 intelligent assistance for routes, stays & travel safety.',
+                  'AI planning guidance. Human pilot support hours are still being confirmed. For urgent help, contact local emergency services.',
                   style: AppTypography.caption(color: Colors.white70),
                   textAlign: TextAlign.center,
                 ),
@@ -116,28 +119,28 @@ class HelpSupportPage extends StatelessWidget {
 
           _buildFaqItem(
             'How do I cancel my booking or stay?',
-            'You can review and manage your reservations directly from the Bookings tab. Tap any booking card to view cancellation terms or copy your offline voucher.',
+            'Review any recorded booking references in Bookings & Vouchers. Confirm changes, cancellation terms and refunds directly with the provider that accepted your booking. A generated itinerary is not a reservation.',
           ),
           const SizedBox(height: 10),
           _buildFaqItem(
             'Can I access itineraries and routes offline?',
-            'Yes! All saved itineraries and digital passport stamps are automatically cached locally via offline storage. You can access your full journey without cellular data.',
+            'Previously loaded saved itineraries may remain available on this device. Open your plan before departure. New photos, maps, AI guidance, live updates and server changes need a connection; keep important confirmations separately.',
           ),
           const SizedBox(height: 10),
           _buildFaqItem(
-            'How does Buddy Tracking work?',
-            'Buddy Tracking allows you to temporarily share your active waypoint and coordinates with trusted contacts during live journeys. You can toggle this on or off at any moment in the Live Companion screen.',
+            'Can someone monitor my journey?',
+            'NaviiGo does not currently provide a monitored safety service. Agree on check-ins with your trusted contacts using your usual communication app. Do not rely on NaviiGo for emergency response.',
           ),
           const SizedBox(height: 10),
           _buildFaqItem(
             'What is the Digital Passport?',
-            'Your Digital Passport is an authoritative ledger of all milestones, heritage stops, and cultural achievements you earn as you explore India.',
+            'Your Digital Passport brings together saved places and recorded journey milestones. Planning a visit does not confirm that you completed it.',
           ),
 
           const SizedBox(height: 36),
           Center(
             child: Text(
-              'Still need custom concierge support?',
+              'Contact the team · response times are not guaranteed',
               style: AppTypography.caption(color: AppColors.textSecondary),
             ),
           ),
@@ -147,7 +150,7 @@ class HelpSupportPage extends StatelessWidget {
               onTap: () async {
                 NavHaptics.fire(NavHaptic.light);
                 final uri = Uri.parse(
-                  'mailto:support@naviigo.com?subject=NaviiGo%20Concierge%20Inquiry',
+                  'mailto:NaviiGo24@gmail.com?subject=NaviiGo%20Pilot%20Inquiry',
                 );
                 if (await canLaunchUrl(uri)) {
                   await launchUrl(uri);
@@ -155,7 +158,7 @@ class HelpSupportPage extends StatelessWidget {
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                        content: Text('Support email: support@naviigo.com'),
+                        content: Text('Contact email: NaviiGo24@gmail.com'),
                       ),
                     );
                   }
@@ -168,7 +171,7 @@ class HelpSupportPage extends StatelessWidget {
                   vertical: 6,
                 ),
                 child: Text(
-                  'support@naviigo.com',
+                  'NaviiGo24@gmail.com',
                   style: AppTypography.bodyMedium(color: AppColors.primary)
                       .copyWith(
                         fontWeight: FontWeight.bold,
@@ -228,20 +231,24 @@ class HelpSupportPage extends StatelessWidget {
   }
 }
 
-class _SupportChatSheet extends StatefulWidget {
+class _SupportChatSheet extends ConsumerStatefulWidget {
   @override
-  State<_SupportChatSheet> createState() => _SupportChatSheetState();
+  ConsumerState<_SupportChatSheet> createState() => _SupportChatSheetState();
 }
 
-class _SupportChatSheetState extends State<_SupportChatSheet> {
+class _SupportChatSheetState extends ConsumerState<_SupportChatSheet> {
   final TextEditingController _messageController = TextEditingController();
   final List<Map<String, String>> _messages = [
     {
       'role': 'assistant',
       'text':
-          'Namaste! I am your NaviiGo Concierge. How may I assist your journey across India today?',
+          'Namaste! I can help with travel planning. I am an AI assistant, not a human dispatcher. Check current access, prices and bookings with official sources. Avoid sharing private documents or payment details here.',
     },
   ];
+  bool _sending = false;
+  String? _error;
+  String? _failedMessage;
+  int _generation = 0;
 
   @override
   void dispose() {
@@ -249,31 +256,94 @@ class _SupportChatSheetState extends State<_SupportChatSheet> {
     super.dispose();
   }
 
-  void _sendMessage([String? preset]) {
+  Future<void> _sendMessage([String? preset, bool retry = false]) async {
+    if (_sending) return;
     final text = preset ?? _messageController.text.trim();
     if (text.isEmpty) return;
-
+    final owner = ref.read(currentUserProvider)?.uid;
+    final generation = ++_generation;
+    final history = _messages.where((m) => m['role'] != 'error').toList();
+    if (retry && history.isNotEmpty && history.last['role'] == 'user') {
+      history.removeLast();
+    }
     setState(() {
-      _messages.add({'role': 'user', 'text': text});
+      if (!retry) _messages.add({'role': 'user', 'text': text});
       if (preset == null) _messageController.clear();
+      _sending = true;
+      _error = null;
+      _failedMessage = null;
     });
-
-    Future.delayed(const Duration(milliseconds: 600), () {
-      if (!mounted) return;
+    try {
+      final response = await ref
+          .read(apiClientProvider)
+          .post(
+            '/api/chat/',
+            requiresAuth: false,
+            timeout: const Duration(seconds: 45),
+            body: {
+              'message': text,
+              'context': history
+                  .skip(history.length > 5 ? history.length - 5 : 0)
+                  .map(
+                    (m) => {
+                      'sender': m['role'] == 'assistant' ? 'ai' : 'user',
+                      'text': m['text'],
+                    },
+                  )
+                  .toList(),
+            },
+          );
+      if (!mounted ||
+          generation != _generation ||
+          owner != ref.read(currentUserProvider)?.uid) {
+        return;
+      }
+      final reply = response is Map ? response['reply'] : null;
+      if (reply is! String ||
+          reply.trim().isEmpty ||
+          reply.contains('AI Chat is in demo mode')) {
+        throw const FormatException('No live reply');
+      }
       setState(() {
-        _messages.add({
-          'role': 'assistant',
-          'text':
-              'Thank you for reaching out regarding "$text". Our 24/7 concierge team is monitoring your query, and automated travel recommendations are being synchronized to your profile.',
-        });
+        _messages.add({'role': 'assistant', 'text': reply.trim()});
       });
-    });
+    } catch (_) {
+      if (!mounted ||
+          generation != _generation ||
+          owner != ref.read(currentUserProvider)?.uid) {
+        return;
+      }
+      setState(() {
+        _error =
+            'AI guidance is unavailable. Retry, or contact the team by email. No support request has been filed.';
+        _failedMessage = text;
+      });
+    } finally {
+      if (mounted && generation == _generation) {
+        setState(() => _sending = false);
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(currentUserProvider, (previous, next) {
+      if (previous?.uid == next?.uid) return;
+      setState(() {
+        _generation++;
+        _messages.removeRange(1, _messages.length);
+        _messageController.clear();
+        _sending = false;
+        _error = null;
+        _failedMessage = null;
+      });
+    });
     return Container(
-      height: MediaQuery.of(context).size.height * 0.75,
+      height:
+          (MediaQuery.sizeOf(context).height -
+              MediaQuery.viewInsetsOf(context).bottom) *
+          0.85,
+      margin: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       decoration: const BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -305,7 +375,9 @@ class _SupportChatSheetState extends State<_SupportChatSheet> {
                         style: AppTypography.tripTitle(color: AppColors.brown),
                       ),
                       Text(
-                        'Online • Instant Responses',
+                        _sending
+                            ? 'Requesting AI guidance…'
+                            : 'AI guidance · not monitored support',
                         style: AppTypography.micro(color: AppColors.teal),
                       ),
                     ],
@@ -316,11 +388,32 @@ class _SupportChatSheetState extends State<_SupportChatSheet> {
                     Icons.close_rounded,
                     color: AppColors.textSecondary,
                   ),
+                  tooltip: 'Close AI guidance',
                   onPressed: () => Navigator.pop(context),
                 ),
               ],
             ),
           ),
+          if (_error != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Column(
+                children: [
+                  Text(
+                    _error!,
+                    style: AppTypography.caption(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: _sending
+                        ? null
+                        : () => _sendMessage(_failedMessage, true),
+                    child: const Text('Retry AI reply'),
+                  ),
+                ],
+              ),
+            ),
           Expanded(
             child: ListView.builder(
               padding: const EdgeInsets.all(16),
@@ -373,16 +466,13 @@ class _SupportChatSheetState extends State<_SupportChatSheet> {
             ),
           ),
           Padding(
-            padding: EdgeInsets.fromLTRB(
-              16,
-              8,
-              16,
-              MediaQuery.of(context).viewInsets.bottom + 16,
-            ),
+            padding: EdgeInsets.fromLTRB(16, 8, 16, 16),
             child: Row(
               children: [
                 Expanded(
                   child: TextField(
+                    maxLength: 4000,
+                    enabled: !_sending,
                     controller: _messageController,
                     decoration: InputDecoration(
                       hintText: 'Type your inquiry...',
@@ -413,7 +503,8 @@ class _SupportChatSheetState extends State<_SupportChatSheet> {
                   style: IconButton.styleFrom(
                     backgroundColor: AppColors.primary,
                   ),
-                  onPressed: () => _sendMessage(),
+                  tooltip: 'Send message',
+                  onPressed: _sending ? null : () => _sendMessage(),
                 ),
               ],
             ),
@@ -429,7 +520,7 @@ class _SupportChatSheetState extends State<_SupportChatSheet> {
       backgroundColor: AppColors.cream,
       side: BorderSide.none,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      onPressed: () => _sendMessage(text),
+      onPressed: _sending ? null : () => _sendMessage(text),
     );
   }
 }

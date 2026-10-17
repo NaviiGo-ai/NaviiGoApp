@@ -160,14 +160,14 @@ class _GeneratedItineraryPageState
                             Clipboard.setData(
                               ClipboardData(
                                 text:
-                                    'https://naviigo.com/itinerary/${trip.uuid}',
+                                    'https://www.naviigo.in/itinerary/${trip.uuid}',
                               ),
                             );
                             NavHaptics.fire(NavHaptic.light);
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text(
-                                  'Itinerary link copied: https://naviigo.com/itinerary/${trip.uuid}',
+                                  'Itinerary link copied: https://www.naviigo.in/itinerary/${trip.uuid}',
                                 ),
                                 backgroundColor: AppColors.teal,
                                 behavior: SnackBarBehavior.floating,
@@ -182,27 +182,34 @@ class _GeneratedItineraryPageState
               background: Stack(
                 fit: StackFit.expand,
                 children: [
-                  DiscoveryImage(
-                    image: approvedDestinationImage(
-                      destinationId: trip.destId,
-                      image: trip.heroImage,
+                  Padding(
+                    padding: EdgeInsets.only(
+                      top: kToolbarHeight + MediaQuery.paddingOf(context).top,
                     ),
-                    label: trip.destName,
-                    height: 290,
-                    creditAtTop: true,
+                    child: DiscoveryImage(
+                      image: approvedDestinationImage(
+                        destinationId: trip.destId,
+                        image: trip.heroImage,
+                      ),
+                      label: trip.destName,
+                      height: 290,
+                      creditAtTop: true,
+                    ),
                   ),
-                  Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.black.withAlpha(115),
-                          Colors.transparent,
-                          AppColors.background.withAlpha(128),
-                          AppColors.background,
-                        ],
-                        stops: const [0.0, 0.35, 0.78, 1.0],
+                  IgnorePointer(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.black.withAlpha(115),
+                            Colors.transparent,
+                            AppColors.background.withAlpha(128),
+                            AppColors.background,
+                          ],
+                          stops: const [0.0, 0.35, 0.78, 1.0],
+                        ),
                       ),
                     ),
                   ),
@@ -311,6 +318,15 @@ class _GeneratedItineraryPageState
             ),
           ),
           SliverToBoxAdapter(child: ItineraryStatsRow(trip: trip)),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+              child: Text(
+                'Suggested plan · not bookings. Times and travel durations are estimates. Confirm visiting access, stays and meals with official sources or the provider before setting out.',
+                style: AppTypography.caption(color: AppColors.textSecondary),
+              ),
+            ),
+          ),
           SliverToBoxAdapter(
             child: ExpeditionRouteMapCard(
               trip: trip,
