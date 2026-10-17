@@ -53,11 +53,16 @@ https://creativecommons.org/licenses/by/4.0/ . Varanasi uses its existing regist
 ## Release validation
 
 - Flutter analyzer: no issues.
-- Full Flutter suite: 308 tests passed, including six new pilot regressions.
+- Full Flutter suite: 309 tests passed, including seven new pilot regressions.
 - Production web build: passed with bundled web resources.
 - Real signed-in browser: existing upcoming Jaipur trip retained; app pilot hub
   and Ujjain preparation page checked at phone width. This is not a native-device
   or an operational-support acceptance test.
 - Missing airport codes disable flight search and booking actions; existing
   connected-flight cold-start regression still passes.
+- The planner uses the existing Places photo loader for cities without approved
+  bundled photos. Attribution stays visible and tappable above the image overlay;
+  provider failures retain the existing neutral fallback and retry control.
+- The deployed photo service returned a Google Maps image and attribution for
+  Ujjain. The signed-in browser confirmed the Ujjain and spiritual-purpose prefill.
 - Whitespace check: passed. Existing destination ordering remains intact.

@@ -3,13 +3,57 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:naviigo_app/core/constants/master_destinations.dart';
+import 'package:naviigo_app/core/auth/auth_provider.dart';
 import 'package:naviigo_app/core/theme/app_theme.dart';
 import 'package:naviigo_app/features/explore/presentation/pages/trip_planner_page.dart';
 import 'package:naviigo_app/features/explore/presentation/pages/transportation_page.dart';
 import 'package:naviigo_app/features/pilgrimage/domain/pilgrimage_pilot.dart';
 import 'package:naviigo_app/features/pilgrimage/presentation/pilgrimage_page.dart';
+import 'package:naviigo_app/features/explore/presentation/widgets/discovery_widgets.dart';
 
 void main() {
+  testWidgets(
+    'planner requests the selected city photo and keeps credits accessible',
+    (tester) async {
+      String? photoQuery;
+      final router = GoRouter(
+        initialLocation: '/planner',
+        initialExtra: pilgrimageDestinations.first.plannerArguments,
+        routes: [
+          GoRoute(path: '/planner', builder: (_, _) => const TripPlannerPage()),
+        ],
+      );
+      addTearDown(router.dispose);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            currentUserProvider.overrideWithValue(null),
+            destinationPhotoProvider.overrideWith((ref, label) async {
+              photoQuery = label;
+              return <String, dynamic>{
+                'image': 'https://example.com/ujjain.jpg',
+                'credit': 'Test photographer',
+                'source': 'Google Maps',
+                'sourceUrl': 'https://maps.google.com/',
+              };
+            }),
+          ],
+          child: MaterialApp.router(
+            theme: AppTheme.lightTheme(),
+            routerConfig: router,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(photoQuery, 'Ujjain, Madhya Pradesh');
+      expect(find.text('Test photographer · Google Maps'), findsOneWidget);
+      await tester.tap(find.byIcon(Icons.info_outline));
+      await tester.pumpAndSettle();
+      expect(find.text('Photo credits'), findsOneWidget);
+      expect(find.text('View source'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
   testWidgets(
     'a pilot city without an airport cannot open an unscoped flight search',
     (tester) async {
