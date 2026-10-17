@@ -14,121 +14,126 @@ import '../../../navigation/presentation/nav_hub_page.dart';
 /// ─────────────────────────────────────────────────────────
 class HomeJournalHeader extends ConsumerWidget {
   const HomeJournalHeader({super.key});
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final userAsync = ref.watch(userProfileStreamProvider);
-    final String initial =
-        (userAsync.valueOrNull?.displayName?.isNotEmpty ?? false)
-        ? userAsync.valueOrNull!.displayName![0].toUpperCase()
+    final user = ref.watch(userProfileStreamProvider).valueOrNull;
+    final initial = (user?.displayName?.isNotEmpty ?? false)
+        ? user!.displayName![0].toUpperCase()
         : 'N';
-
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 10, 16, 6),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          // Left: Navigation drawer + Brand mark + Editorial wordmark
-          Row(
-            mainAxisSize: MainAxisSize.min,
+      padding: const EdgeInsets.fromLTRB(12, 4, 14, 4),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact =
+              constraints.maxWidth < 420 ||
+              MediaQuery.textScalerOf(context).scale(1) > 1.3;
+          return Row(
             children: [
-              const NavHubLeading(iconColor: AppColors.textPrimary),
-              Image.asset(
-                'assets/brand/naviigo-mark-primary.png',
-                width: 26,
-                height: 26,
-                fit: BoxFit.contain,
-                errorBuilder: (_, __, ___) => const SizedBox(width: 26),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'NAVIIGO',
-                style: AppTypography.epilogue.copyWith(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 2.4,
-                  color: AppColors.brown,
+              Expanded(
+                child: Row(
+                  children: [
+                    const NavHubLeading(iconColor: AppColors.textPrimary),
+                    Image.asset(
+                      'assets/brand/naviigo-mark-primary.png',
+                      width: 26,
+                      height: 26,
+                      errorBuilder: (_, _, _) =>
+                          const Icon(Icons.explore_outlined, size: 26),
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: MediaQuery.withClampedTextScaling(
+                        maxScaleFactor: 1.3,
+                        child: Text(
+                          'NAVIIGO',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTypography.epilogue.copyWith(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.4,
+                            color: AppColors.brown,
+                          ),
+                        ),
+                      ),
+                    ),
+                    if (!compact) ...[
+                      const SizedBox(width: 10),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.cream,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          'JOURNAL',
+                          style: AppTypography.plusJakartaSans.copyWith(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.brown,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: AppColors.cream,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  'JOURNAL',
-                  style: AppTypography.plusJakartaSans.copyWith(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.0,
-                    color: AppColors.brown,
-                  ),
-                ),
-              ),
-            ],
-          ),
-
-          // Right: Action controls (Search, Saved, Profile avatar)
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
               IconButton(
-                icon: const Icon(
-                  Icons.search_rounded,
-                  color: AppColors.textPrimary,
-                  size: 22,
-                ),
-                tooltip: 'Search destinations',
-                visualDensity: VisualDensity.compact,
-                onPressed: () => context.push('/explore-discover'),
-              ),
-              IconButton(
-                icon: const Icon(
-                  Icons.bookmark_border_rounded,
-                  color: AppColors.textPrimary,
-                  size: 22,
-                ),
                 tooltip: 'Saved places',
-                visualDensity: VisualDensity.compact,
                 onPressed: () => context.push('/saved-places'),
+                icon: const Icon(Icons.bookmark_border_rounded),
               ),
-              const SizedBox(width: 4),
-              InkWell(
-                onTap: () => context.push('/profile'),
-                borderRadius: BorderRadius.circular(18),
-                child: Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceWarm,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: AppColors.primary, width: 1.5),
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    initial,
-                    style: AppTypography.plusJakartaSans.copyWith(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.brown,
+              Semantics(
+                container: true,
+                excludeSemantics: true,
+                button: true,
+                label: 'Travel profile',
+                child: InkWell(
+                  onTap: () => context.push('/profile'),
+                  borderRadius: BorderRadius.circular(24),
+                  child: SizedBox(
+                    width: 44,
+                    height: 44,
+                    child: Center(
+                      child: Container(
+                        width: 32,
+                        height: 32,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceWarm,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: AppColors.primary,
+                            width: 1.5,
+                          ),
+                        ),
+                        child: MediaQuery.withClampedTextScaling(
+                          maxScaleFactor: 1.3,
+                          child: Text(
+                            initial,
+                            style: AppTypography.plusJakartaSans.copyWith(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.brown,
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ),
               ),
             ],
-          ),
-        ],
+          );
+        },
       ),
     );
   }
 }
 
-/// ─────────────────────────────────────────────────────────
-/// 2. ASYMMETRIC EDITORIAL MASTHEAD
-/// ─────────────────────────────────────────────────────────
 class HomeEditorialMasthead extends StatelessWidget {
   final TripItineraryModel? activeTrip;
   final TripItineraryModel? upcomingTrip;
