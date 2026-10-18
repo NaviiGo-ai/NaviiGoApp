@@ -8,6 +8,7 @@ import 'package:naviigo_app/core/auth/auth_provider.dart';
 import 'package:naviigo_app/core/auth/auth_repository.dart';
 import 'package:naviigo_app/features/trips/domain/models/trip_itinerary_model.dart';
 import 'package:naviigo_app/features/trips/presentation/pages/generated_itinerary_page.dart';
+import 'package:naviigo_app/features/explore/presentation/widgets/discovery_widgets.dart';
 
 class _User extends Fake implements User {
   _User(this.uid);
@@ -64,6 +65,37 @@ TripItineraryModel _tripWithPlans(
 }
 
 void main() {
+  testWidgets(
+    'itinerary photo credits stay tappable above decorative overlays',
+    (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            currentUserProvider.overrideWithValue(_User('uid-a')),
+            destinationPhotoProvider.overrideWith(
+              (ref, label) async => {
+                'image': 'https://example.com/photo.jpg',
+                'credit': 'Provider photographer',
+                'source': 'Google Maps',
+                'sourceUrl': 'https://maps.google.com/',
+              },
+            ),
+          ],
+          child: MaterialApp(
+            home: GeneratedItineraryPage(
+              trip: _trip(destination: 'Ujjain', userId: 'uid-a'),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Provider photographer · Google Maps'));
+      await tester.pumpAndSettle();
+      expect(find.text('Photo credits'), findsOneWidget);
+      expect(find.text('View source'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
   testWidgets('ownerless explicit result fails closed', (tester) async {
     await tester.pumpWidget(
       ProviderScope(
@@ -254,6 +286,8 @@ void main() {
             child: MaterialApp(home: GeneratedItineraryPage(trip: trip)),
           ),
         );
+        await tester.pumpAndSettle();
+        await tester.drag(find.byType(CustomScrollView), const Offset(0, -160));
         await tester.pumpAndSettle();
       }
 
